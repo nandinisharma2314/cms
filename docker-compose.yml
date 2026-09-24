@@ -1,0 +1,64 @@
+
+services:
+  # MySQL Database Service
+  mysql_db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_here
+      MYSQL_DATABASE: cms
+      MYSQL_USER: devuser
+      MYSQL_PASSWORD: NewPassword123!
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # Python FastAPI Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mysql_db
+
+  # Next.js Frontend Service (Admin Panel)
+  admin-panel:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:5000 
+    volumes:
+      - ./admin-panel:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  # Next.js Frontend Service (End User Portal)
+  end-user:
+    build:
+      context: ./end-user
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:5000 
+    volumes:
+      # Sync local files into the container so 'npm run dev' hot-reloads
+      - ./end-user:/app
+      # Keep the container's node_modules separate from the host machine
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:

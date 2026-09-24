@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071126"/><stop offset="1" stop-color="#1d2b50"/></linearGradient>
+    <linearGradient id="accent" x1="0" x2="1"><stop stop-color="#ff6b22"/><stop offset="1" stop-color="#ffb15c"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="18" flood-opacity=".28"/></filter>
+  </defs>
+  <rect width="1600" height="600" fill="url(#bg)"/>
+  <circle cx="250" cy="90" r="260" fill="#ff6b22" opacity=".08"/>
+  <circle cx="1400" cy="520" r="300" fill="#5b7cff" opacity=".08"/>
+  <g opacity=".1" stroke="#fff"><path d="M0 100h1600M0 200h1600M0 300h1600M0 400h1600M0 500h1600"/><path d="M200 0v600M400 0v600M600 0v600M800 0v600M1000 0v600M1200 0v600M1400 0v600"/></g>
+  <g transform="translate(110 105)" filter="url(#shadow)">
+    <rect width="770" height="390" rx="30" fill="#f8fafc"/>
+    <rect width="770" height="64" rx="30" fill="#0a1128"/>
+    <text x="35" y="42" font-family="Arial,sans-serif" font-size="17" font-weight="800" fill="#fff">BUSINESS INSIGHTS</text>
+    <rect x="35" y="95" width="215" height="125" rx="20" fill="#fff" stroke="#dbe4f0"/>
+    <text x="58" y="128" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#64748b">TODAY'S REVENUE</text>
+    <text x="58" y="171" font-family="Arial,sans-serif" font-size="30" font-weight="900" fill="#0a1128">₹14,875</text>
+    <text x="58" y="198" font-family="Arial,sans-serif" font-size="13" font-weight="800" fill="#ff6b22">+12% TODAY</text>
+    <rect x="270" y="95" width="215" height="125" rx="20" fill="#0a1128"/>
+    <text x="293" y="128" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#94a3b8">AVG TURN TIME</text>
+    <text x="293" y="171" font-family="Arial,sans-serif" font-size="30" font-weight="900" fill="#fff">45m 12s</text>
+    <text x="293" y="198" font-family="Arial,sans-serif" font-size="13" fill="#cbd5e1">LIVE OPERATIONAL DATA</text>
+    <rect x="505" y="95" width="230" height="125" rx="20" fill="#fff" stroke="#dbe4f0"/>
+    <text x="528" y="128" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#64748b">BESTSELLER</text>
+    <text x="528" y="166" font-family="Arial,sans-serif" font-size="20" font-weight="900" fill="#0a1128">Wagyu Burger</text>
+    <text x="528" y="195" font-family="Arial,sans-serif" font-size="13" fill="#64748b">68 orders · highest margin</text>
+    <rect x="35" y="245" width="700" height="110" rx="20" fill="#eef3fb"/>
+    <text x="58" y="277" font-family="Arial,sans-serif" font-size="13" font-weight="800" fill="#64748b">REVENUE TREND</text>
+    <polyline points="60,330 135,315 205,320 280,292 350,302 425,270 495,278 570,245 650,258 710,225" fill="none" stroke="url(#accent)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="710" cy="225" r="8" fill="#ff8a3d"/>
+  </g>
+  <g transform="translate(955 120)">
+    <text x="0" y="50" font-family="Arial,sans-serif" font-size="48" font-weight="900" fill="#fff">Know your</text>
+    <text x="0" y="106" font-family="Arial,sans-serif" font-size="48" font-weight="900" fill="#ff8a3d">restaurant.</text>
+    <text x="0" y="153" font-family="Arial,sans-serif" font-size="19" fill="#cbd5e1">Turn live operational data into decisions</text>
+    <text x="0" y="181" font-family="Arial,sans-serif" font-size="19" fill="#cbd5e1">that improve speed, margins and service.</text>
+    <g transform="translate(0 225)">
+      <rect width="185" height="92" rx="20" fill="#fff" opacity=".08" stroke="#fff" stroke-opacity=".14"/>
+      <text x="22" y="36" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#94a3b8">LIVE</text>
+      <text x="22" y="68" font-family="Arial,sans-serif" font-size="22" font-weight="800" fill="#fff">Analytics</text>
+      <rect x="205" width="185" height="92" rx="20" fill="url(#accent)"/>
+      <text x="227" y="36" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#fff" opacity=".8">ACTIONABLE</text>
+      <text x="227" y="68" font-family="Arial,sans-serif" font-size="22" font-weight="800" fill="#fff">Insights</text>
+    </g>
+  </g>
+</svg>
