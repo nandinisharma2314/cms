@@ -126,8 +126,8 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8">
-      <div className="max-w-3xl mx-auto flex flex-col gap-6 pb-24">
+    <div className="flex-1 overflow-y-auto bg-slate-50 p-2 md:p-4">
+      <div className="max-w-3xl mx-auto flex flex-col gap-2 pb-24">
         {/* Top Back Link */}
         <div className="flex items-center justify-between">
           <button
@@ -149,11 +149,8 @@ export default function NotificationsPage() {
         {/* Card Container */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
           {/* Header */}
-          <div className="p-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/20">
+          <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/20">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30">
-                <Bell size={22} />
-              </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-slate-900">Live Notifications</h1>
