@@ -10,6 +10,9 @@ class User(Base):
     mobile = Column(String(20), unique=True, index=True, nullable=True)
     email = Column(String(120), unique=True, index=True, nullable=True)
     name = Column(String(100), nullable=True)
+    dob = Column(String(20), nullable=True)
+    gender = Column(String(20), nullable=True)
+    address = Column(String(500), nullable=True)
     role = Column(String(50), default='citizen')
 
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
@@ -82,3 +85,33 @@ class ComplaintAttachment(Base):
     file_name = Column(String(200))
 
     complaint = relationship("Complaint", back_populates="attachments")
+
+class Notification(Base):
+    __tablename__ = 'notifications'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    title = Column(String(200), nullable=False)
+    message = Column(String(500), nullable=False)
+    type = Column(String(50), default='complaint_update') # complaint_update, civic_alert, assignment, resolution
+    complaint_id = Column(String(50), nullable=True)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Notification {self.title}>'
+
+class Activity(Base):
+    __tablename__ = 'activities'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(String(500), nullable=False)
+    type = Column(String(50), default='forwarded') # forwarded, assigned, in_progress, resolved, announcement
+    complaint_id = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Activity {self.title}>'
+

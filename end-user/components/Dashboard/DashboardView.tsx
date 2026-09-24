@@ -25,6 +25,7 @@ export function DashboardView() {
  const [selectedStatusFilter, setSelectedStatusFilter] =
  useState<string>("all");
  const [activeToast, setActiveToast] = useState<string>("");
+  const [userName, setUserName] = useState<string>("User");
 
  const [complaintsList, setComplaintsList] = useState<any[]>(sampleComplaints);
  const [stats, setStats] = useState({
@@ -42,9 +43,10 @@ export function DashboardView() {
  useEffect(() => {
  const fetchData = async () => {
  try {
- const [complaintsRes, statsRes] = await Promise.all([
+ const [complaintsRes, statsRes, profileRes] = await Promise.all([
  apis.complaints.getComplaints(),
  apis.complaints.getDashboardStats(),
+          apis.profile.getProfile().catch(() => null),
  ]);
 
  if (Array.isArray(complaintsRes)) {
@@ -64,7 +66,11 @@ export function DashboardView() {
  setComplaintsList(formatted);
  }
 
- if (statsRes && statsRes.total !== undefined) {
+ if (profileRes && profileRes.success && profileRes.user?.name) {
+          setUserName(profileRes.user.name);
+        }
+
+        if (statsRes && statsRes.total !== undefined) {
  setStats({
  total: statsRes.total,
  open: statsRes.total - statsRes.in_progress - statsRes.resolved,
@@ -117,7 +123,7 @@ export function DashboardView() {
  <TopHeader
  searchQuery={searchQuery}
  onSearchChange={setSearchQuery}
- userName="Rahul Sharma"
+ userName={userName}
  onNotificationClick={() =>
  triggerToast("You have 3 unread notifications")
  }
@@ -125,11 +131,12 @@ export function DashboardView() {
  />
 
  {/* Scrollable Body Content */}
- <div className="flex-1 overflow-y-auto pb-8">
+ <div className="flex-1 overflow-y-auto pb-28 md:pb-8">
  <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-6">
  {/* Hero Call-to-Action Banner */}
  <HeroBanner
  onRegisterClick={() => router.push("/dashboard/register")}
+          userName={userName}
  />
 
  {/* Mobile Only: 4 Quick Actions Grid */}
@@ -194,7 +201,7 @@ export function DashboardView() {
  {/* Mobile Card List */}
  <div className="block lg:hidden">
  <RecentComplaintsList
- complaints={filteredComplaints}
+ complaints={filteredComplaints.slice(0, 5)}
  onViewAll={() => {
  setSelectedStatusFilter("all");
  setSearchQuery("");

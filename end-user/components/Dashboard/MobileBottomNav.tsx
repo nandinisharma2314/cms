@@ -60,12 +60,12 @@ const MobileBottomNav = ({
 
  {/* Center FAB */}
  <div className="absolute left-1/2 -top-5 -translate-x-1/2">
- <button
- onClick={onCenterAction}
- className="bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 flex items-center justify-center shadow-lg shadow-blue-600/30 transition-transform active:scale-95"
+ <Link
+ href="/dashboard/complaints/new"
+ className="bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/30 transition-transform active:scale-95"
  >
  <Plus size={28} />
- </button>
+ </Link>
  </div>
 
  {/* Right Items */}

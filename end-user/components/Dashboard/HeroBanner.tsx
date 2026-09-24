@@ -5,11 +5,12 @@ import { MegaphoneArtwork } from"./MegaphoneArtwork";
 
 interface HeroBannerProps {
  onRegisterClick?: () => void;
+  userName?: string;
 }
 
-export function HeroBanner({ onRegisterClick }: HeroBannerProps) {
+export function HeroBanner({ onRegisterClick, userName = "User" }: HeroBannerProps) {
  return (
- <section className="relative w-full bg-gradient-to-r from-[#4F39F6] via-[#5b40f6] to-[#7851f5] overflow-hidden shadow-lg flex flex-col md:flex-row items-center justify-between px-8 md:px-12 py-10 md:py-12 min-h-[220px]">
+ <section className="relative w-full bg-gradient-to-r from-[#4F39F6] via-[#5b40f6] to-[#7851f5] overflow-hidden shadow-lg flex flex-col md:flex-row items-center justify-between px-6 md:px-12 py-6 md:py-12 min-h-[150px] md:min-h-[220px]">
  {/* Background Ambience / Glow circles */}
  <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
  <div className="absolute -top-[20%] -left-[5%] w-[400px] h-[400px] bg-white/10 blur-3xl" />
@@ -20,7 +21,7 @@ export function HeroBanner({ onRegisterClick }: HeroBannerProps) {
  <div className="relative z-10 flex flex-col items-start gap-2 text-white max-w-lg w-full">
  <span className="text-sm font-medium text-white/90">Good Morning,</span>
  <h2 className="text-3xl md:text-4xl font-extrabold leading-tight tracking-tight mb-1">
- Rahul Sharma{""}
+ {userName}{""}
  <span role="img" aria-label="waving hand">
  👋
  </span>

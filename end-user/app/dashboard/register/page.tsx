@@ -114,49 +114,95 @@ export default function RegisterComplaintPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const canNavigateToStep = (targetStep: number) => {
+    if (step === 4) return false;
+    if (targetStep === step) return true;
+    if (targetStep < step) return true;
+    if (targetStep === 2) {
+      return !!(formData.department && formData.category && formData.title.trim() && formData.description.trim());
+    }
+    if (targetStep === 3) {
+      return !!(
+        formData.department &&
+        formData.category &&
+        formData.title.trim() &&
+        formData.description.trim() &&
+        formData.country &&
+        formData.state &&
+        formData.district &&
+        formData.city &&
+        formData.area
+      );
+    }
+    return false;
+  };
+
+  const handleStepClick = (targetStep: number) => {
+    if (canNavigateToStep(targetStep)) {
+      setError("");
+      setStep(targetStep);
+    }
+  };
+
   const handleNext = () => {
+    setError("");
     if (step === 1) {
-      if (!formData.department || !formData.category || !formData.title.trim() || !formData.description.trim()) {
-        setError("Please fill in all required details in the form.");
+      if (!formData.department) {
+        setError("Please select a department.");
         return;
       }
+      if (!formData.category) {
+        setError("Please select a category.");
+        return;
+      }
+      if (!formData.title.trim()) {
+        setError("Please enter a complaint title.");
+        return;
+      }
+      if (!formData.description.trim()) {
+        setError("Please enter a complaint description.");
+        return;
+      }
+      setStep(2);
+      return;
     }
+
     if (step === 2) {
       if (!formData.country || !formData.state || !formData.district || !formData.city || !formData.area) {
         setError("Please fill in all location fields.");
         return;
       }
+      setStep(3);
+      return;
     }
-    setError("");
-    setStep((prev) => prev + 1);
   };
 
   const handlePrev = () => {
     setError("");
-    setStep((prev) => prev - 1);
+    setStep((prev) => Math.max(1, prev - 1));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) e.preventDefault();
     
-    if (step !== 3) {
-      handleNext();
+    // Strict guard: submission ONLY happens from step 3 (Review step)
+    if (step !== 3 || loading) {
+      return;
+    }
+
+    if (!formData.department || !formData.category || !formData.title.trim() || !formData.description.trim()) {
+      setError("Please fill in all required complaint details.");
+      setStep(1);
+      return;
+    }
+    if (!formData.country || !formData.state || !formData.district || !formData.city || !formData.area) {
+      setError("Please fill in all required location fields.");
+      setStep(2);
       return;
     }
 
     setLoading(true);
     setError("");
-
-    if (!formData.department || !formData.category || !formData.title.trim() || !formData.description.trim()) {
-      setError("Please fill in all required details in the form.");
-      setLoading(false);
-      return;
-    }
-    if (!formData.country || !formData.state || !formData.district || !formData.city || !formData.area) {
-      setError("Please fill in all location fields.");
-      setLoading(false);
-      return;
-    }
 
     try {
       const data = new FormData();
@@ -173,11 +219,11 @@ export default function RegisterComplaintPage() {
       });
 
       const response = await apis.complaints.registerComplaint(data);
-      if (response.success) {
+      if (response && response.success) {
         setComplaintId(response.complaint_id);
         setStep(4);
       } else {
-        setError(response.message || "Failed to submit complaint");
+        setError(response?.message || "Failed to submit complaint. Please try again.");
       }
     } catch (err: any) {
       console.error(err);
@@ -188,13 +234,13 @@ export default function RegisterComplaintPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-80px)] overflow-y-auto bg-[#f4f7fe] flex flex-col font-sans relative pt-2 md:pb-2">
+    <div className="h-[calc(100vh-80px)] overflow-y-auto lg:overflow-hidden bg-[#f4f7fe] flex flex-col font-sans relative pt-2 md:pb-2">
       <div
         className={`flex-1 max-w-[1400px] w-full mx-auto md:p-2 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-8 xl:gap-12 px-4 relative z-10`}
       >
         {/* Left Column */}
-        <div className={`hidden lg:flex flex-col h-[calc(100vh-120px)] sticky top-6 self-start`}>
-          <div className="flex flex-col w-full max-w-[420px] mx-auto h-full">
+        <div className={`hidden lg:flex flex-col h-[calc(100vh-120px)] sticky top-6 self-start justify-center`}>
+          <div className="flex flex-col w-full max-w-[480px] mx-auto">
           {/* Breadcrumb */}
           <div className="inline-flex items-center gap-2 bg-indigo-50/80 rounded-full px-4 py-1.5 text-indigo-700 text-xs font-semibold w-fit mb-4">
             <Home size={14} />
@@ -204,34 +250,30 @@ export default function RegisterComplaintPage() {
           </div>
 
           <h1 className="text-3xl md:text-[2.25rem] font-extrabold text-slate-900 mb-2 tracking-tight leading-tight">
-            {step === 4 ? (
-              <>Complaint <span className="text-indigo-600">Registered</span></>
-            ) : (
-              <>Register a <span className="text-indigo-600">Complaint</span></>
-            )}
+            Register a <span className="text-indigo-600">Complaint</span>
           </h1>
           <p className="text-sm text-slate-500 font-medium mb-6">
-            {step === 4 ? "Thank you for being an active citizen. We are on it!" : "Let us know the issue. We'll get it resolved."}
+            Let us know the issue. We'll get it resolved.
           </p>
 
-          <div className="flex items-center gap-6 mb-6">
+          <div className="flex items-center flex-wrap gap-x-5 gap-y-3 mb-6">
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-blue-600 rounded-full text-white flex items-center justify-center">
+              <div className="w-5 h-5 bg-blue-600 rounded-full text-white flex items-center justify-center shrink-0">
                 <Check size={12} strokeWidth={3} />
               </div>
-              <span className="text-sm font-semibold text-slate-700">Fast Response</span>
+              <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">Fast Response</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-blue-600 rounded-full text-white flex items-center justify-center">
+              <div className="w-5 h-5 bg-blue-600 rounded-full text-white flex items-center justify-center shrink-0">
                 <Check size={12} strokeWidth={3} />
               </div>
-              <span className="text-sm font-semibold text-slate-700">Track in Real-time</span>
+              <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">Track in Real-time</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-blue-600 rounded-full text-white flex items-center justify-center">
+              <div className="w-5 h-5 bg-blue-600 rounded-full text-white flex items-center justify-center shrink-0">
                 <Check size={12} strokeWidth={3} />
               </div>
-              <span className="text-sm font-semibold text-slate-700">Better Community</span>
+              <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">Better Community</span>
             </div>
           </div>
 
@@ -261,8 +303,8 @@ export default function RegisterComplaintPage() {
             `}</style>
             <div className="relative w-80 h-80">
               {/* Central Hub */}
-              <div className="absolute inset-0 m-auto w-32 h-32 bg-gradient-to-tr from-indigo-600 to-blue-500 rounded-[2rem] rotate-3 flex items-center justify-center shadow-2xl shadow-blue-500/40 z-20 transition-transform duration-500 hover:rotate-12 hover:scale-110 cursor-pointer">
-                <Globe size={56} className="text-white -rotate-3" />
+              <div className="absolute inset-0 m-auto w-32 h-32 bg-gradient-to-tr from-indigo-600 to-blue-500 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-blue-500/40 z-20 transition-transform duration-500 hover:scale-110 cursor-pointer">
+                <Globe size={56} className="text-white" />
               </div>
               
               {/* Orbiting Ring 1 */}
@@ -294,56 +336,93 @@ export default function RegisterComplaintPage() {
           </div>
 
           {/* Bottom Info Cards */}
-          <div className="bg-white rounded-[1.5rem] p-4 flex items-center justify-between shadow-sm mt-auto pb-4 gap-2">
+          <div className="bg-white/90 backdrop-blur-sm rounded-[2rem] px-6 py-6 flex items-center justify-between shadow-lg shadow-indigo-100/30 mt-8 gap-4 border border-white">
             <div className="flex flex-col items-center justify-center text-center flex-1">
-              <div className="w-9 h-9 bg-indigo-50 rounded-full text-indigo-600 flex items-center justify-center mb-2">
-                <Home size={16} />
+              <div className="w-10 h-10 bg-indigo-50 rounded-full text-indigo-600 flex items-center justify-center mb-3">
+                <Home size={18} />
               </div>
-              <p className="text-xs font-bold text-slate-900 mb-0.5">Report Issues</p>
-              <p className="text-[10px] text-slate-400 font-medium">Easy & Quick</p>
+              <p className="text-sm font-bold text-slate-900 mb-0.5 whitespace-nowrap">Report Issues</p>
+              <p className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Easy & Quick</p>
             </div>
-            <div className="flex flex-col items-center justify-center text-center flex-1 border-l border-slate-100">
-              <div className="w-9 h-9 bg-indigo-50 rounded-full text-indigo-600 flex items-center justify-center mb-2">
-                <Clock size={16} />
+            <div className="w-px h-12 bg-slate-100"></div>
+            <div className="flex flex-col items-center justify-center text-center flex-1">
+              <div className="w-10 h-10 bg-indigo-50 rounded-full text-indigo-600 flex items-center justify-center mb-3">
+                <Clock size={18} />
               </div>
-              <p className="text-xs font-bold text-slate-900 mb-0.5">Track Progress</p>
-              <p className="text-[10px] text-slate-400 font-medium">Real-time Updates</p>
+              <p className="text-sm font-bold text-slate-900 mb-0.5 whitespace-nowrap">Track Progress</p>
+              <p className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Real-time Updates</p>
             </div>
-            <div className="flex flex-col items-center justify-center text-center flex-1 border-l border-slate-100">
-              <div className="w-9 h-9 bg-indigo-50 rounded-full text-indigo-600 flex items-center justify-center mb-2">
-                <Users size={16} />
+            <div className="w-px h-12 bg-slate-100"></div>
+            <div className="flex flex-col items-center justify-center text-center flex-1">
+              <div className="w-10 h-10 bg-indigo-50 rounded-full text-indigo-600 flex items-center justify-center mb-3">
+                <Users size={18} />
               </div>
-              <p className="text-xs font-bold text-slate-900 mb-0.5">Better Community</p>
-              <p className="text-[10px] text-slate-400 font-medium">Together We Build</p>
+              <p className="text-sm font-bold text-slate-900 mb-0.5 whitespace-nowrap">Community</p>
+              <p className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Together We Build</p>
             </div>
           </div>
+          </div>
         </div>
-      </div>
 
         {/* Right Column (Form Card) */}
         <div
-          className={`bg-white rounded-[1.5rem] shadow-sm p-4 md:p-8 flex flex-col relative h-fit mt-0.5 ${
-            step === 4 ? "w-full lg:max-w-2xl lg:mx-auto" : ""
+          className={`bg-white rounded-[1.5rem] shadow-sm p-3.5 md:px-6 md:py-3.5 flex flex-col justify-between relative mt-0.5 lg:h-[calc(100vh-120px)] ${
+            step === 4 ? "w-full lg:max-w-2xl lg:mx-auto overflow-y-auto" : "overflow-hidden"
           }`}
         >
           {step !== 4 ? (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2.5 w-full animate-in fade-in">
+            <form onSubmit={(e) => e.preventDefault()} className="flex flex-col justify-between h-full gap-1.5 w-full animate-in fade-in overflow-hidden">
               {/* Stepper */}
-              <div className="flex items-center justify-between w-full mb-2 relative px-2">
-                <div className="absolute top-[18px] left-[10%] right-[10%] h-[2px] bg-slate-100 -z-10" />
-                {[ {id:1, label:"Details"}, {id:2, label:"Location"}, {id:3, label:"Review"}, {id:4, label:"Submit"} ].map((s) => (
-                  <div key={s.id} className="flex flex-col items-center gap-2 bg-white relative z-10 px-2">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                      step >= s.id ? "bg-blue-600 text-white shadow-md shadow-blue-200" : "bg-slate-50 text-slate-400"
-                    }`}>
-                      {step > s.id ? <Check size={16} strokeWidth={3} /> : s.id}
-                    </div>
-                    <div className={`text-xs ${step >= s.id ? "font-bold text-slate-900" : "font-semibold text-slate-400"}`}>
-                      {s.label}
-                    </div>
-                    {step === s.id && <div className="absolute -bottom-2 w-full h-[2px] bg-blue-600" />}
-                  </div>
-                ))}
+              <div className="flex items-center justify-between w-full mb-1 relative px-2">
+                <div className="absolute top-[16px] left-[10%] right-[10%] h-[2px] bg-slate-100 -z-10" />
+                {[
+                  { id: 1, label: "Details" },
+                  { id: 2, label: "Location" },
+                  { id: 3, label: "Review" },
+                  { id: 4, label: "Submit" },
+                ].map((s) => {
+                  const isClickable = canNavigateToStep(s.id);
+                  const isCurrent = step === s.id;
+                  const isCompleted = step > s.id;
+
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={!isClickable}
+                      onClick={() => handleStepClick(s.id)}
+                      className={`flex flex-col items-center gap-1 bg-white relative z-10 px-2 transition-all ${
+                        isClickable ? "cursor-pointer group" : "cursor-default"
+                      }`}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          isCurrent
+                            ? "bg-blue-600 text-white shadow-md shadow-blue-200 ring-4 ring-blue-50"
+                            : isCompleted
+                            ? "bg-emerald-500 text-white shadow-sm group-hover:scale-105"
+                            : "bg-slate-100 text-slate-400"
+                        }`}
+                      >
+                        {isCompleted ? <Check size={14} strokeWidth={3} /> : s.id}
+                      </div>
+                      <div
+                        className={`text-[11px] ${
+                          isCurrent
+                            ? "font-bold text-slate-900"
+                            : isCompleted
+                            ? "font-semibold text-slate-700 group-hover:text-blue-600"
+                            : "font-semibold text-slate-400"
+                        }`}
+                      >
+                        {s.label}
+                      </div>
+                      {isCurrent && (
+                        <div className="absolute -bottom-1 w-full h-[2px] bg-blue-600 rounded-full" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {step === 1 && (
@@ -702,205 +781,220 @@ export default function RegisterComplaintPage() {
               )}
 
               {step === 3 && (
-                <>
-                  {/* Desktop Layout (Hidden on Mobile) */}
-                  <div className="hidden md:flex flex-col gap-3 text-sm text-slate-700 animate-in fade-in">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-base font-bold text-slate-900">Review Your Complaint</h2>
-                        <p className="text-[10px] text-slate-500 mt-0.5">Please check the information below.</p>
-                      </div>
-                      <button type="button" onClick={() => setStep(1)} className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold hover:bg-blue-100 transition-colors border border-blue-100">
-                        <Edit3 size={12} /> Edit
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                         <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-1.5 text-xs"><FileText size={14} className="text-blue-500"/> Complaint Details</h3>
-                         <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-[10px]">
-                           <div><span className="text-slate-500 block mb-0.5">Department</span><span className="font-semibold">{formData.department || "-"}</span></div>
-                           <div><span className="text-slate-500 block mb-0.5">Category</span><span className="font-semibold">{formData.category || "-"}</span></div>
-                           <div className="col-span-2"><span className="text-slate-500 block mb-0.5">Priority</span><span className="inline-flex items-center px-1.5 py-0.5 rounded font-bold bg-red-50 text-red-500">{formData.priority}</span></div>
-                         </div>
-                         <div className="mt-2 text-[10px]">
-                           <span className="text-slate-500 block mb-0.5">Title</span><span className="font-semibold truncate block">{formData.title || "-"}</span>
-                         </div>
-                         <div className="mt-2 text-[10px]">
-                           <span className="text-slate-500 block mb-0.5">Description</span><span className="font-semibold line-clamp-2">{formData.description || "-"}</span>
-                         </div>
-                       </div>
-                       
-                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col">
-                         <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-1.5 text-xs"><MapPin size={14} className="text-blue-500"/> Location</h3>
-                         <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-[10px]">
-                           <div><span className="text-slate-500 block mb-0.5">Country</span><span className="font-semibold">{formData.country || "-"}</span></div>
-                           <div><span className="text-slate-500 block mb-0.5">State</span><span className="font-semibold">{formData.state || "-"}</span></div>
-                           <div><span className="text-slate-500 block mb-0.5">District</span><span className="font-semibold">{formData.district || "-"}</span></div>
-                           <div><span className="text-slate-500 block mb-0.5">City</span><span className="font-semibold">{formData.city || "-"}</span></div>
-                           <div className="col-span-2"><span className="text-slate-500 block mb-0.5">Area / Locality</span><span className="font-semibold">{formData.area || "-"}</span></div>
-                           {formData.additionalDetails && (
-                             <div className="col-span-2"><span className="text-slate-500 block mb-0.5">Landmark</span><span className="font-semibold truncate block">{formData.additionalDetails}</span></div>
-                           )}
-                         </div>
-                       </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                       {files.length > 0 && (
-                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex-1">
-                           <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-1.5 text-xs"><Paperclip size={14} className="text-blue-500"/> Attachments</h3>
-                           <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                             {files.map((f, i) => (
-                                <div key={i} className="flex items-center gap-1.5 text-[10px] font-medium text-slate-700 bg-white p-1.5 rounded-lg border border-slate-100 shrink-0">
-                                  {f.type.startsWith('image/') ? <img src={URL.createObjectURL(f)} className="w-5 h-5 object-cover rounded" alt=""/> : <FileText size={12} className="text-blue-500"/>} 
-                                  <span className="max-w-[80px] truncate">{f.name}</span>
-                                </div>
-                             ))}
-                           </div>
-                         </div>
-                       )}
-                       
-                       <div className="flex items-center gap-2 bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex-1">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                            <ShieldCheck size={12} />
-                          </div>
-                          <p className="text-[10px] text-slate-600 font-medium leading-tight">
-                            By submitting, you confirm that the information provided is true to the best of your knowledge.
-                          </p>
-                       </div>
-                    </div>
-                  </div>
-                  
-                  {/* Mobile Layout (Hidden on Desktop) */}
-                  <div className="md:hidden flex flex-col gap-4 animate-in fade-in">
-                  <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 text-sm text-slate-700 animate-in fade-in flex-1 justify-between overflow-hidden">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100">
                     <div>
-                      <h2 className="text-base font-bold text-slate-900">Review Your Complaint</h2>
-                      <p className="text-xs text-slate-500 mt-1">Please check the information below. You can go back and edit if needed.</p>
+                      <h2 className="text-sm md:text-base font-bold text-slate-900 leading-tight">Review Your Complaint</h2>
+                      <p className="text-[10px] text-slate-500">Verify your information before final submission. Click Edit on any card to modify.</p>
                     </div>
-                    <button type="button" onClick={() => setStep(1)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors border border-blue-100">
-                      <Edit3 size={12} /> Edit
-                    </button>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-full text-[10px] font-bold shrink-0">
+                      <Clock size={11} /> Step 3 of 4
+                    </span>
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col p-4">
-                    {/* Items */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><FileText size={16} /></div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1.5">
-                          <span className="text-xs text-slate-500 font-medium">Department</span>
-                          <span className="text-xs text-slate-900 font-semibold">{formData.department || "-"}</span>
+                  <div className="grid grid-cols-2 gap-2.5 flex-1 min-h-0">
+                    {/* Column 1: Complaint Details */}
+                    <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-2.5 flex flex-col justify-between shadow-sm">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                              <FileText size={12} />
+                            </div>
+                            <h3 className="font-bold text-slate-900 text-xs">1. Complaint Details</h3>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setStep(1)}
+                            className="flex items-center gap-1 px-2 py-0.5 bg-white text-blue-600 rounded-md text-[10px] font-bold hover:bg-blue-50 transition-colors border border-blue-200 shadow-sm"
+                          >
+                            <Edit3 size={10} /> Edit Details
+                          </button>
                         </div>
-                      </div>
 
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><LayoutGrid size={16} /></div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1.5">
-                          <span className="text-xs text-slate-500 font-medium">Category</span>
-                          <span className="text-xs text-slate-900 font-semibold">{formData.category || "-"}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center shrink-0"><AlertCircle size={16} /></div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1">
-                          <span className="text-xs text-slate-500 font-medium pt-0.5">Priority</span>
-                          <div>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-500">{formData.priority}</span>
+                        <div className="grid grid-cols-2 gap-1.5 text-xs">
+                          <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Department</span>
+                            <span className="font-bold text-slate-800 text-xs truncate block">{formData.department || "-"}</span>
+                          </div>
+                          <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Category</span>
+                            <span className="font-bold text-slate-800 text-xs truncate block">{formData.category || "-"}</span>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><FileText size={16} /></div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1.5">
-                          <span className="text-xs text-slate-500 font-medium">Title</span>
-                          <span className="text-xs text-slate-900 font-semibold">{formData.title || "-"}</span>
+                        <div className="flex items-center justify-between bg-white px-2 py-1 rounded-lg border border-slate-100">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Priority</span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                            formData.priority === 'Critical' || formData.priority === 'High'
+                              ? 'bg-red-50 text-red-600 border border-red-200'
+                              : formData.priority === 'Medium'
+                              ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                              : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                          }`}>
+                            {formData.priority}
+                          </span>
                         </div>
-                      </div>
 
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><FileText size={16} /></div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1.5">
-                          <span className="text-xs text-slate-500 font-medium">Description</span>
-                          <span className="text-xs text-slate-900 font-medium leading-relaxed">{formData.description || "-"}</span>
+                        <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Title</span>
+                          <p className="font-bold text-slate-900 text-xs truncate">{formData.title || "-"}</p>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="h-px bg-slate-100 my-4"></div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><MapPin size={16} /></div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1.5">
-                          <span className="text-xs text-slate-500 font-medium">Location</span>
-                          <span className="text-xs text-slate-900 font-medium">{[formData.country, formData.state, formData.district, formData.city, formData.area].filter(Boolean).join(" > ")}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><Building size={16} /></div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1.5">
-                          <span className="text-xs text-slate-500 font-medium">Additional Details</span>
-                          <span className="text-xs text-slate-900 font-medium">{formData.additionalDetails || "-"}</span>
+                        <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                          <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Description</span>
+                          <p className="text-xs text-slate-700 leading-snug font-medium line-clamp-3">{formData.description || "-"}</p>
                         </div>
                       </div>
                     </div>
 
-                    {files.length > 0 && (
-                      <>
-                        <div className="h-px bg-slate-100 my-4"></div>
-                        <div className="flex items-start gap-4">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><Paperclip size={16} /></div>
-                          <div className="grid grid-cols-[100px_1fr] gap-2 w-full pt-1.5">
-                            <span className="text-xs text-slate-500 font-medium">Attachments ({files.length})</span>
-                            <div className="flex items-center gap-3 overflow-x-auto pb-2">
-                              {files.map((f, i) => (
-                                <div key={i} className="flex flex-col gap-1 w-20 shrink-0">
-                                  {f.type.startsWith('image/') ? (
-                                    <img src={URL.createObjectURL(f)} className="w-20 h-14 object-cover rounded-lg border border-slate-200" alt={f.name} />
-                                  ) : (
-                                    <div className="w-20 h-14 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 border border-slate-200"><FileText size={20}/></div>
-                                  )}
-                                  <span className="text-[9px] font-semibold text-slate-700 truncate">{f.name}</span>
-                                  <span className="text-[8px] text-slate-400">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
-                                </div>
-                              ))}
+                    {/* Column 2: Location & Attachments */}
+                    <div className="flex flex-col gap-2 justify-between">
+                      {/* Location Details */}
+                      <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-2.5 shadow-sm flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between pb-1 mb-1.5 border-b border-slate-200/60">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                                <MapPin size={12} />
+                              </div>
+                              <h3 className="font-bold text-slate-900 text-xs">2. Location Details</h3>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setStep(2)}
+                              className="flex items-center gap-1 px-2 py-0.5 bg-white text-blue-600 rounded-md text-[10px] font-bold hover:bg-blue-50 transition-colors border border-blue-200 shadow-sm"
+                            >
+                              <Edit3 size={10} /> Edit Location
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-1.5 text-xs mb-1.5">
+                            <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Area</span>
+                              <span className="font-bold text-slate-800 text-xs truncate block">{formData.area || "-"}</span>
+                            </div>
+                            <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">City</span>
+                              <span className="font-bold text-slate-800 text-xs truncate block">{formData.city || "-"}</span>
+                            </div>
+                            <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">District / State</span>
+                              <span className="font-bold text-slate-800 text-xs truncate block">{formData.district}, {formData.state}</span>
+                            </div>
+                            <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Country</span>
+                              <span className="font-bold text-slate-800 text-xs truncate block">{formData.country || "India"}</span>
                             </div>
                           </div>
+
+                          {formData.additionalDetails ? (
+                            <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Landmark / Notes</span>
+                              <p className="text-xs text-slate-700 font-medium truncate">{formData.additionalDetails}</p>
+                            </div>
+                          ) : (
+                            <div className="bg-white/60 p-1 rounded-lg border border-dashed border-slate-200 text-center">
+                              <span className="text-[9px] text-slate-400 font-medium">No additional landmark provided</span>
+                            </div>
+                          )}
                         </div>
-                      </>
-                    )}
+                      </div>
+
+                      {/* Attachments Section */}
+                      <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-2 shadow-sm">
+                        <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200/60">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                              <Paperclip size={12} />
+                            </div>
+                            <h3 className="font-bold text-slate-900 text-xs">
+                              3. Attachments {files.length > 0 ? `(${files.length})` : ""}
+                            </h3>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setStep(1)}
+                            className="flex items-center gap-1 px-2 py-0.5 bg-white text-blue-600 rounded-md text-[10px] font-bold hover:bg-blue-50 transition-colors border border-blue-200 shadow-sm"
+                          >
+                            <Edit3 size={10} /> {files.length > 0 ? "Edit" : "+ Add"}
+                          </button>
+                        </div>
+
+                        {files.length > 0 ? (
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                            {files.map((f, i) => (
+                              <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg border border-slate-100 shadow-sm shrink-0">
+                                {f.type.startsWith('image/') ? (
+                                  <img src={URL.createObjectURL(f)} className="w-6 h-6 object-cover rounded border border-slate-100" alt={f.name} />
+                                ) : (
+                                  <div className="w-6 h-6 rounded bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                    <FileText size={12} />
+                                  </div>
+                                )}
+                                <div className="flex flex-col max-w-[100px]">
+                                  <span className="text-[10px] font-bold text-slate-800 truncate">{f.name}</span>
+                                  <span className="text-[8px] text-slate-400 font-medium">{(f.size / 1024).toFixed(1)} KB</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-slate-400 font-medium py-0.5 italic">No attachments uploaded (Optional)</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                      <ShieldCheck size={16} />
-                    </div>
-                    <p className="text-xs text-slate-600 font-medium">
-                      By submitting, you confirm that the information provided is true to the best of your knowledge.
+                  {/* Full Width Confirmation Strip */}
+                  <div className="flex items-center gap-2 bg-blue-50/80 px-3 py-1.5 rounded-xl border border-blue-100 text-[10px] text-slate-600 shrink-0">
+                    <ShieldCheck size={14} className="text-blue-600 shrink-0" />
+                    <p className="font-medium leading-tight">
+                      Please confirm all details above are accurate. When ready, click <span className="font-bold text-slate-900">"Submit Complaint"</span> below.
                     </p>
                   </div>
                 </div>
-                </>
               )}
-{error && <div className="text-red-500 text-xs font-bold text-center mt-2">{error}</div>}
 
-              <div className="flex items-center gap-3 mt-1">
+              {error && <div className="text-red-500 text-xs font-bold text-center mt-2 bg-red-50 py-1.5 px-3 rounded-lg border border-red-100">{error}</div>}
+
+              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-100">
                 {step > 1 && (
-                  <button type="button" onClick={handlePrev} className="flex-[0.8] bg-slate-50 text-blue-600 font-bold py-2.5 rounded-xl flex items-center justify-center transition-all text-sm border border-slate-200 hover:bg-slate-100">
+                  <button
+                    key="btn-prev"
+                    type="button"
+                    onClick={handlePrev}
+                    className="flex-[0.8] bg-slate-50 text-blue-600 font-bold py-2.5 rounded-xl flex items-center justify-center transition-all text-sm border border-slate-200 hover:bg-slate-100"
+                  >
                     <ArrowLeft size={16} className="mr-2" /> Back
                   </button>
                 )}
                 {step < 3 ? (
-                  <button type="button" onClick={handleNext} className="flex-[1.2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/25 text-sm">
+                  <button
+                    key={`btn-next-${step}`}
+                    type="button"
+                    onClick={handleNext}
+                    className="flex-[1.2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/25 text-sm"
+                  >
                     Next <ArrowRight size={16} className="ml-2" />
                   </button>
                 ) : (
-                  <button type="submit" disabled={loading} className="flex-[1.2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/25 text-sm disabled:opacity-50">
-                    {loading ? "Submitting..." : (
+                  <button
+                    key="btn-submit"
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="flex-[1.2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/25 text-sm disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Submitting Complaint...
+                      </span>
+                    ) : (
                       <>
                         <Send size={16} className="mr-2" /> Submit Complaint
                       </>
@@ -908,129 +1002,133 @@ export default function RegisterComplaintPage() {
                   </button>
                 )}
               </div>
-</form>
+            </form>
           ) : (
-            <div className="flex flex-col items-center w-full animate-in fade-in py-4 lg:py-6">
-              {/* Confetti & Check */}
-              <div className="relative w-full flex justify-center mb-4 mt-2">
-                <div className="absolute top-0 -ml-12 w-2 h-3 bg-amber-400 rounded-full rotate-45 opacity-80"></div>
-                <div className="absolute top-2 ml-16 w-2 h-2 bg-blue-500 rounded-full opacity-80"></div>
-                <div className="absolute top-8 -ml-16 w-2 h-2 bg-emerald-400 rounded-full opacity-80"></div>
-                
-                <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/30 z-10 relative border-4 border-white">
-                  <Check size={32} className="text-white" strokeWidth={4} />
-                </div>
-                
-                <button onClick={() => router.push("/dashboard")} className="absolute -top-4 right-0 md:hidden bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5">
-                  <Home size={12} /> Go to Home
-                </button>
-              </div>
-
-              <div className="text-center mb-4">
-                <h2 className="text-xl md:text-2xl font-black text-slate-900 leading-tight mb-1">
-                  Complaint Submitted Successfully!
-                </h2>
-                <p className="text-xs text-slate-500 px-4">
-                  Your complaint has been registered. We'll keep you updated.
-                </p>
-              </div>
-
-              <div className="bg-[#f0f4f8] w-full max-w-sm p-4 rounded-2xl flex items-center justify-between mb-5 border border-slate-100">
-                <div className="flex flex-col items-start">
-                  <p className="text-[10px] font-medium text-slate-500 mb-0.5">Complaint ID</p>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">{complaintId || "CMP-10231"}</h3>
-                    <button className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors bg-blue-50">
-                      <Copy size={12} />
-                    </button>
+            <div className="flex flex-col items-center justify-center gap-6 w-full h-full animate-in fade-in pb-4">
+              <div className="flex flex-col items-center w-full">
+                {/* Confetti & Check */}
+                <div className="relative w-full flex justify-center mb-6 mt-2">
+                  <div className="absolute top-0 -ml-12 w-2 h-3 bg-amber-400 rounded-full rotate-45 opacity-80"></div>
+                  <div className="absolute top-2 ml-20 w-3 h-3 bg-blue-500 rounded-full opacity-80"></div>
+                  <div className="absolute top-10 -ml-20 w-3 h-3 bg-emerald-400 rounded-full opacity-80"></div>
+                  
+                  <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/30 z-10 relative border-4 border-white">
+                    <Check size={40} className="text-white" strokeWidth={4} />
                   </div>
+                  
+                  <button onClick={() => router.push("/dashboard")} className="absolute -top-4 right-0 md:hidden bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5">
+                    <Home size={12} /> Go to Home
+                  </button>
                 </div>
-                <p className="text-[9px] text-slate-400 font-medium text-right max-w-[80px]">
-                  {new Date().toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true})}
-                </p>
+
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight mb-2">
+                    Complaint Submitted Successfully!
+                  </h2>
+                  <p className="text-sm text-slate-500 px-4">
+                    Your complaint has been registered. We'll keep you updated.
+                  </p>
+                </div>
+
+                <div className="bg-[#f0f4f8] w-full max-w-md p-5 rounded-2xl flex items-center justify-between mb-4 border border-slate-100">
+                  <div className="flex flex-col items-start">
+                    <p className="text-xs font-medium text-slate-500 mb-1">Complaint ID</p>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">{complaintId || "CMP-10231"}</h3>
+                      <button className="text-blue-600 hover:bg-blue-100 p-1.5 rounded-md transition-colors bg-blue-50">
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium text-right max-w-[90px]">
+                    {new Date().toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true})}
+                  </p>
+                </div>
               </div>
 
-              <div className="w-full text-left mb-5">
-                <h3 className="text-sm font-extrabold text-slate-900 mb-3">What's Next?</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="w-full text-left">
+                <h3 className="text-base font-extrabold text-slate-900 mb-4">What's Next?</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    {/* Step 1 */}
-                   <div className="flex flex-col gap-1.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                   <div className="flex flex-col gap-2 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                      <div className="flex items-center justify-between">
-                       <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Send size={12} /></div>
-                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Completed</span>
+                       <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Send size={14} /></div>
+                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">Completed</span>
                      </div>
                      <div>
-                       <h4 className="text-xs font-bold text-slate-900">Assigned to Department</h4>
-                       <p className="text-[10px] text-slate-500 mt-0.5">Forwarded to the {formData.department || "Electricity"} Department.</p>
+                       <h4 className="text-sm font-bold text-slate-900">Assigned to Department</h4>
+                       <p className="text-xs text-slate-500 mt-0.5">Forwarded to the {formData.department || "Electricity"} Department.</p>
                      </div>
                    </div>
                    
                    {/* Step 2 */}
-                   <div className="flex flex-col gap-1.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                   <div className="flex flex-col gap-2 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                      <div className="flex items-center justify-between">
-                       <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={12} /></div>
-                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">In Progress</span>
+                       <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={14} /></div>
+                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">In Progress</span>
                      </div>
                      <div>
-                       <h4 className="text-xs font-bold text-slate-900">Assigned to Agent</h4>
-                       <p className="text-[10px] text-slate-500 mt-0.5">A field agent will be assigned shortly.</p>
+                       <h4 className="text-sm font-bold text-slate-900">Assigned to Agent</h4>
+                       <p className="text-xs text-slate-500 mt-0.5">A field agent will be assigned shortly.</p>
                      </div>
                    </div>
 
                    {/* Step 3 */}
-                   <div className="flex flex-col gap-1.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                   <div className="flex flex-col gap-2 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                      <div className="flex items-center justify-between">
-                       <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0"><BellRing size={12} /></div>
-                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Pending</span>
+                       <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0"><BellRing size={14} /></div>
+                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-600">Pending</span>
                      </div>
                      <div>
-                       <h4 className="text-xs font-bold text-slate-900">Updates via Notifications</h4>
-                       <p className="text-[10px] text-slate-500 mt-0.5">You'll receive updates in the app.</p>
+                       <h4 className="text-sm font-bold text-slate-900">Updates via Notifications</h4>
+                       <p className="text-xs text-slate-500 mt-0.5">You'll receive updates in the app.</p>
                      </div>
                    </div>
 
                    {/* Step 4 */}
-                   <div className="flex flex-col gap-1.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                   <div className="flex flex-col gap-2 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                      <div className="flex items-center justify-between">
-                       <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0"><CheckCircle2 size={12} /></div>
-                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Pending</span>
+                       <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center shrink-0"><CheckCircle2 size={14} /></div>
+                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-600">Pending</span>
                      </div>
                      <div>
-                       <h4 className="text-xs font-bold text-slate-900">Resolution</h4>
-                       <p className="text-[10px] text-slate-500 mt-0.5">We'll notify you once resolved.</p>
+                       <h4 className="text-sm font-bold text-slate-900">Resolution</h4>
+                       <p className="text-xs text-slate-500 mt-0.5">We'll notify you once resolved.</p>
                      </div>
                    </div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2 bg-blue-50/50 p-3 rounded-xl border border-blue-100 w-full mb-5">
-                <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                  <Info size={10} />
+              <div className="w-full flex flex-col gap-4">
+                <div className="flex items-start gap-3 bg-blue-50/50 p-4 rounded-xl border border-blue-100 w-full">
+                  <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <Info size={12} />
+                  </div>
+                  <p className="text-xs text-slate-600 font-medium">
+                    Track the status and view updates from the My Complaints section.
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-600 font-medium">
-                  Track the status and view updates from the My Complaints section.
-                </p>
-              </div>
 
-              <div className="flex w-full flex-col sm:flex-row items-center gap-3">
-                <button
-                  onClick={() => router.push("/dashboard")}
-                  className="w-full sm:flex-1 bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold py-2.5 rounded-xl flex items-center justify-center transition-all text-sm"
-                >
-                  View My Complaints
-                </button>
-                <button
-                  onClick={() => {
-                    setStep(1);
-                    setFormData({...formData, title: "", description: ""});
-                    setFiles([]);
-                  }}
-                  className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/25 text-sm"
-                >
-                  Submit Another Complaint
-                </button>
+                <div className="flex w-full flex-col sm:flex-row items-center gap-3">
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    className="w-full sm:flex-1 bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold py-3 md:py-3.5 rounded-xl flex items-center justify-center transition-all text-sm md:text-base"
+                  >
+                    View My Complaints
+                  </button>
+                  <button
+                    onClick={() => {
+                      setStep(1);
+                      setFormData({...formData, title: "", description: ""});
+                      setFiles([]);
+                    }}
+                    className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 md:py-3.5 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/25 text-sm md:text-base"
+                  >
+                    Submit Another Complaint
+                  </button>
+                </div>
               </div>
-</div>
+            </div>
           )}
         </div>
       </div>

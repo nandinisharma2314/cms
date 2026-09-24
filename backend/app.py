@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 from database import engine, Base
-from routes import health_routes, auth_routes, complaint_routes
+from routes import health_routes, auth_routes, complaint_routes, notification_routes
 
 # Ensure uploads dir exists
 os.makedirs("uploads", exist_ok=True)
@@ -29,6 +29,8 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(health_routes.router, prefix="/health", tags=["health"])
 app.include_router(auth_routes.router, prefix="/auth", tags=["auth"])
 app.include_router(complaint_routes.router, prefix="/complaints", tags=["complaints"])
+app.include_router(notification_routes.router, prefix="/notifications", tags=["notifications"])
+
 
 if __name__ == '__main__':
     import uvicorn

@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional
 import jwt
 from datetime import datetime, timedelta
 import os
 import secrets
 from database import get_db
 from models import User, RefreshToken, Otp
+from utils.auth_middleware import get_current_user
 import random
 from twilio.rest import Client
 import smtplib
@@ -30,6 +32,14 @@ class VerifyOtpRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    mobile: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    address: Optional[str] = None
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -158,6 +168,9 @@ def verify_otp(request: VerifyOtpRequest, db: Session = Depends(get_db)):
             "name": user.name,
             "mobile": user.mobile,
             "email": user.email,
+            "dob": user.dob,
+            "gender": user.gender,
+            "address": user.address,
             "role": user.role
         }
     }
@@ -191,3 +204,91 @@ def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
         "refresh_token": new_refresh_token,
         "token_type": "bearer"
     }
+
+@router.get("/me")
+def get_me(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return {
+        "success": True,
+        "user": {
+            "id": user.id,
+            "name": user.name or "",
+            "email": user.email or "",
+            "mobile": user.mobile or "",
+            "dob": user.dob or "",
+            "gender": user.gender or "",
+            "address": user.address or "",
+            "role": user.role or "citizen"
+        }
+    }
+
+@router.put("/profile")
+def update_profile(request: UpdateProfileRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    if request.name is not None and request.name.strip():
+        user.name = request.name.strip()
+
+    if request.email is not None:
+        new_email = request.email.strip()
+        if new_email:
+            # Check if email is already taken by another user (case-insensitive)
+            existing = db.query(User).filter(
+                User.email.ilike(new_email),
+                User.id != user.id
+            ).first()
+            if existing:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is already registered with another account")
+            user.email = new_email
+        else:
+            # If user registered with mobile, email can be cleared
+            if not user.mobile:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email cannot be empty for email-based account")
+            user.email = None
+
+    if request.mobile is not None:
+        new_mobile = request.mobile.strip()
+        if new_mobile:
+            # Extract last 10 digits for clean match
+            clean_digits = "".join(filter(str.isdigit, new_mobile))
+            last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
+            existing = db.query(User).filter(
+                (User.mobile == new_mobile) | (User.mobile.like(f"%{last10}%")),
+                User.id != user.id
+            ).first() if last10 else None
+            
+            if existing:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mobile number is already registered with another account")
+            user.mobile = new_mobile
+        else:
+            if not user.email:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mobile number cannot be empty for mobile-based account")
+            user.mobile = None
+            
+    if request.dob is not None: user.dob = request.dob
+    if request.gender is not None: user.gender = request.gender
+    if request.address is not None: user.address = request.address
+        
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "success": True,
+        "message": "Profile updated successfully",
+        "user": {
+            "id": user.id,
+            "name": user.name or "",
+            "email": user.email or "",
+            "mobile": user.mobile or "",
+            "dob": user.dob or "",
+            "gender": user.gender or "",
+            "address": user.address or "",
+            "role": user.role or "citizen"
+        }
+    }
+
+

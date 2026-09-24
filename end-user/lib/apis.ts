@@ -130,4 +130,51 @@ export const apis = {
  });
  }
  },
+  profile: {
+    getProfile: () =>
+      fetchApi<{ success: boolean; user: { id: number; name: string; email: string; mobile: string; role: string; dob?: string; gender?: string; address?: string } }>('/auth/me', {
+        method: 'GET',
+      }),
+    updateProfile: (data: { name?: string; email?: string; mobile?: string; dob?: string; gender?: string; address?: string }) =>
+      fetchApi<{ success: boolean; message: string; user: { id: number; name: string; email: string; mobile: string; role: string; dob?: string; gender?: string; address?: string } }>('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+  },
+  notifications: {
+    getNotifications: () =>
+      fetchApi<{
+        success: boolean;
+        unread_count: number;
+        notifications: Array<{
+          id: number;
+          title: string;
+          message: string;
+          type: string;
+          complaint_id?: string;
+          is_read: boolean;
+          time: string;
+          created_at: string;
+        }>;
+      }>('/notifications/', { method: 'GET' }),
+    markRead: (id: number) =>
+      fetchApi<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PUT' }),
+    markAllRead: () =>
+      fetchApi<{ success: boolean }>('/notifications/read-all', { method: 'PUT' }),
+    clearAll: () =>
+      fetchApi<{ success: boolean }>('/notifications/clear', { method: 'DELETE' }),
+    getActivities: () =>
+      fetchApi<{
+        success: boolean;
+        activities: Array<{
+          id: number;
+          title: string;
+          desc: string;
+          type: string;
+          complaint_id?: string;
+          time: string;
+          created_at: string;
+        }>;
+      }>('/notifications/activities', { method: 'GET' }),
+  },
 };

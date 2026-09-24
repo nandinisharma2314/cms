@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 from database import get_db
-from models import Complaint, ComplaintAttachment
+from models import Complaint, ComplaintAttachment, Notification, Activity
 from utils.auth_middleware import get_current_user
 
 router = APIRouter()
@@ -82,6 +82,25 @@ def create_complaint(
                 "file_name": file.filename
             })
     
+    # Create notification and activity for this new complaint
+    db.add(Notification(
+        user_id=current_user["id"],
+        title="Complaint Registered",
+        message=f"{gen_id} has been registered and forwarded to {department} Department.",
+        type="forwarded",
+        complaint_id=gen_id,
+        is_read=False,
+        created_at=datetime.utcnow()
+    ))
+    db.add(Activity(
+        user_id=current_user["id"],
+        title="Complaint Forwarded",
+        description=f"{gen_id} forwarded to {department} Department.",
+        type="forwarded",
+        complaint_id=gen_id,
+        created_at=datetime.utcnow()
+    ))
+
     db.commit()
 
     return {

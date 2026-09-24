@@ -106,7 +106,7 @@ export function RecentComplaintsList({
 
  {/* Card List */}
  <div className="mobile-complaints-list">
- {mobileComplaints.map((item) => (
+ {(complaints && complaints.length > 0 ? complaints : mobileComplaints).slice(0, 5).map((item) => (
  <div
  key={item.id}
  className="mobile-complaint-card"
@@ -115,7 +115,7 @@ export function RecentComplaintsList({
  {/* Leading Icon Box */}
  <div
  className="complaint-card-icon-box"
- style={{ backgroundColor: item.iconBoxBg }}
+ style={{ backgroundColor: item.iconBoxBg || '#eff6ff' }}
  >
  {renderLeadingIcon(item.id)}
  </div>
@@ -130,9 +130,9 @@ export function RecentComplaintsList({
  </div>
 
  <div className="complaint-card-meta-row">
- <span className="complaint-card-cmp-id">{item.cmpId}</span>
+ <span className="complaint-card-cmp-id">{item.cmpId || item.id}</span>
  <span className="complaint-card-meta-dot">•</span>
- <span className="complaint-card-loc">{item.fullLocation}</span>
+ <span className="complaint-card-loc">{item.fullLocation || item.location}</span>
  </div>
 
  <div className="complaint-card-date-row">

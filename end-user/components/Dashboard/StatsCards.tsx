@@ -93,38 +93,39 @@ export function StatsCards({
  </div>
 
  {/* Grid of 4 Stat Cards */}
- <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+ <div className="grid grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-6">
  {stats.map((stat) => {
  const Icon = stat.icon;
 
  return (
  <div
  key={stat.id}
- className="bg-white shadow-sm border border-slate-100 p-5 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group flex flex-col justify-between relative overflow-hidden"
+ className="bg-white shadow-sm border border-slate-100 p-2 md:p-5 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group flex flex-col justify-between relative overflow-hidden rounded-xl md:rounded-none"
  onClick={() => onFilterStatus && onFilterStatus(stat.id)}
  >
- <div className="flex items-start gap-4">
+ <div className="flex flex-col md:flex-row items-center md:items-start gap-1 md:gap-4 text-center md:text-left">
  {/* Icon Container */}
  <div
- className="w-12 h-12 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform"
+ className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform rounded-full md:rounded-none [&>svg]:scale-75 md:[&>svg]:scale-100"
  style={{ backgroundColor: stat.bgColor }}
  >
  <Icon size={24} color={stat.accentColor} />
  </div>
 
  {/* Data & Label */}
- <div className="flex flex-col">
- <span className="text-2xl font-black text-slate-800 leading-none mb-1">
+ <div className="flex flex-col mt-1 md:mt-0">
+ <span className="text-sm md:text-2xl font-black text-slate-800 leading-none mb-0 md:mb-1">
  {stat.count}
  </span>
- <span className="text-[13px] font-semibold text-slate-500 leading-tight">
- {stat.label}
+ <span className="text-[9px] md:text-[13px] font-semibold text-slate-500 leading-tight">
+ <span className="md:hidden">{stat.label.split(' ')[0]}<br/>{stat.label.split(' ')[1]}</span>
+ <span className="hidden md:inline">{stat.label}</span>
  </span>
  </div>
  </div>
 
  {/* Bottom area: Trend and Sparkline */}
- <div className="mt-4 flex items-end justify-between relative">
+ <div className="hidden md:flex mt-4 items-end justify-between relative">
  <div className="flex items-center gap-1">
  <span className={`text-xs font-bold ${stat.trendColor}`}>
  {stat.trendText}
