@@ -1,8 +1,24 @@
-import React from"react";
+"use client";
+
+import React, { useEffect, useState } from"react";
 import Link from"next/link";
 import { Plus, Megaphone } from"lucide-react";
 
 const Banner = () => {
+  const [userName, setUserName] = useState("User");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u.name) setUserName(u.name);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
  return (
  <div className="relative w-full h-40 shrink-0 bg-gradient-to-r from-blue-700 via-blue-600 to-blue-400 overflow-hidden mb-4 flex items-center px-5 md:px-10">
  {/* Decorative Background Elements */}
@@ -13,10 +29,10 @@ const Banner = () => {
 
  {/* Content */}
  <div className="relative z-10 max-w-[200px] md:max-w-lg ml-2 md:ml-6">
- <h2 className="text-lg md:text-xl font-bold text-white mb-1 leading-tight">
+ <h2 className="text-lg md:text-xl font-bold text-white mb-1 leading-tight capitalize">
  Good Morning,
  <br />
- Rahul Sharma 👋
+ {userName} 👋
  </h2>
  <p className="text-blue-100 mb-3 text-[10px] md:text-xs">
  Together for a cleaner, safer and better community.

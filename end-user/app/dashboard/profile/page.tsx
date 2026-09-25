@@ -72,12 +72,19 @@ export default function ProfilePage() {
     // Fetch live profile
     apis.profile.getProfile().then((res) => {
       if (res && res.success && res.user) {
-        if (res.user.name) setName(res.user.name);
-        if (res.user.email) setEmail(res.user.email);
-        if (res.user.mobile) setMobile(res.user.mobile);
-        if (res.user.dob) setDob(res.user.dob);
-        if (res.user.gender) setGender(res.user.gender);
-        if (res.user.address) setAddress(res.user.address);
+        setName(res.user.name || "");
+        setEmail(res.user.email || "");
+        setMobile(res.user.mobile || "");
+        setDob(res.user.dob || "");
+        setGender(res.user.gender || "Not Specified");
+        setAddress(res.user.address || "");
+        setLanguage(res.user.language || "English (India)");
+        if (res.user.notify_sms !== undefined) setNotifySms(res.user.notify_sms);
+        if (res.user.notify_email !== undefined) setNotifyEmail(res.user.notify_email);
+        if (res.user.notify_alerts !== undefined) setNotifyAlerts(res.user.notify_alerts);
+        
+        // Ensure local storage stays perfectly in sync with truth
+        localStorage.setItem("user", JSON.stringify(res.user));
       }
     }).catch(() => {});
   }, []);
@@ -103,11 +110,25 @@ export default function ProfilePage() {
         
         setSaveMessage({ type: "success", text: "Profile updated successfully!" });
       } else if (activeTab === "notifications") {
+        const payload = { notify_sms: notifySms, notify_email: notifyEmail, notify_alerts: notifyAlerts };
+        await apis.profile.updateProfile(payload);
+        
+        const stored = localStorage.getItem("user");
+        const u = stored ? JSON.parse(stored) : {};
+        localStorage.setItem("user", JSON.stringify({ ...u, ...payload }));
+        
         localStorage.setItem("user_notifySms", String(notifySms));
         localStorage.setItem("user_notifyEmail", String(notifyEmail));
         localStorage.setItem("user_notifyAlerts", String(notifyAlerts));
         setSaveMessage({ type: "success", text: "Notification preferences saved!" });
       } else if (activeTab === "language") {
+        const payload = { language };
+        await apis.profile.updateProfile(payload);
+        
+        const stored = localStorage.getItem("user");
+        const u = stored ? JSON.parse(stored) : {};
+        localStorage.setItem("user", JSON.stringify({ ...u, ...payload }));
+        
         localStorage.setItem("user_language", language);
         setSaveMessage({ type: "success", text: "Language preference saved!" });
       }

@@ -132,11 +132,11 @@ export const apis = {
  },
   profile: {
     getProfile: () =>
-      fetchApi<{ success: boolean; user: { id: number; name: string; email: string; mobile: string; role: string; dob?: string; gender?: string; address?: string } }>('/auth/me', {
+      fetchApi<{ success: boolean; user: any }>('/auth/me', {
         method: 'GET',
       }),
-    updateProfile: (data: { name?: string; email?: string; mobile?: string; dob?: string; gender?: string; address?: string }) =>
-      fetchApi<{ success: boolean; message: string; user: { id: number; name: string; email: string; mobile: string; role: string; dob?: string; gender?: string; address?: string } }>('/auth/profile', {
+    updateProfile: (data: { name?: string; email?: string; mobile?: string; dob?: string; gender?: string; address?: string; language?: string; notify_sms?: boolean; notify_email?: boolean; notify_alerts?: boolean }) =>
+      fetchApi<{ success: boolean; message: string; user: any }>('/auth/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
       }),

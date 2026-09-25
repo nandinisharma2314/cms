@@ -115,9 +115,11 @@ export function MailEnvelopeIcon({
 export function ChevronRightIcon({
  size = 18,
  color ="#3b82f6",
+ className,
 }: {
  size?: number;
  color?: string;
+ className?: string;
 }) {
  return (
  <svg
@@ -126,6 +128,7 @@ export function ChevronRightIcon({
  viewBox="0 0 24 24"
  fill="none"
  xmlns="http://www.w3.org/2000/svg"
+ className={className}
  >
  <path
  d="M9 18L15 12L9 6"
@@ -196,9 +199,11 @@ export function ChevronDownIcon({
 export function ArrowRightIcon({
  size = 18,
  color ="#ffffff",
+ className,
 }: {
  size?: number;
  color?: string;
+ className?: string;
 }) {
  return (
  <svg
@@ -207,6 +212,7 @@ export function ArrowRightIcon({
  viewBox="0 0 24 24"
  fill="none"
  xmlns="http://www.w3.org/2000/svg"
+ className={className}
  >
  <path d="M5 12H19" stroke={color} strokeWidth="2" strokeLinecap="round" />
  <path
@@ -433,3 +439,34 @@ export function CloseIcon({
 // Phone Icon alias for retro compatibility
 export const PhoneIcon = SmartphoneIcon;
 export const MailIcon = MailEnvelopeIcon;
+
+// Filled Mail Envelope Icon
+export function MailFilledIcon({
+ size = 20,
+ color = "#2563eb",
+ className,
+}: {
+ size?: number;
+ color?: string;
+ className?: string;
+}) {
+ return (
+  <svg
+   width={size}
+   height={size}
+   viewBox="0 0 24 24"
+   fill="none"
+   xmlns="http://www.w3.org/2000/svg"
+   className={className}
+  >
+   <rect x="2" y="4" width="20" height="16" rx="3" fill={color} />
+   <path
+    d="M2 6L10.8 12.6C11.5111 13.1333 12.4889 13.1333 13.2 12.6L22 6M2 18L9 12M22 18L15 12"
+    stroke="white"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+   />
+  </svg>
+ );
+}

@@ -1,14 +1,39 @@
-import React from"react";
+"use client";
+
+import React, { useEffect, useState } from"react";
 import { Search, Bell, ChevronDown } from"lucide-react";
 
 const Header = () => {
+  const [userName, setUserName] = useState("User");
+  const [initials, setInitials] = useState("U");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u.name) {
+          setUserName(u.name);
+          const parts = u.name.split(" ");
+          if (parts.length > 1) {
+            setInitials(parts[0][0].toUpperCase() + parts[1][0].toUpperCase());
+          } else {
+            setInitials(u.name.substring(0, 2).toUpperCase());
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
  return (
  <header className="flex items-start justify-between mb-4">
  {/* Left Greeting */}
  <div>
  <p className="text-slate-500 text-sm font-medium">Good Morning,</p>
- <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
- Rahul Sharma <span className="text-xl">👋</span>
+ <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2 capitalize">
+ {userName} <span className="text-xl">👋</span>
  </h1>
  <p className="text-slate-500 text-xs mt-0.5">
  Together for a cleaner, safer and better community.
@@ -36,7 +61,7 @@ const Header = () => {
  {/* Profile */}
  <button className="flex items-center gap-2 bg-white p-1 md:pr-3 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] hover:bg-slate-50 transition-colors">
  <div className="w-8 h-8 bg-blue-100 text-blue-700 font-semibold flex items-center justify-center text-sm">
- RS
+ {initials}
  </div>
  <ChevronDown className="hidden md:block w-4 h-4 text-slate-400" />
  </button>

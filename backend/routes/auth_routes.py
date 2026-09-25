@@ -40,6 +40,10 @@ class UpdateProfileRequest(BaseModel):
     dob: Optional[str] = None
     gender: Optional[str] = None
     address: Optional[str] = None
+    language: Optional[str] = None
+    notify_sms: Optional[bool] = None
+    notify_email: Optional[bool] = None
+    notify_alerts: Optional[bool] = None
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -74,7 +78,10 @@ def send_otp(request: SendOtpRequest, db: Session = Depends(get_db)):
     if request.method == 'mobile':
         clean_digits = "".join(filter(str.isdigit, target))
         last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
-        user = db.query(User).filter((User.mobile == target) | (User.mobile.like(f"%{last10}%"))).first()
+        if last10:
+            user = db.query(User).filter((User.mobile == target) | (User.mobile.like(f"%{last10}%"))).first()
+        else:
+            user = db.query(User).filter(User.mobile == target).first()
     else:
         user = db.query(User).filter(User.email.ilike(target)).first()
 
@@ -86,12 +93,16 @@ def send_otp(request: SendOtpRequest, db: Session = Depends(get_db)):
     
     # Store OTP using canonical user target
     actual_target = user.mobile if request.method == 'mobile' else user.email
+    print(f"\n==============================================", flush=True)
+    print(f"--- DEV MODE: OTP for {actual_target} is {otp_code} ---", flush=True)
+    print(f"==============================================\n", flush=True)
+    
     db_otp = Otp(target=actual_target, code=otp_code, expires_at=expires_at)
     db.add(db_otp)
     db.commit()
     
     if os.getenv("ENVIRONMENT") == "development":
-        print(f"--- DEV MODE: OTP for {target} is {otp_code} ---")
+        pass
     else:
         if request.method == 'mobile':
             try:
@@ -128,11 +139,17 @@ def verify_otp(request: VerifyOtpRequest, db: Session = Depends(get_db)):
     target = request.target.strip()
     clean_digits = "".join(filter(str.isdigit, target))
     last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
-    user = db.query(User).filter(
-        (User.mobile == target) | 
-        (User.mobile.like(f"%{last10}%")) | 
-        (User.email.ilike(target))
-    ).first()
+    
+    if "@" in target:
+        user = db.query(User).filter(User.email.ilike(target)).first()
+    else:
+        if last10:
+            user = db.query(User).filter(
+                (User.mobile == target) | 
+                (User.mobile.like(f"%{last10}%"))
+            ).first()
+        else:
+            user = db.query(User).filter(User.mobile == target).first()
 
     if not user:
         return {"success": False, "error": "User not registered."}
@@ -171,7 +188,11 @@ def verify_otp(request: VerifyOtpRequest, db: Session = Depends(get_db)):
             "dob": user.dob,
             "gender": user.gender,
             "address": user.address,
-            "role": user.role
+            "role": user.role,
+            "language": user.language,
+            "notify_sms": user.notify_sms,
+            "notify_email": user.notify_email,
+            "notify_alerts": user.notify_alerts
         }
     }
 
@@ -220,7 +241,11 @@ def get_me(db: Session = Depends(get_db), current_user: dict = Depends(get_curre
             "dob": user.dob or "",
             "gender": user.gender or "",
             "address": user.address or "",
-            "role": user.role or "citizen"
+            "role": user.role or "citizen",
+            "language": user.language or "English (India)",
+            "notify_sms": user.notify_sms,
+            "notify_email": user.notify_email,
+            "notify_alerts": user.notify_alerts
         }
     }
 
@@ -272,6 +297,10 @@ def update_profile(request: UpdateProfileRequest, db: Session = Depends(get_db),
     if request.dob is not None: user.dob = request.dob
     if request.gender is not None: user.gender = request.gender
     if request.address is not None: user.address = request.address
+    if request.language is not None: user.language = request.language
+    if request.notify_sms is not None: user.notify_sms = request.notify_sms
+    if request.notify_email is not None: user.notify_email = request.notify_email
+    if request.notify_alerts is not None: user.notify_alerts = request.notify_alerts
         
     db.commit()
     db.refresh(user)
@@ -287,7 +316,11 @@ def update_profile(request: UpdateProfileRequest, db: Session = Depends(get_db),
             "dob": user.dob or "",
             "gender": user.gender or "",
             "address": user.address or "",
-            "role": user.role or "citizen"
+            "role": user.role or "citizen",
+            "language": user.language or "English (India)",
+            "notify_sms": user.notify_sms,
+            "notify_email": user.notify_email,
+            "notify_alerts": user.notify_alerts
         }
     }
 

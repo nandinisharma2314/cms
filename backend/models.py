@@ -14,6 +14,12 @@ class User(Base):
     gender = Column(String(20), nullable=True)
     address = Column(String(500), nullable=True)
     role = Column(String(50), default='citizen')
+    
+    # Preferences
+    language = Column(String(50), default='English (India)')
+    notify_sms = Column(Boolean, default=True)
+    notify_email = Column(Boolean, default=True)
+    notify_alerts = Column(Boolean, default=True)
 
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
 
