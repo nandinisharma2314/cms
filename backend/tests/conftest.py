@@ -1,12 +1,10 @@
 import os
 import sys
-import tempfile
 
 import pytest
 
-# Point the app at a throwaway SQLite file before anything imports `database`.
-_db_dir = tempfile.mkdtemp(prefix="cms-test-")
-os.environ["DATABASE_URI"] = f"sqlite:///{os.path.join(_db_dir, 'test.db')}"
+# Point the app at MySQL test database before anything imports `database`.
+os.environ["DATABASE_URI"] = "mysql+pymysql://root:Aviinyou07@localhost:3306/cms_test?charset=utf8mb4"
 os.environ["APP_ENV"] = "development"
 os.environ["SLA_CHECK_INTERVAL_SECONDS"] = "0"  # tests drive the SLA check explicitly
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

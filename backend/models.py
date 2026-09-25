@@ -165,6 +165,16 @@ class EndUser(Base):
     email = Column(String(120), nullable=False, index=True)  # lowercased
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Profile details the citizen maintains in the portal
+    dob = Column(String(20), nullable=True)
+    gender = Column(String(20), nullable=True)
+    address = Column(String(500), nullable=True)
+    language = Column(String(50), default="English (India)", nullable=False)
+    notify_sms = Column(Boolean, default=True, nullable=False)
+    notify_email = Column(Boolean, default=True, nullable=False)
+    notify_alerts = Column(Boolean, default=True, nullable=False)
+
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
     last_login_at = Column(DateTime, nullable=True)
