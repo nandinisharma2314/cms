@@ -260,64 +260,11 @@ export const apis = {
       }
     },
   },
-  profile: {
-    getProfile: async () => {
-      const user = await fetchApi<any>("/portal/me");
-      return { success: true, user };
-    },
-    updateProfile: (data: {
-      name?: string;
-      email?: string;
-      mobile?: string;
-      dob?: string;
-      gender?: string;
-      address?: string;
-      language?: string;
-      notify_sms?: boolean;
-      notify_email?: boolean;
-      notify_alerts?: boolean;
-    }) =>
-      fetchApi<{ success: boolean; message: string; user: any }>("/portal/profile", {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-  },
   notifications: {
     list: () =>
       fetchApi<{ items: CitizenNotification[]; unread_count: number }>("/portal/notifications?limit=30"),
-    getNotifications: async () => {
-      const res = await fetchApi<{ items: any[]; unread_count: number }>("/portal/notifications?limit=30");
-      return {
-        success: true,
-        unread_count: res.unread_count,
-        notifications: (res.items || []).map((n) => ({
-          id: n.id,
-          title: n.title,
-          message: n.body || "",
-          type: n.kind || "alert",
-          complaint_id: n.complaint_id,
-          is_read: !!n.read_at,
-          time: n.created_at,
-          created_at: n.created_at,
-        })),
-      };
-    },
-    markRead: (id: number) => fetchApi<{ success: boolean }>(`/portal/notifications/${id}/read`, { method: "POST" }),
-    markAllRead: () => fetchApi<{ success: boolean }>("/portal/notifications/read-all", { method: "POST" }),
-    clearAll: () => fetchApi<{ success: boolean }>("/portal/notifications", { method: "DELETE" }),
-    getActivities: () =>
-      fetchApi<{
-        success: boolean;
-        activities: Array<{
-          id: number;
-          title: string;
-          desc: string;
-          type: string;
-          complaint_id?: string;
-          time: string;
-          created_at: string;
-        }>;
-      }>("/portal/activities"),
+    markRead: (id: number) => fetchApi(`/portal/notifications/${id}/read`, { method: "POST" }),
+    markAllRead: () => fetchApi("/portal/notifications/read-all", { method: "POST" }),
   },
   reference: {
     departments: () => fetchApi<PortalDepartment[]>("/portal/departments"),

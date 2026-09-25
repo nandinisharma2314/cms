@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest
+# FastAPI's TestClient needs httpx2 on Starlette 1.x (older Starlette uses httpx)
+httpx2

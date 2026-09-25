@@ -571,16 +571,16 @@ export function LoginFlow() {
  />
  </div>
 
-                           {/* Submit Button */}
-                           <button 
-                              type="submit" 
-                              disabled={loading}
-                              className="w-full h-[56px] bg-[#1877f2] text-white rounded-2xl flex items-center justify-center gap-2 font-semibold text-[16px] hover:bg-[#166fe5] transition-all active:scale-[0.98] disabled:opacity-70 shadow-sm"
-                           >
-                              {loading ? "Sending..." : "Send OTP"}
-                              <ArrowRightIcon size={18} color="#ffffff" />
-                           </button>
-                        </form>
+ {/* Primary Submit Button */}
+ <button
+ type="submit"
+ className="primary-action-btn"
+ disabled={loading}
+ >
+ <span>{loading ?"Sending..." :"Send OTP"}</span>
+ <ArrowRightIcon size={18} />
+ </button>
+ </form>
 
                         {/* Divider */}
                         <div className="flex items-center w-full my-5">
