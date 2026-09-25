@@ -83,7 +83,7 @@ export function ComplaintsTrendChart({ trend = [], isLoading = false }: Complain
   ];
 
   return (
-    <div className="flex flex-col p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
       {/* Header with Title and Legend */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-bold text-slate-800">Complaints Trend</h3>
@@ -101,7 +101,7 @@ export function ComplaintsTrendChart({ trend = [], isLoading = false }: Complain
 
       {isLoading ? (
         <div className="flex items-center justify-center flex-1 py-12">
-          <div className="w-32 h-16 bg-slate-100 rounded-lg animate-pulse"></div>
+          <div className="w-32 h-16 bg-slate-100 rounded-none animate-pulse"></div>
         </div>
       ) : points.length === 0 ? (
         <div className="flex items-center justify-center flex-1 text-xs text-slate-400">
@@ -246,7 +246,7 @@ export function ComplaintsTrendChart({ trend = [], isLoading = false }: Complain
           {/* Hover Tooltip Overlay */}
           {hoverIndex !== null && points[hoverIndex] && (
             <div
-              className="absolute -top-3 pointer-events-none transform -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1.5 rounded-lg shadow-lg z-20 flex flex-col gap-0.5"
+              className="absolute -top-3 pointer-events-none transform -translate-x-1/2 bg-slate-900 text-white text-[11px] px-2.5 py-1.5 rounded-none shadow-lg z-20 flex flex-col gap-0.5"
               style={{
                 left: `${(points[hoverIndex].x / width) * 100}%`,
               }}

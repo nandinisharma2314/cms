@@ -23,7 +23,7 @@ export function TopDepartments({ departments = [], isLoading = false }: TopDepar
   const maxTotal = departments.length > 0 ? Math.max(...departments.map((d) => d.count), 1) : 1;
 
   return (
-    <div className="flex flex-col p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-base font-bold text-slate-800">Top Departments</h3>

@@ -76,7 +76,7 @@ export function RecentComplaintsTable({
   const displayList = showAll ? complaints : complaints.slice(0, 5);
 
   return (
-    <div className="flex flex-col p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-[450px]">
       {/* Table Card Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
@@ -95,9 +95,9 @@ export function RecentComplaintsTable({
       </div>
 
       {/* Table Content */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
+      <div className="overflow-auto flex-1 min-h-0 pr-1">
+        <table className="w-full text-left text-xs relative">
+          <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-slate-100 text-slate-400 font-semibold uppercase text-[11px] tracking-wider pb-3">
               <th className="pb-3 pl-2 font-semibold">ID</th>
               <th className="pb-3 font-semibold">Title</th>
@@ -157,12 +157,12 @@ export function RecentComplaintsTable({
                       </div>
                     </td>
                     <td className="py-3.5">
-                      <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-md ${PRIORITY_BADGE[item.priority] ?? ""}`}>
+                      <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-none ${PRIORITY_BADGE[item.priority] ?? ""}`}>
                         {item.priority}
                       </span>
                     </td>
                     <td className="py-3.5">
-                      <span className={`inline-block px-2.5 py-1 text-[11px] font-semibold rounded-lg whitespace-nowrap ${STATUS_BADGE[item.status]}`}>
+                      <span className={`inline-block px-2.5 py-1 text-[11px] font-semibold rounded-none whitespace-nowrap ${STATUS_BADGE[item.status]}`}>
                         {item.status_label}
                       </span>
                       <SlaChips item={item} />

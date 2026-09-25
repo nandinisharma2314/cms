@@ -66,9 +66,9 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
 
   return (
     <aside
-      className={`relative flex flex-col bg-[#111c38] text-slate-300 transition-all duration-300 ease-in-out z-30 shrink-0 ${
+      className={`sticky top-0 flex flex-col bg-[#111c38] text-slate-300 transition-all duration-300 ease-in-out z-30 shrink-0 ${
         isCollapsed ? "w-20" : "w-64"
-      } min-h-screen border-r border-[#1e2d54]`}
+      } h-screen border-r border-[#1e2d54]`}
     >
       {/* Brand Header */}
       <div className="flex items-center justify-between px-5 py-5 border-b border-[#1b284e]">

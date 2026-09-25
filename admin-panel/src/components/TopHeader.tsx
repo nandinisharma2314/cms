@@ -16,6 +16,7 @@ import { useApiData } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { scopeLabel } from "./ScopeEditor";
 import { formatDateTime } from "./ui";
+import { QuickActionsBar } from "./QuickActionsBar";
 
 const NOTIFICATION_POLL_MS = 60_000;
 
@@ -24,6 +25,9 @@ export function TopHeader() {
   const { me, can, logout, reload } = useSession();
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const notifRef = React.useRef<HTMLDivElement>(null);
+  const userRef = React.useRef<HTMLDivElement>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [currentDateStr] = useState(() =>
     new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
@@ -34,11 +38,33 @@ export function TopHeader() {
     return () => clearInterval(timer);
   }, [reloadInbox]);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifMenuOpen && notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotifMenuOpen(false);
+      }
+      if (userMenuOpen && userRef.current && !userRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifMenuOpen, userMenuOpen]);
+
   const openNotification = async (n: NotificationItem) => {
     setNotifMenuOpen(false);
     if (!n.read_at) await api.notifications.markRead(n.id).catch(() => undefined);
     reloadInbox();
     if (n.complaint_id) router.push(`/complaints/${n.complaint_id}`);
+  };
+
+  const toggleNotifications = async () => {
+    const isOpening = !notifMenuOpen;
+    setNotifMenuOpen(isOpening);
+    if (isOpening && inbox && inbox.unread_count > 0) {
+      await api.notifications.markAllRead().catch(() => undefined);
+      reloadInbox();
+    }
   };
 
   // Compute initials from name (e.g. "Rahul Sharma" -> "RS")
@@ -58,7 +84,7 @@ export function TopHeader() {
       : `${me.scopes.length} scopes`;
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between h-20 px-8 bg-white border-b border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+    <header className="sticky top-0 z-40 flex items-center justify-between min-h-[96px] py-4 px-8 bg-[#f8fafc]">
       {/* Search complaints (scoped by the backend) */}
       <form
         className="relative w-full max-w-lg"
@@ -94,24 +120,36 @@ export function TopHeader() {
           <span className="font-medium max-w-[220px] truncate">{scopeSummary}</span>
         </div>
 
+        {/* Date Display Pill / Box with Live Date */}
+        <div className="hidden xl:flex items-center gap-3 px-3.5 py-2 bg-slate-50/80 border border-slate-200/80 rounded-none text-slate-700 select-none">
+          <Calendar className="w-4 h-4 text-blue-600" />
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 leading-none">
+              Today
+            </span>
+            <span className="text-xs font-bold text-slate-800 leading-tight">
+              {currentDateStr}
+            </span>
+          </div>
+        </div>
         {/* Notifications Icon with Dynamic Badge */}
-        <div className="relative">
+        <div className="relative" ref={notifRef}>
           <button
-            onClick={() => setNotifMenuOpen(!notifMenuOpen)}
+            onClick={toggleNotifications}
             className="relative p-2.5 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
             title="Notifications"
           >
             <Bell className="w-5 h-5 text-slate-700" />
             {unread > 0 && (
-              <span className="absolute top-1.5 right-1.5 flex items-center justify-center min-w-[17px] h-[17px] px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full ring-2 ring-white">
+              <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full ring-2 ring-white">
                 {unread > 99 ? "99+" : unread}
               </span>
             )}
           </button>
 
           {notifMenuOpen && (
-            <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-slate-100 z-50 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100">
+            <div className="absolute right-0 mt-3 w-96 bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100/80 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100/80">
                 <span className="text-xs font-bold text-slate-800">Notifications</span>
                 {unread > 0 && (
                   <button
@@ -155,13 +193,16 @@ export function TopHeader() {
           )}
         </div>
 
+
+        <QuickActionsBar />
+
         {/* User Profile Avatar with Initials and Name */}
-        <div className="relative">
+        <div className="relative" ref={userRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="flex items-center gap-2.5 p-1 rounded-full hover:bg-slate-50 transition-colors cursor-pointer"
+            className="flex items-center gap-2.5 p-1 rounded-none hover:bg-slate-50 transition-colors cursor-pointer"
           >
-            <div className="flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 text-blue-700 font-bold text-xs shadow-inner">
+            <div className="flex items-center justify-center w-9 h-9 rounded-none bg-blue-100 text-blue-700 font-bold text-xs shadow-inner">
               {getInitials(me.name)}
             </div>
             <span className="text-xs font-semibold text-slate-800 hidden sm:inline-block">
@@ -171,8 +212,8 @@ export function TopHeader() {
           </button>
 
           {userMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in duration-150">
-              <div className="px-3.5 py-2 border-b border-slate-100">
+            <div className="absolute right-0 mt-3 w-64 bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100/80 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="px-3.5 py-2 border-b border-slate-100/80">
                 <p className="text-xs font-bold text-slate-800">{me.name}</p>
                 <p className="text-[11px] text-slate-400 truncate">{me.email}</p>
                 <div className="mt-1">
@@ -210,19 +251,6 @@ export function TopHeader() {
               </button>
             </div>
           )}
-        </div>
-
-        {/* Date Display Pill / Box with Live Date */}
-        <div className="hidden xl:flex items-center gap-3 px-3.5 py-2 bg-slate-50/80 border border-slate-200/80 rounded-xl text-slate-700 select-none">
-          <Calendar className="w-4 h-4 text-blue-600" />
-          <div className="flex flex-col text-left">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 leading-none">
-              Today
-            </span>
-            <span className="text-xs font-bold text-slate-800 leading-tight">
-              {currentDateStr}
-            </span>
-          </div>
         </div>
       </div>
     </header>

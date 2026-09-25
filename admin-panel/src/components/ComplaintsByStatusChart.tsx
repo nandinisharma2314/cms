@@ -61,7 +61,7 @@ export function ComplaintsByStatusChart({ stats, isLoading = false }: Complaints
   let accumulatedPercent = 0;
 
   return (
-    <div className="flex flex-col p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
       <h3 className="text-base font-bold text-slate-800 mb-4">Complaints by Status</h3>
 
       {isLoading ? (

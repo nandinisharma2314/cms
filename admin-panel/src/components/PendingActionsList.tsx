@@ -44,7 +44,7 @@ function ActionRow({
   const body = (
     <>
       <div className="flex items-center gap-3.5">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${iconClass}`}>
+        <div className={`w-10 h-10 rounded-none flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${iconClass}`}>
           <Icon className="w-5 h-5" />
         </div>
         <div>
@@ -56,7 +56,7 @@ function ActionRow({
     </>
   );
   const className =
-    "flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60 transition-all text-left w-full group cursor-pointer";
+    "flex items-center justify-between p-3.5 rounded-none border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60 transition-all text-left w-full group cursor-pointer";
   return href ? (
     <Link href={href} className={className}>
       {body}
@@ -111,7 +111,7 @@ export function PendingActionsList({
   const staffCount = pendingSummary?.total_users ?? null;
 
   return (
-    <div className="flex flex-col p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-[450px]">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-bold text-slate-800">Pending Actions</h3>
       </div>
@@ -119,8 +119,8 @@ export function PendingActionsList({
       {isLoading ? (
         <div className="flex flex-col flex-1 gap-2.5 animate-pulse py-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="p-3.5 rounded-xl border border-slate-100 bg-slate-50 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-200" />
+            <div key={i} className="p-3.5 rounded-none border border-slate-100 bg-slate-50 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-none bg-slate-200" />
               <div className="flex-1 space-y-1.5">
                 <div className="w-3/4 h-3 bg-slate-200 rounded" />
                 <div className="w-1/2 h-2.5 bg-slate-100 rounded" />
@@ -129,7 +129,7 @@ export function PendingActionsList({
           ))}
         </div>
       ) : (
-        <div className="flex flex-col flex-1 gap-2.5">
+        <div className="flex flex-col flex-1 gap-2.5 overflow-y-auto pr-1">
           {canApproveResets && pendingResetCount > 0 && (
             <ActionRow
               onClick={() => setResetsOpen(true)}
@@ -205,32 +205,32 @@ export function PendingActionsList({
 
       {resetsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-lg bg-white rounded-2xl p-6 shadow-2xl border border-slate-100">
+          <div className="relative w-full max-w-lg bg-white rounded-none p-6 shadow-2xl border border-slate-100">
             <button
               onClick={() => {
                 setResetsOpen(false);
                 setApprovedKey(null);
                 setActionError(null);
               }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-none hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-none bg-blue-100 text-blue-600 flex items-center justify-center">
                 <KeyRound className="w-4 h-4" />
               </div>
               <h3 className="text-sm font-bold text-slate-800">Password Reset Queries</h3>
             </div>
             {actionError && (
-              <div className="mb-3 p-2.5 rounded-lg bg-rose-50 text-rose-700 text-xs border border-rose-200">{actionError}</div>
+              <div className="mb-3 p-2.5 rounded-none bg-rose-50 text-rose-700 text-xs border border-rose-200">{actionError}</div>
             )}
             <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
               {resetTickets.length === 0 ? (
                 <p className="text-xs text-slate-400 py-4 text-center">No password reset tickets pending.</p>
               ) : (
                 resetTickets.map((t) => (
-                  <div key={t.ticket_id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs space-y-2">
+                  <div key={t.ticket_id} className="p-3.5 rounded-none border border-slate-200 bg-slate-50 text-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-bold text-blue-600">#{t.ticket_id}</span>
                       <span
@@ -255,7 +255,7 @@ export function PendingActionsList({
                         <button
                           disabled={isProcessing}
                           onClick={() => handleApproveReset(t.ticket_id)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-none text-xs font-semibold cursor-pointer"
                         >
                           {isProcessing ? "Processing..." : "Approve & Issue Temporary Password"}
                         </button>
@@ -266,7 +266,7 @@ export function PendingActionsList({
               )}
             </div>
             {approvedKey && (
-              <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+              <div className="mt-4 p-3 rounded-none bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                 <span>
                   Temporary password: <strong className="font-mono">{approvedKey}</strong>. Share it with the officer

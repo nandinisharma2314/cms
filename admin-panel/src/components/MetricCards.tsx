@@ -25,9 +25,9 @@ export function MetricCards({ metrics = [], isLoading = false }: MetricCardsProp
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] animate-pulse"
+            className="flex items-center gap-4 p-5 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] animate-pulse"
           >
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 shrink-0" />
+            <div className="w-14 h-14 rounded-none bg-slate-100 shrink-0" />
             <div className="flex flex-col gap-2 flex-1">
               <div className="w-20 h-3 bg-slate-100 rounded" />
               <div className="w-16 h-6 bg-slate-200 rounded" />
@@ -48,10 +48,10 @@ export function MetricCards({ metrics = [], isLoading = false }: MetricCardsProp
         return (
           <div
             key={card.id}
-            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow"
+            className="flex items-center gap-4 p-5 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow"
           >
             <div
-              className={`w-14 h-14 rounded-2xl ${card.iconBg} flex items-center justify-center shrink-0`}
+              className={`w-14 h-14 rounded-none ${card.iconBg} flex items-center justify-center shrink-0`}
             >
               <IconComponent className={`w-7 h-7 ${card.iconColor}`} />
             </div>

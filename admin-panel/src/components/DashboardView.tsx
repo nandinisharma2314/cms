@@ -139,8 +139,6 @@ export function DashboardView() {
         </>
       )}
 
-      {/* Row 4: Quick Actions (only those the user is allowed to perform) */}
-      <QuickActionsBar onRefresh={loadBackendData} />
     </>
   );
 }

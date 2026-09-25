@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   MapPinned,
   CheckCircle2,
+  ChevronDown
 } from "lucide-react";
 import { api, Department, LocationNode } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -98,8 +99,20 @@ export function QuickActionsBar({ onRefresh }: { onRefresh?: () => void }) {
   const [newComplaint, setNewComplaint] = useState(EMPTY_COMPLAINT);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const visible = actions.filter((a) => can(a.permission));
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownOpen && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownOpen]);
 
   useEffect(() => {
     if (!registerOpen) return;
@@ -149,34 +162,51 @@ export function QuickActionsBar({ onRefresh }: { onRefresh?: () => void }) {
   const selectedDepartment = departments.find((d) => d.id === newComplaint.department_id);
 
   return (
-    <div className="flex flex-col gap-3">
-      <h3 className="text-base font-bold text-slate-800">Quick Actions</h3>
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setDropdownOpen(!dropdownOpen)}
+        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-xs rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg cursor-pointer transform hover:-translate-y-0.5"
+      >
+        <span>Quick Actions</span>
+        <ChevronDown className="w-4 h-4" />
+      </button>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {visible.map((act) => {
-          const Icon = act.icon;
-          const className = `flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-xl border ${act.borderClass} ${act.bgClass} transition-all duration-200 cursor-pointer shadow-sm hover:shadow hover:-translate-y-0.5`;
-          const content = (
-            <>
-              <Icon className={`w-4 h-4 ${act.textClass}`} />
-              <span className={`text-xs font-bold ${act.textClass} tracking-tight`}>{act.label}</span>
-            </>
-          );
-          return act.href ? (
-            <Link key={act.id} href={act.href} className={className}>
-              {content}
-            </Link>
-          ) : (
-            <button key={act.id} onClick={() => setRegisterOpen(true)} className={className}>
-              {content}
-            </button>
-          );
-        })}
-      </div>
+      {dropdownOpen && (
+        <div className="absolute right-0 mt-3 w-52 bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100/80 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          {visible.map((act) => {
+            const Icon = act.icon;
+            const content = (
+              <>
+                <div className={`w-7 h-7 shrink-0 flex items-center justify-center rounded-lg transition-colors ${act.bgClass}`}>
+                  <Icon className={`w-3.5 h-3.5 ${act.textClass}`} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">{act.label}</span>
+              </>
+            );
+            const className = `group w-full flex items-center gap-3 px-3.5 py-2 hover:bg-slate-50 transition-colors cursor-pointer`;
+            return act.href ? (
+              <Link key={act.id} href={act.href} className={className} onClick={() => setDropdownOpen(false)}>
+                {content}
+              </Link>
+            ) : (
+              <button
+                key={act.id}
+                onClick={() => {
+                  setDropdownOpen(false);
+                  setRegisterOpen(true);
+                }}
+                className={className}
+              >
+                {content}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 text-white shadow-2xl flex items-center gap-3 text-xs border border-slate-700">
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-none bg-slate-900 text-white shadow-2xl flex items-center gap-3 text-xs border border-slate-700">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
@@ -286,7 +316,7 @@ export function QuickActionsBar({ onRefresh }: { onRefresh?: () => void }) {
                 value={newComplaint.description}
                 onChange={(e) => setNewComplaint({ ...newComplaint, description: e.target.value })}
                 placeholder="Details of the grievance..."
-                className="w-full p-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full p-2 text-xs border border-slate-200 rounded-none focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </Field>
             <div className="pt-2 flex justify-end gap-2">
