@@ -1,327 +1,221 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional
-import jwt
-from datetime import datetime, timedelta
-import os
 import secrets
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from database import get_db
-from models import User, RefreshToken, Otp
-from utils.auth_middleware import get_current_user
-import random
-from twilio.rest import Client
-import smtplib
-from email.message import EmailMessage
+from models import EndUser, PasswordResetTicket, RefreshToken, User
+from services import audit_service
+from services.access_service import AccessContext
+from services.token_service import consume_refresh_token, issue_token_pair, revoke_all_for
+from services.user_service import find_staff_by_identifier, serialize_users, visible_reset_tickets
+from utils.auth_middleware import get_access_context, require_permission
+from utils.security import (
+    PRINCIPAL_STAFF, hash_password, sha256_hex, utcnow, validate_password_strength, verify_password,
+)
 
 router = APIRouter()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key-change-me")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRES_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_MINUTES", "15"))
-REFRESH_TOKEN_EXPIRES_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES_DAYS", "7"))
 
-class SendOtpRequest(BaseModel):
-    mobile: str = None
-    email: str = None
-    method: str
+class LoginRequest(BaseModel):
+    email: str | None = None
+    mobile: str | None = None
+    password: str
 
-class VerifyOtpRequest(BaseModel):
-    target: str # mobile or email
-    otp: str
 
 class RefreshRequest(BaseModel):
     refresh_token: str
 
-class UpdateProfileRequest(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    mobile: Optional[str] = None
-    dob: Optional[str] = None
-    gender: Optional[str] = None
-    address: Optional[str] = None
-    language: Optional[str] = None
-    notify_sms: Optional[bool] = None
-    notify_email: Optional[bool] = None
-    notify_alerts: Optional[bool] = None
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
-def create_refresh_token(user_id: int, db: Session):
-    token = secrets.token_hex(32)
-    expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRES_DAYS)
-    
-    db_token = RefreshToken(token=token, user_id=user_id, expires_at=expires_at)
-    db.add(db_token)
-    db.commit()
-    db.refresh(db_token)
-    
-    return token
 
-@router.post("/send-otp")
-def send_otp(request: SendOtpRequest, db: Session = Depends(get_db)):
-    target = request.mobile if request.method == 'mobile' else request.email
-    if not target:
-        raise HTTPException(status_code=400, detail="Target is required.")
-        
-    target = target.strip()
-    
-    # Check if user is pre-registered
-    if request.method == 'mobile':
-        clean_digits = "".join(filter(str.isdigit, target))
-        last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
-        if last10:
-            user = db.query(User).filter((User.mobile == target) | (User.mobile.like(f"%{last10}%"))).first()
-        else:
-            user = db.query(User).filter(User.mobile == target).first()
-    else:
-        user = db.query(User).filter(User.email.ilike(target)).first()
+class AvailabilityRequest(BaseModel):
+    is_available: bool
 
-    if not user:
-        raise HTTPException(status_code=400, detail="User not found. Only registered users can log in.")
-        
-    otp_code = str(random.randint(100000, 999999))
-    expires_at = datetime.utcnow() + timedelta(minutes=15)
-    
-    # Store OTP using canonical user target
-    actual_target = user.mobile if request.method == 'mobile' else user.email
-    print(f"\n==============================================", flush=True)
-    print(f"--- DEV MODE: OTP for {actual_target} is {otp_code} ---", flush=True)
-    print(f"==============================================\n", flush=True)
-    
-    db_otp = Otp(target=actual_target, code=otp_code, expires_at=expires_at)
-    db.add(db_otp)
-    db.commit()
-    
-    if os.getenv("ENVIRONMENT") == "development":
-        pass
-    else:
-        if request.method == 'mobile':
-            try:
-                client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
-                client.messages.create(
-                    body=f"Your CMS verification code is {otp_code}",
-                    from_=os.getenv("TWILIO_PHONE_NUMBER"),
-                    to=target
-                )
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to send SMS: {str(e)}")
-        else:
-            try:
-                msg = EmailMessage()
-                msg.set_content(f"Your CMS verification code is {otp_code}")
-                msg['Subject'] = 'CMS Login Verification'
-                msg['From'] = os.getenv("SMTP_USERNAME")
-                msg['To'] = target
-                
-                with smtplib.SMTP(os.getenv("SMTP_SERVER"), int(os.getenv("SMTP_PORT", 587))) as server:
-                    server.starttls()
-                    server.login(os.getenv("SMTP_USERNAME"), os.getenv("SMTP_PASSWORD"))
-                    server.send_message(msg)
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to send Email: {str(e)}")
 
-    res = {"success": True, "message": "OTP sent successfully"}
-    if os.getenv("ENVIRONMENT") == "development":
-        res["dev_otp"] = otp_code
-    return res
+class ResetQueryRequest(BaseModel):
+    email_or_id: str
+    department: str
+    reason: str
 
-@router.post("/verify-otp")
-def verify_otp(request: VerifyOtpRequest, db: Session = Depends(get_db)):
-    target = request.target.strip()
-    clean_digits = "".join(filter(str.isdigit, target))
-    last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
-    
-    if "@" in target:
-        user = db.query(User).filter(User.email.ilike(target)).first()
-    else:
-        if last10:
-            user = db.query(User).filter(
-                (User.mobile == target) | 
-                (User.mobile.like(f"%{last10}%"))
-            ).first()
-        else:
-            user = db.query(User).filter(User.mobile == target).first()
 
-    if not user:
-        return {"success": False, "error": "User not registered."}
+class ApproveResetRequest(BaseModel):
+    temporary_key: str | None = None
 
-    # Find valid OTP for this user's mobile or email or request target
-    valid_otp = db.query(Otp).filter(
-        (Otp.target == target) | (Otp.target == user.mobile) | (Otp.target == user.email),
-        Otp.code == request.otp.strip(),
-        Otp.expires_at > datetime.utcnow()
-    ).order_by(Otp.id.desc()).first()
-    
-    if not valid_otp:
-        return {"success": False, "error": "Invalid or expired verification code."}
-    
-    # Generate tokens
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRES_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.id, "role": user.role}, expires_delta=access_token_expires
+
+def staff_profile(db: Session, ctx: AccessContext) -> dict:
+    profile = serialize_users(db, [ctx.user])[0]
+    profile["permissions"] = sorted(ctx.permissions)
+    profile["is_super_admin"] = ctx.is_super_admin
+    return profile
+
+
+# Email / mobile + password login for staff (Super Admin down to Agent)
+@router.post("/login")
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    identifier = payload.email or payload.mobile
+    user = find_staff_by_identifier(db, identifier) if identifier else None
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    if not user.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been deactivated")
+
+    user.last_login_at = utcnow()
+    audit_service.record(
+        db, actor=user, action="auth.login", entity_type="user", entity_id=user.id,
+        summary=f"{user.name} signed in", request=request,
     )
-    refresh_token = create_refresh_token(user.id, db)
-    
-    # Invalidate used OTP
-    db.delete(valid_otp)
-    db.commit()
-    
-    return {
-        "success": True, 
-        "access_token": access_token, 
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "name": user.name,
-            "mobile": user.mobile,
-            "email": user.email,
-            "dob": user.dob,
-            "gender": user.gender,
-            "address": user.address,
-            "role": user.role,
-            "language": user.language,
-            "notify_sms": user.notify_sms,
-            "notify_email": user.notify_email,
-            "notify_alerts": user.notify_alerts
-        }
-    }
+    tokens = issue_token_pair(db, PRINCIPAL_STAFF, user.id)
+    ctx = AccessContext(db, user)
+    return {"success": True, **tokens, "user": staff_profile(db, ctx)}
 
+
+# Works for both staff and citizen refresh tokens; the old token is revoked (rotation)
 @router.post("/refresh")
-def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
-    db_token = db.query(RefreshToken).filter(RefreshToken.token == request.refresh_token).first()
-    
-    if not db_token or db_token.revoked or db_token.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
-    
-    # Revoke old token
-    db_token.revoked = True
-    db.commit()
-    
-    # Get user
-    user = db.query(User).filter(User.id == db_token.user_id).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-        
-    # Generate new tokens
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRES_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.id, "role": user.role}, expires_delta=access_token_expires
-    )
-    new_refresh_token = create_refresh_token(user.id, db)
-    
-    return {
-        "success": True,
-        "access_token": access_token,
-        "refresh_token": new_refresh_token,
-        "token_type": "bearer"
-    }
+def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
+    token = consume_refresh_token(db, payload.refresh_token)
+    model = User if token.principal_type == PRINCIPAL_STAFF else EndUser
+    principal = db.get(model, token.principal_id)
+    if principal is None or not principal.is_active:
+        db.commit()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account not found or deactivated")
+    return {"success": True, **issue_token_pair(db, token.principal_type, principal.id)}
+
+
+@router.post("/logout")
+def logout(payload: RefreshRequest, db: Session = Depends(get_db)):
+    token = db.query(RefreshToken).filter(RefreshToken.token_hash == sha256_hex(payload.refresh_token)).first()
+    if token is not None and token.revoked_at is None:
+        token.revoked_at = utcnow()
+        db.commit()
+    return {"success": True}
+
 
 @router.get("/me")
-def get_me(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    user = db.query(User).filter(User.id == current_user["id"]).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return {
-        "success": True,
-        "user": {
-            "id": user.id,
-            "name": user.name or "",
-            "email": user.email or "",
-            "mobile": user.mobile or "",
-            "dob": user.dob or "",
-            "gender": user.gender or "",
-            "address": user.address or "",
-            "role": user.role or "citizen",
-            "language": user.language or "English (India)",
-            "notify_sms": user.notify_sms,
-            "notify_email": user.notify_email,
-            "notify_alerts": user.notify_alerts
-        }
-    }
+def me(ctx: AccessContext = Depends(get_access_context)):
+    return staff_profile(ctx.db, ctx)
 
-@router.put("/profile")
-def update_profile(request: UpdateProfileRequest, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    user = db.query(User).filter(User.id == current_user["id"]).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-    if request.name is not None and request.name.strip():
-        user.name = request.name.strip()
 
-    if request.email is not None:
-        new_email = request.email.strip()
-        if new_email:
-            # Check if email is already taken by another user (case-insensitive)
-            existing = db.query(User).filter(
-                User.email.ilike(new_email),
-                User.id != user.id
-            ).first()
-            if existing:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is already registered with another account")
-            user.email = new_email
-        else:
-            # If user registered with mobile, email can be cleared
-            if not user.mobile:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email cannot be empty for email-based account")
-            user.email = None
+@router.post("/availability")
+def set_my_availability(
+    payload: AvailabilityRequest, request: Request, ctx: AccessContext = Depends(get_access_context),
+):
+    """Staff can mark themselves unavailable (e.g. on leave) so routing skips them."""
+    if ctx.user.is_available != payload.is_available:
+        ctx.user.is_available = payload.is_available
+        audit_service.record(
+            ctx.db, actor=ctx.user, action="user.availability", entity_type="user", entity_id=ctx.user.id,
+            summary=f"{ctx.user.name} marked themselves {'available' if payload.is_available else 'unavailable'}",
+            changes={"is_available": [not payload.is_available, payload.is_available]}, request=request,
+        )
+        ctx.db.commit()
+    return staff_profile(ctx.db, ctx)
 
-    if request.mobile is not None:
-        new_mobile = request.mobile.strip()
-        if new_mobile:
-            # Extract last 10 digits for clean match
-            clean_digits = "".join(filter(str.isdigit, new_mobile))
-            last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
-            existing = db.query(User).filter(
-                (User.mobile == new_mobile) | (User.mobile.like(f"%{last10}%")),
-                User.id != user.id
-            ).first() if last10 else None
-            
-            if existing:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mobile number is already registered with another account")
-            user.mobile = new_mobile
-        else:
-            if not user.email:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mobile number cannot be empty for mobile-based account")
-            user.mobile = None
-            
-    if request.dob is not None: user.dob = request.dob
-    if request.gender is not None: user.gender = request.gender
-    if request.address is not None: user.address = request.address
-    if request.language is not None: user.language = request.language
-    if request.notify_sms is not None: user.notify_sms = request.notify_sms
-    if request.notify_email is not None: user.notify_email = request.notify_email
-    if request.notify_alerts is not None: user.notify_alerts = request.notify_alerts
-        
+
+@router.post("/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    ctx: AccessContext = Depends(get_access_context),
+):
+    db = ctx.db
+    if not verify_password(payload.current_password, ctx.user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
+    error = validate_password_strength(payload.new_password)
+    if error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
+    ctx.user.password_hash = hash_password(payload.new_password)
+    revoke_all_for(db, PRINCIPAL_STAFF, ctx.user.id)
+    audit_service.record(
+        db, actor=ctx.user, action="user.password_change", entity_type="user", entity_id=ctx.user.id,
+        summary=f"{ctx.user.name} changed their password", request=request,
+    )
     db.commit()
-    db.refresh(user)
-    
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Password reset queries: a locked-out officer raises a ticket, someone above
+# them approves it and hands over a temporary password.
+# ---------------------------------------------------------------------------
+
+@router.post("/reset-query")
+def raise_reset_query(payload: ResetQueryRequest, db: Session = Depends(get_db)):
+    ticket = PasswordResetTicket(
+        ticket_id=f"RST-{secrets.token_hex(3).upper()}",
+        email_or_id=payload.email_or_id.strip()[:120],
+        department=payload.department.strip()[:100],
+        reason=payload.reason.strip()[:500],
+        status="Pending Approval",
+    )
+    db.add(ticket)
+    db.commit()
     return {
         "success": True,
-        "message": "Profile updated successfully",
-        "user": {
-            "id": user.id,
-            "name": user.name or "",
-            "email": user.email or "",
-            "mobile": user.mobile or "",
-            "dob": user.dob or "",
-            "gender": user.gender or "",
-            "address": user.address or "",
-            "role": user.role or "citizen",
-            "language": user.language or "English (India)",
-            "notify_sms": user.notify_sms,
-            "notify_email": user.notify_email,
-            "notify_alerts": user.notify_alerts
-        }
+        "ticket_id": ticket.ticket_id,
+        "message": "Reset query submitted for review",
+        "status": ticket.status,
     }
 
 
+@router.get("/reset-queries")
+def list_reset_queries(ctx: AccessContext = Depends(require_permission("user.reset_password"))):
+    return [
+        {
+            "ticket_id": t.ticket_id,
+            "email_or_id": t.email_or_id,
+            "department": t.department,
+            "reason": t.reason,
+            "status": t.status,
+            "created_at": t.created_at.isoformat(),
+            "matched_user": {"id": u.id, "name": u.name, "role": u.role.name} if u else None,
+        }
+        for t, u in visible_reset_tickets(ctx)
+    ]
+
+
+@router.post("/reset-queries/{ticket_id}/approve")
+def approve_reset_query(
+    ticket_id: str,
+    request: Request,
+    payload: ApproveResetRequest | None = None,
+    ctx: AccessContext = Depends(require_permission("user.reset_password")),
+):
+    db = ctx.db
+    ticket = db.query(PasswordResetTicket).filter(PasswordResetTicket.ticket_id == ticket_id).first()
+    if ticket is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reset ticket not found")
+    if ticket.status != "Pending Approval":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Ticket has already been processed")
+    user = find_staff_by_identifier(db, ticket.email_or_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No staff account matches this ticket")
+    if not ctx.can_manage_user(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot reset this user's password")
+
+    temp_key = (payload.temporary_key if payload and payload.temporary_key else secrets.token_urlsafe(9))
+    error = validate_password_strength(temp_key)
+    if error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
+
+    user.password_hash = hash_password(temp_key)
+    revoke_all_for(db, PRINCIPAL_STAFF, user.id)
+    ticket.status = "Approved"
+    ticket.approved_by_id = ctx.user.id
+    audit_service.record(
+        db, actor=ctx.user, action="user.password_reset", entity_type="user", entity_id=user.id,
+        summary=f"Approved password reset {ticket.ticket_id} for {user.name}", request=request,
+    )
+    db.commit()
+    # The key is returned once so the approver can pass it on; it is not stored in plain text.
+    return {
+        "success": True,
+        "ticket_id": ticket_id,
+        "status": "Approved",
+        "temporary_key": temp_key,
+        "message": f"Reset approved for {user.name}. Share the temporary password securely.",
+    }

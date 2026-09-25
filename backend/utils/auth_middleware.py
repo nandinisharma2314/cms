@@ -1,38 +1,68 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
-import os
-from dotenv import load_dotenv
+from sqlalchemy.orm import Session
 
-load_dotenv()
+from database import get_db
+from models import EndUser, User
+from services.access_service import AccessContext
+from utils.security import PRINCIPAL_END_USER, PRINCIPAL_STAFF, decode_access_token
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key-change-me")
-ALGORITHM = "HS256"
+bearer_scheme = HTTPBearer(auto_error=False)
 
-security = HTTPBearer()
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
+def _unauthorized(detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _decode(credentials: HTTPAuthorizationCredentials | None) -> tuple[str, int]:
+    if credentials is None:
+        raise _unauthorized("Not authenticated")
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
-        role: str = payload.get("role")
-        if user_id is None or role is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        return {"id": user_id, "role": role}
+        return decode_access_token(credentials.credentials)
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _unauthorized("Token has expired")
+    except (jwt.InvalidTokenError, ValueError):
+        raise _unauthorized("Invalid token")
+
+
+def get_access_context(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> AccessContext:
+    """Authenticated staff user with their permissions and scopes. The user is
+    reloaded on every request so role, scope and deactivation changes apply
+    immediately rather than when the token expires."""
+    principal_type, principal_id = _decode(credentials)
+    if principal_type != PRINCIPAL_STAFF:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff account required")
+    user = db.get(User, principal_id)
+    if user is None or not user.is_active:
+        raise _unauthorized("Account not found or deactivated")
+    return AccessContext(db, user)
+
+
+def require_permission(*permissions: str):
+    """Dependency factory: the staff user must hold every listed permission."""
+    def dependency(ctx: AccessContext = Depends(get_access_context)) -> AccessContext:
+        for permission in permissions:
+            ctx.require(permission)
+        return ctx
+    return dependency
+
+
+def get_current_end_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> EndUser:
+    principal_type, principal_id = _decode(credentials)
+    if principal_type != PRINCIPAL_END_USER:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Citizen account required")
+    end_user = db.get(EndUser, principal_id)
+    if end_user is None or not end_user.is_active:
+        raise _unauthorized("Account not found or deactivated")
+    return end_user

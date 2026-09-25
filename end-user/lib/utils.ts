@@ -12,15 +12,24 @@ export const getPriorityStyles = (priority: string) => {
  }
 };
 
+// Takes the workflow status key (e.g. "IN_PROGRESS").
 export const getStatusStyles = (status: string) => {
  switch (status) {
- case"In Progress":
+ case"ACKNOWLEDGED":
+ case"IN_PROGRESS":
  return"bg-emerald-50 text-emerald-700";
- case"Resolved":
+ case"WAITING_FOR_INFORMATION":
+ case"REJECTION_REQUESTED": // shown to citizens as "Under Review"
+ return"bg-amber-50 text-amber-700";
+ case"RESOLVED":
+ case"CLOSED":
  return"bg-green-50 text-green-600";
- case"Open":
- case"Submitted":
+ case"SUBMITTED":
+ case"ASSIGNED":
+ case"REOPENED":
  return"bg-red-50 text-red-500";
+ case"REJECTED":
+ return"bg-slate-700 text-white";
  default:
  return"bg-slate-50 text-slate-600";
  }

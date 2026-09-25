@@ -6,22 +6,21 @@ import { CivicLogo } from "./CivicLogo";
 import { SkylineIllustration } from "./SkylineIllustration";
 import { NeedHelpModal } from "./NeedHelpModal";
 import {
-   SmartphoneIcon,
-   MailEnvelopeIcon,
-   ChevronLeftIcon,
-   ChevronRightIcon,
-   ChevronDownIcon,
-   ArrowRightIcon,
-   ShieldCheckIcon,
-   LockPrivacyIcon,
-   MunicipalCheckBadge,
-   BoltIcon,
-   PadlockIcon,
-   QuestionCircleIcon,
-   IndiaFlagIcon,
-   MailFilledIcon,
-} from "./AuthIcons";
-import { apis } from "../../lib/apis";
+ SmartphoneIcon,
+ MailEnvelopeIcon,
+ ChevronLeftIcon,
+ ChevronRightIcon,
+ ChevronDownIcon,
+ ArrowRightIcon,
+ ShieldCheckIcon,
+ LockPrivacyIcon,
+ MunicipalCheckBadge,
+ BoltIcon,
+ PadlockIcon,
+ QuestionCircleIcon,
+ IndiaFlagIcon,
+} from"./AuthIcons";
+import { apis, OtpChannel, saveSession } from"../../lib/apis";
 
 export type AuthScreenStep =
    | "welcome" // Screen 1
@@ -71,11 +70,14 @@ export function LoginFlow() {
       return false;
    });
 
-   // Form Inputs
-   const [countryCode, setCountryCode] = useState("+91");
-   const [showCountryPicker, setShowCountryPicker] = useState(false);
-   const [mobileNumber, setMobileNumber] = useState("");
-   const [emailAddress, setEmailAddress] = useState("");
+ // Form Inputs
+ const [countryCode, setCountryCode] = useState("+91");
+ const [showCountryPicker, setShowCountryPicker] = useState(false);
+ const [mobileNumber, setMobileNumber] = useState("");
+ const [emailAddress, setEmailAddress] = useState("");
+ // Returned by request-otp; identifies the code being verified.
+ const [challengeId, setChallengeId] = useState("");
+ const [sentTo, setSentTo] = useState("");
 
    // 6-digit OTP State
    const [devOtp, setDevOtp] = useState<string>("");
@@ -130,88 +132,48 @@ export function LoginFlow() {
       return `${mins.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`;
    };
 
-   // Send OTP for Mobile
-   const handleMobileSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setErrorMessage("");
-      setLoading(true);
+ // Citizens must match on both mobile and email; the channel only decides
+ // where the code is delivered.
+ const requestOtp = async (channel: OtpChannel) => {
+ const response = await apis.auth.requestOtp({
+ mobile: `${countryCode}${mobileNumber.replace(/\s+/g,"")}`,
+ email: emailAddress.trim(),
+ channel,
+ });
+ setChallengeId(response.challenge_id);
+ setSentTo(response.sent_to);
+ setDevOtp(response.dev_otp ||"");
+ setOtpDigits(["","","","","",""]);
+ startOtpTimer();
+ };
 
-      const cleanNumber = mobileNumber.replace(/\s+/g, "");
-      const fullTarget = `${countryCode} ${cleanNumber}`;
+ const handleOtpRequest = (channel: OtpChannel) => async (e: React.FormEvent) => {
+ e.preventDefault();
+ setErrorMessage("");
+ setLoading(true);
+ try {
+ await requestOtp(channel);
+ setCurrentStep(channel ==="sms" ?"otp_mobile" :"otp_email");
+ } catch (err) {
+ setErrorMessage((err as Error).message ||"Could not send verification code.");
+ } finally {
+ setLoading(false);
+ }
+ };
 
-      try {
-         const response = await apis.auth.sendOtp({
-            mobile: fullTarget,
-            method: "mobile",
-         });
-
-         if (response.success) {
-            if (response.dev_otp) setDevOtp(response.dev_otp);
-            startOtpTimer();
-            setCurrentStep("otp_mobile");
-         } else {
-            setErrorMessage(response.error || "Could not send verification code.");
-         }
-      } catch (err: any) {
-         setErrorMessage(err.message || "Could not send verification code.");
-      } finally {
-         setLoading(false);
-      }
-   };
-
-   // Send OTP for Email
-   const handleEmailSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setErrorMessage("");
-      setLoading(true);
-
-      try {
-         const response = await apis.auth.sendOtp({
-            email: emailAddress,
-            method: "email",
-         });
-
-         if (response.success) {
-            if (response.dev_otp) setDevOtp(response.dev_otp);
-            startOtpTimer();
-            setCurrentStep("otp_email");
-         } else {
-            setErrorMessage(response.error || "Could not send verification code.");
-         }
-      } catch (err: any) {
-         setErrorMessage(err.message || "Could not send verification code.");
-      } finally {
-         setLoading(false);
-      }
-   };
-
-   // Resend OTP
-   const handleResendOtp = async () => {
-      if (!canResend && timerSeconds > 0) return;
-      setLoading(true);
-      setErrorMessage("");
-
-      try {
-         const isEmail = currentStep === "otp_email";
-         const payload = isEmail
-            ? { email: emailAddress, method: "email" as const }
-            : {
-               mobile: `${countryCode} ${mobileNumber.replace(/\s+/g, "")}`,
-               method: "mobile" as const,
-            };
-
-         const response = await apis.auth.sendOtp(payload);
-         if (response.success) {
-            startOtpTimer();
-         } else {
-            setErrorMessage(response.error || "Could not resend code.");
-         }
-      } catch {
-         startOtpTimer();
-      } finally {
-         setLoading(false);
-      }
-   };
+ // Resend OTP
+ const handleResendOtp = async () => {
+ if (!canResend && timerSeconds > 0) return;
+ setLoading(true);
+ setErrorMessage("");
+ try {
+ await requestOtp(currentStep ==="otp_email" ?"email" :"sms");
+ } catch (err) {
+ setErrorMessage((err as Error).message ||"Could not resend code.");
+ } finally {
+ setLoading(false);
+ }
+ };
 
    // Handle individual OTP digit input
    const handleOtpDigitChange = (index: number, value: string) => {
@@ -258,57 +220,27 @@ export function LoginFlow() {
          return;
       }
 
-      setErrorMessage("");
-      setCurrentStep("verifying");
+ setErrorMessage("");
+ setCurrentStep("verifying");
 
-      const target =
-         currentStep === "otp_email"
-            ? emailAddress
-            : `${countryCode} ${mobileNumber.replace(/\s+/g, "")}`;
-
-      try {
-         const response = await apis.auth.verifyOtp({
-            target,
-            otp: code,
-         });
-
-         if (response.success) {
-            // Clear old session completely
-            localStorage.clear();
-
-            if (response.access_token) {
-               localStorage.setItem("access_token", response.access_token);
-            }
-            if (response.user) {
-               localStorage.setItem("user", JSON.stringify(response.user));
-               if (response.user.dob) localStorage.setItem("user_dob", response.user.dob);
-               if (response.user.gender) localStorage.setItem("user_gender", response.user.gender);
-               if (response.user.address) localStorage.setItem("user_address", response.user.address);
-            }
-            
-            // Dispatch event for other tabs/components
-            window.dispatchEvent(new Event("profileUpdated"));
-
-            setTimeout(() => {
-               router.push("/dashboard");
-            }, 1600);
-         } else {
-            setTimeout(() => {
-               setCurrentStep(
-                  currentStep === "otp_email" ? "otp_email" : "otp_mobile",
-               );
-               setErrorMessage(response.error || "Invalid verification code.");
-            }, 1000);
-         }
-      } catch (err: any) {
-         setTimeout(() => {
-            setCurrentStep(
-               currentStep === "otp_email" ? "otp_email" : "otp_mobile",
-            );
-            setErrorMessage(err.message || "Invalid verification code.");
-         }, 1000);
-      }
-   };
+ try {
+ const response = await apis.auth.verifyOtp({
+ challenge_id: challengeId,
+ otp: code,
+ });
+ saveSession(response);
+ setTimeout(() => {
+ router.push("/dashboard");
+ }, 1600);
+ } catch (err) {
+ setTimeout(() => {
+ setCurrentStep(
+ currentStep ==="otp_email" ?"otp_email" :"otp_mobile",
+ );
+ setErrorMessage((err as Error).message ||"Invalid verification code.");
+ }, 1000);
+ }
+ };
 
    return (
       <div className="civic-auth-page">
@@ -563,53 +495,81 @@ export function LoginFlow() {
                            <img src="/images/mobile_icon_cloud_1790310888070.jpg" alt="Mobile illustration" className="w-[180px] h-[180px] object-cover mix-blend-multiply [mask-image:radial-gradient(circle,black_50%,transparent_70%)]" />
                         </div>
 
-                        {/* Title & Subtitle */}
-                        <div className="flex flex-col items-center text-center mb-5 px-2">
-                           <h2 className="text-[22px] font-bold text-[#1e293b] tracking-tight">Login with Mobile Number</h2>
-                        </div>
+ {/* Screen Title & Subtitle */}
+ <div className="auth-header-block centered">
+ <h3 className="auth-title">Login with Mobile Number</h3>
+ <p className="auth-subtitle">
+ Enter your registered mobile number and email address.
+ We&apos;ll text a verification code to your mobile.
+ </p>
+ </div>
 
-                        {/* Form */}
-                        <form onSubmit={handleMobileSubmit} className="flex flex-col">
-                           
-                           {/* Input Group */}
-                           <div className="flex items-center w-full h-[56px] border border-[#cbd5e1] rounded-2xl bg-white overflow-visible relative mb-6">
-                              {/* Country Selector */}
-                              <div className="flex items-center h-full px-4 border-r border-[#e2e8f0] cursor-pointer" onClick={() => setShowCountryPicker(!showCountryPicker)}>
-                                 <IndiaFlagIcon size={22} />
-                                 <span className="ml-2 mr-1 text-[15px] font-semibold text-[#0f172a]">{countryCode}</span>
-                                 <ChevronDownIcon size={14} color="#64748b" />
-                              </div>
-                              
-                              {showCountryPicker && (
-                                 <div className="absolute top-[64px] left-0 w-[200px] bg-white rounded-xl shadow-lg border border-[#e2e8f0] overflow-hidden z-20">
-                                    {COUNTRY_CODES.map((item) => (
-                                       <button
-                                          key={item.code}
-                                          type="button"
-                                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f8fafc] text-left transition-colors"
-                                          onClick={() => {
-                                             setCountryCode(item.code);
-                                             setShowCountryPicker(false);
-                                          }}
-                                       >
-                                          <span className="text-[18px]">{item.flag}</span>
-                                          <span className="text-[14px] font-medium text-[#0f172a] flex-1">{item.name}</span>
-                                          <span className="text-[13px] text-[#64748b]">{item.code}</span>
-                                       </button>
-                                    ))}
-                                 </div>
-                              )}
+ {/* Mobile Input Form */}
+ <form onSubmit={handleOtpRequest("sms")} className="auth-form">
+ <div className="phone-input-row">
+ {/* Country Selector */}
+ <div className="country-selector-wrapper">
+ <button
+ type="button"
+ className="country-picker-btn"
+ onClick={() => setShowCountryPicker(!showCountryPicker)}
+ >
+ <IndiaFlagIcon size={20} />
+ <span className="country-code-text">{countryCode}</span>
+ <ChevronDownIcon size={12} color="#64748b" />
+ </button>
 
-                              {/* Input */}
-                              <input 
-                                 type="tel" 
-                                 className="flex-1 h-full px-4 outline-none text-[16px] text-[#0f172a] bg-transparent font-medium"
-                                 placeholder="98765 42210"
-                                 value={mobileNumber}
-                                 onChange={(e) => setMobileNumber(e.target.value)}
-                                 required
-                              />
-                           </div>
+ {showCountryPicker && (
+ <div className="country-dropdown-menu">
+ {COUNTRY_CODES.map((item) => (
+ <button
+ key={item.code}
+ type="button"
+ className="country-dropdown-item"
+ onClick={() => {
+ setCountryCode(item.code);
+ setShowCountryPicker(false);
+ }}
+ >
+ <span>{item.flag}</span>
+ <span className="country-item-name">
+ {item.name}
+ </span>
+ <span className="country-item-code">
+ {item.code}
+ </span>
+ </button>
+ ))}
+ </div>
+ )}
+ </div>
+
+ {/* Number Input Field */}
+ <div className="phone-number-field">
+ <input
+ type="tel"
+ className="auth-text-input"
+ value={mobileNumber}
+ onChange={(e) => setMobileNumber(e.target.value)}
+ placeholder="98765 43210"
+ required
+ />
+ </div>
+ </div>
+
+ <div className="email-input-wrapper">
+ <span className="input-prefix-icon">
+ <MailEnvelopeIcon size={18} color="#64748b" />
+ </span>
+ <input
+ type="email"
+ className="auth-text-input with-prefix"
+ value={emailAddress}
+ onChange={(e) => setEmailAddress(e.target.value)}
+ placeholder="Registered email address"
+ required
+ />
+ </div>
 
                            {/* Submit Button */}
                            <button 
@@ -629,27 +589,18 @@ export function LoginFlow() {
                            <div className="flex-1 h-[1px] bg-[#cbd5e1]"></div>
                         </div>
 
-                        {/* Email Button */}
-                        <button 
-                           type="button" 
-                           onClick={() => {
-                              setErrorMessage("");
-                              setCurrentStep("email_login");
-                           }}
-                           className="w-full h-[56px] bg-[#f0f9ff] border border-[#bae6fd] rounded-2xl flex items-center justify-center gap-3 hover:bg-[#e0f2fe] transition-transform active:scale-[0.98]"
-                        >
-                           <MailFilledIcon size={24} color="#1877f2" />
-                           <span className="text-[15px] font-bold text-[#1877f2]">Login with Email Instead</span>
-                        </button>
-
-                        {/* Spacer */}
-                        <div className="flex-1"></div>
-
-                        {/* Footer text */}
-                        <div className="flex justify-center items-center gap-2 mt-6 pb-2">
-                           <ShieldCheckIcon size={18} color="#2563eb" />
-                           <span className="text-[13px] text-[#475569] font-medium">Your information is secure with us</span>
-                        </div>
+ {/* Switch to Email Button */}
+ <button
+ type="button"
+ className="secondary-action-btn"
+ onClick={() => {
+ setErrorMessage("");
+ setCurrentStep("email_login");
+ }}
+ >
+ <MailEnvelopeIcon size={18} color="#059669" />
+ <span>Get the code by email instead</span>
+ </button>
 
                      </div>
                   </div>
@@ -689,26 +640,81 @@ export function LoginFlow() {
                            <img src="/images/email_icon_cloud_1790310901967.jpg" alt="Email illustration" className="w-[180px] h-[180px] object-cover mix-blend-multiply [mask-image:radial-gradient(circle,black_50%,transparent_70%)]" />
                         </div>
 
-                        {/* Title & Subtitle */}
-                        <div className="flex flex-col items-center text-center mb-5 px-2">
-                           <h2 className="text-[22px] font-bold text-[#1e293b] tracking-tight">Login with Email Address</h2>
-                        </div>
+ {/* Screen Title & Subtitle */}
+ <div className="auth-header-block centered">
+ <h3 className="auth-title">Login with Email Address</h3>
+ <p className="auth-subtitle">
+ Enter your registered email address and mobile number.
+ We&apos;ll email you a verification code.
+ </p>
+ </div>
 
-                        {/* Form */}
-                        <form onSubmit={handleEmailSubmit} className="flex flex-col">
-                           
-                           {/* Input Group */}
-                           <div className="flex items-center w-full h-[56px] border border-[#cbd5e1] rounded-2xl bg-white overflow-hidden relative mb-6 px-4">
-                              <MailEnvelopeIcon size={20} color="#64748b" />
-                              <input 
-                                 type="email" 
-                                 className="flex-1 h-full px-3 outline-none text-[16px] text-[#0f172a] bg-transparent font-medium"
-                                 placeholder="rahul.sharma@example.com"
-                                 value={emailAddress}
-                                 onChange={(e) => setEmailAddress(e.target.value)}
-                                 required
-                              />
-                           </div>
+ {/* Email Form */}
+ <form onSubmit={handleOtpRequest("email")} className="auth-form">
+ <div className="phone-input-row">
+ {/* Country Selector */}
+ <div className="country-selector-wrapper">
+ <button
+ type="button"
+ className="country-picker-btn"
+ onClick={() => setShowCountryPicker(!showCountryPicker)}
+ >
+ <IndiaFlagIcon size={20} />
+ <span className="country-code-text">{countryCode}</span>
+ <ChevronDownIcon size={12} color="#64748b" />
+ </button>
+
+ {showCountryPicker && (
+ <div className="country-dropdown-menu">
+ {COUNTRY_CODES.map((item) => (
+ <button
+ key={item.code}
+ type="button"
+ className="country-dropdown-item"
+ onClick={() => {
+ setCountryCode(item.code);
+ setShowCountryPicker(false);
+ }}
+ >
+ <span>{item.flag}</span>
+ <span className="country-item-name">
+ {item.name}
+ </span>
+ <span className="country-item-code">
+ {item.code}
+ </span>
+ </button>
+ ))}
+ </div>
+ )}
+ </div>
+
+ {/* Number Input Field */}
+ <div className="phone-number-field">
+ <input
+ type="tel"
+ className="auth-text-input"
+ value={mobileNumber}
+ onChange={(e) => setMobileNumber(e.target.value)}
+ placeholder="98765 43210"
+ required
+ />
+ </div>
+ </div>
+
+ <div className="email-input-wrapper">
+ <span className="input-prefix-icon">
+ <MailEnvelopeIcon size={18} color="#64748b" />
+ </span>
+ <input
+ type="email"
+ className="auth-text-input with-prefix"
+ value={emailAddress}
+ onChange={(e) => setEmailAddress(e.target.value)}
+ placeholder="rahul.sharma@example.com"
+ required
+ />
+ </div>
 
                            {/* Submit Button */}
                            <button 
@@ -728,27 +734,18 @@ export function LoginFlow() {
                            <div className="flex-1 h-[1px] bg-[#cbd5e1]"></div>
                         </div>
 
-                        {/* Mobile Button Instead */}
-                        <button 
-                           type="button" 
-                           onClick={() => {
-                              setErrorMessage("");
-                              setCurrentStep("mobile_login");
-                           }}
-                           className="w-full h-[56px] bg-[#f0f9ff] border border-[#bae6fd] rounded-2xl flex items-center justify-center gap-3 hover:bg-[#e0f2fe] transition-transform active:scale-[0.98]"
-                        >
-                           <SmartphoneIcon size={24} color="#1877f2" />
-                           <span className="text-[15px] font-bold text-[#1877f2]">Login with Mobile Instead</span>
-                        </button>
-
-                        {/* Spacer */}
-                        <div className="flex-1"></div>
-
-                        {/* Footer text */}
-                        <div className="flex justify-center items-center gap-2 mt-6 pb-2">
-                           <ShieldCheckIcon size={18} color="#2563eb" />
-                           <span className="text-[13px] text-[#475569] font-medium">Your information is secure with us</span>
-                        </div>
+ {/* Switch to Mobile Button */}
+ <button
+ type="button"
+ className="secondary-action-btn"
+ onClick={() => {
+ setErrorMessage("");
+ setCurrentStep("mobile_login");
+ }}
+ >
+ <SmartphoneIcon size={18} color="#3b82f6" />
+ <span>Get the code by SMS instead</span>
+ </button>
 
                      </div>
                   </div>
@@ -795,30 +792,43 @@ export function LoginFlow() {
                            />
                         </div>
 
-                        {/* Title & Subtitle */}
-                        <div className="flex flex-col items-start text-left mb-6 px-2">
-                           <h2 className="text-[24px] font-bold text-[#1e293b] mb-2 tracking-tight">Enter OTP</h2>
-                           <p className="text-[15px] text-[#475569] leading-relaxed">
-                              We have sent a 6-digit code to<br/>
-                              <strong className="text-[#1877f2] font-bold text-[16px]">
-                                 {currentStep === "otp_email"
-                                    ? emailAddress
-                                    : `${countryCode} ${mobileNumber}`}
-                              </strong>
-                           </p>
-                           {devOtp && (
-                              <button
-                                 type="button"
-                                 onClick={() => {
-                                    const digits = devOtp.split("").slice(0, 6);
-                                    setOtpDigits(digits);
-                                 }}
-                                 className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-[#fef3c7] border border-[#fde68a] text-[#92400e] rounded-full text-[12px] font-mono font-bold hover:bg-[#fde68a] transition-colors"
-                              >
-                                 ⚡ Dev Code: {devOtp} (Click to fill)
-                              </button>
-                           )}
-                        </div>
+ {/* Screen Title & Subtitle */}
+ <div className="auth-header-block centered">
+ <h3 className="auth-title">Verify OTP</h3>
+ <p className="auth-subtitle">
+ We have sent a 6-digit code to{""}
+ <strong className="highlight-target">
+ {sentTo}
+ </strong>
+ </p>
+ {devOtp && (
+ <div style={{ marginTop:"10px", textAlign:"center" }}>
+ <button
+ type="button"
+ onClick={() => {
+ const digits = devOtp.split("").slice(0, 6);
+ setOtpDigits(digits);
+ }}
+ style={{
+ display:"inline-flex",
+ alignItems:"center",
+ gap:"6px",
+ padding:"6px 14px",
+ background:"#fef3c7",
+ border:"1px solid #fde68a",
+ color:"#92400e",
+ borderRadius:"9999px",
+ fontSize:"12px",
+ fontFamily:"monospace",
+ fontWeight:"bold",
+ cursor:"pointer",
+ }}
+ >
+ ⚡ Dev Code: {devOtp} (Click to fill)
+ </button>
+ </div>
+ )}
+ </div>
 
                         {/* OTP Form */}
                         <form onSubmit={handleVerifyOtp} className="flex flex-col flex-1">

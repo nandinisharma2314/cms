@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from"react";
+import React, { Suspense, useState, useEffect, useMemo } from"react";
+import { useRouter, useSearchParams } from"next/navigation";
 import { MapPin, Search, Filter } from"lucide-react";
 import {
  getPriorityStyles,
@@ -9,9 +10,14 @@ import {
 import ComplaintModal from"@/components/Dashboard/ComplaintModal";
 import { apis } from"@/lib/apis";
 
-export default function MyComplaintsPage() {
+function MyComplaints() {
+ const router = useRouter();
+ // ?open=CMP-... (from a notification) opens that complaint once the list loads
+ const openId = useSearchParams().get("open");
  const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
  const [allComplaints, setAllComplaints] = useState<any[]>([]);
+ // bumped when the detail modal closes, so status changes made there show up
+ const [refreshKey, setRefreshKey] = useState(0);
  const [searchTerm, setSearchTerm] = useState("");
  const [statusFilter, setStatusFilter] = useState("All");
  const [locationFilter, setLocationFilter] = useState("All");
@@ -23,12 +29,18 @@ export default function MyComplaintsPage() {
  .then((data) => {
  setAllComplaints(data || []);
  setLoading(false);
+ if (openId) {
+ const match = (data || []).find((c) => c.id === openId);
+ if (match) setSelectedComplaint(match);
+ router.replace("/dashboard/complaints");
+ }
  })
  .catch((err) => {
  console.error("Failed to fetch complaints:", err);
  setLoading(false);
  });
- }, []);
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [refreshKey, openId]);
 
  const locations = useMemo(
  () => [
@@ -56,7 +68,7 @@ export default function MyComplaintsPage() {
  item.id?.toLowerCase().includes(sTerm) ||
  item.department?.toLowerCase().includes(sTerm);
  const matchesStatus =
- statusFilter ==="All" || item.status === statusFilter;
+ statusFilter ==="All" || item.status_group === statusFilter;
  const itemLoc = item.location || (item.area ? `${item.area}, ${item.city}` :"");
  const matchesLoc =
  locationFilter ==="All" || itemLoc === locationFilter;
@@ -129,10 +141,10 @@ export default function MyComplaintsPage() {
  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 cursor-pointer text-slate-700"
  >
  <option value="All">All Statuses</option>
- <option value="Submitted">Submitted</option>
- <option value="Open">Open</option>
- <option value="In Progress">In Progress</option>
- <option value="Resolved">Resolved</option>
+ <option value="open">Submitted / Awaiting Action</option>
+ <option value="in_progress">In Progress</option>
+ <option value="resolved">Resolved / Closed</option>
+ <option value="rejected">Rejected</option>
  </select>
  <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
  </div>
@@ -204,7 +216,7 @@ export default function MyComplaintsPage() {
  <span
  className={`px-3 py-1 text-xs font-semibold ${getStatusStyles(item.status)}`}
  >
- {item.status ||"Submitted"}
+ {item.status_label || item.status}
  </span>
  </td>
  </tr>
@@ -234,9 +246,20 @@ export default function MyComplaintsPage() {
  {selectedComplaint && (
  <ComplaintModal
  complaint={selectedComplaint}
- onClose={() => setSelectedComplaint(null)}
+ onClose={() => {
+ setSelectedComplaint(null);
+ setRefreshKey((k) => k + 1);
+ }}
  />
  )}
  </>
+ );
+}
+
+export default function MyComplaintsPage() {
+ return (
+ <Suspense>
+ <MyComplaints />
+ </Suspense>
  );
 }

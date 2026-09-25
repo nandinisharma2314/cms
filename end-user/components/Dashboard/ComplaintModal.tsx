@@ -17,6 +17,8 @@ import {
  FileCheck,
 } from"lucide-react";
 import { getPriorityStyles, getStatusStyles } from"@/lib/utils";
+import type { ComplaintDetail } from"@/lib/apis";
+import ComplaintActivity from"./ComplaintActivity";
 
 interface ComplaintModalProps {
  complaint: any;
@@ -33,6 +35,10 @@ export default function ComplaintModal({
  name: string;
  type:"image" |"pdf" |"csv" |"video" |"other";
  } | null>(null);
+
+ // Latest copy from the server, after the citizen confirms/reopens/replies
+ const [live, setLive] = useState<ComplaintDetail | null>(null);
+ const current = live ?? complaint;
 
  // CSV parsing state for preview
  const [csvData, setCsvData] = useState<{
@@ -176,10 +182,10 @@ export default function ComplaintModal({
  </span>
  <span
  className={`px-3 py-1 text-xs font-bold uppercase tracking-wider ${getStatusStyles(
- complaint.status
+ current.status
  )}`}
  >
- {complaint.status ||"Submitted"}
+ {current.status_label || current.status}
  </span>
  </div>
  <span
@@ -356,6 +362,8 @@ export default function ComplaintModal({
  </div>
  )}
  </div>
+
+ <ComplaintActivity complaintId={complaintId} onUpdate={setLive} />
  </div>
  </div>
  </div>

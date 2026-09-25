@@ -55,7 +55,7 @@ export function DashboardView() {
  cmpId: c.id,
  title: c.title,
  date: c.date,
- status: c.status ==="Submitted" ?"Open" : c.status,
+ status: c.status,
  department: c.department,
  location: c.location ||"Dashboard",
  img:

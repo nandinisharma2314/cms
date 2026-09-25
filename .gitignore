@@ -6,3 +6,5 @@ node_modules
 
 venv/
 uploads/
+__pycache__/
+.pytest_cache/

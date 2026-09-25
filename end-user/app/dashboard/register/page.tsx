@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Home,
@@ -32,23 +32,11 @@ import {
   Send,
   ArrowLeft
 } from "lucide-react";
-import { apis } from "../../../lib/apis";
+import { apis, LocationNode, PortalDepartment } from "../../../lib/apis";
+import { useCitizen } from "../../../lib/citizenSession";
 
-const DEPARTMENTS = [
-  "Electricity",
-  "Water Supply",
-  "Sanitation",
-  "Public Works",
-  "Parks & Gardens",
-];
-
-const CATEGORIES: Record<string, string[]> = {
-  Electricity: ["Street Light", "Power Cut", "Fallen Pole", "Other"],
-  "Water Supply": ["No Water", "Leakage", "Contaminated Water", "Other"],
-  Sanitation: ["Garbage Collection", "Drainage Issue", "Dead Animal", "Other"],
-  "Public Works": ["Potholes", "Road Damage", "Footpath Issue", "Other"],
-  "Parks & Gardens": ["Fallen Tree", "Park Maintenance", "Other"],
-};
+// Form fields for each level of the location tree, top down.
+const LOCATION_FIELDS = ["country", "state", "district", "city", "area"] as const;
 
 const PRIORITIES = [
   { val: "Low", color: "emerald", text: "Low" },
@@ -59,20 +47,26 @@ const PRIORITIES = [
 
 export default function RegisterComplaintPage() {
   const router = useRouter();
+  const { profile } = useCitizen();
+  const [departments, setDepartments] = useState<PortalDepartment[]>([]);
+  const [locationTree, setLocationTree] = useState<LocationNode[]>([]);
 
+  // Location defaults to the citizen's registered area.
+  const homePath = profile.location?.path_names ?? [];
   const [formData, setFormData] = useState({
     department: "",
     category: "",
     priority: "Low",
     title: "",
     description: "",
-    country: "India",
-    state: "Rajasthan",
-    district: "Jaipur",
-    city: "Jaipur",
-    area: "Mansarovar",
+    country: homePath[0] ?? "",
+    state: homePath[1] ?? "",
+    district: homePath[2] ?? "",
+    city: homePath[3] ?? "",
+    area: homePath[4] ?? "",
     additionalDetails: "",
   });
+
 
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -82,6 +76,52 @@ export default function RegisterComplaintPage() {
   const [complaintId, setComplaintId] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [step, setStep] = useState(1);
+
+  useEffect(() => {
+    Promise.all([apis.reference.departments(), apis.reference.locationTree()])
+      .then(([deps, tree]) => {
+        setDepartments(deps);
+        setLocationTree(tree);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
+  const selectedDepartment = departments.find((d) => d.name === formData.department);
+
+  // Options for a level are the children of the node selected one level up.
+  const locationOptions = (level: number): LocationNode[] => {
+    let nodes = locationTree;
+    for (let i = 0; i < level; i++) {
+      const node = nodes.find((n) => n.name === formData[LOCATION_FIELDS[i]]);
+      if (!node) return [];
+      nodes = node.children;
+    }
+    return nodes;
+  };
+
+  // Deepest selected node, or null if the selection doesn't match the tree.
+  const resolveLocation = (): LocationNode | null => {
+    let nodes = locationTree;
+    let found: LocationNode | null = null;
+    for (const field of LOCATION_FIELDS) {
+      if (!formData[field]) break;
+      const node = nodes.find((n) => n.name === formData[field]);
+      if (!node) return null;
+      found = node;
+      nodes = node.children;
+    }
+    return found;
+  };
+
+  const locationComplete = () =>
+    LOCATION_FIELDS.every((field, level) => formData[field] || locationOptions(level).length === 0) &&
+    resolveLocation() !== null;
+
+  const setLocationLevel = (level: number, value: string) => {
+    const next = { ...formData, [LOCATION_FIELDS[level]]: value };
+    for (const deeper of LOCATION_FIELDS.slice(level + 1)) next[deeper] = "";
+    setFormData(next);
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -168,7 +208,7 @@ export default function RegisterComplaintPage() {
     }
 
     if (step === 2) {
-      if (!formData.country || !formData.state || !formData.district || !formData.city || !formData.area) {
+      if (!locationComplete()) {
         setError("Please fill in all location fields.");
         return;
       }
@@ -195,39 +235,33 @@ export default function RegisterComplaintPage() {
       setStep(1);
       return;
     }
-    if (!formData.country || !formData.state || !formData.district || !formData.city || !formData.area) {
-      setError("Please fill in all required location fields.");
-      setStep(2);
+    const location = resolveLocation();
+    if (!locationComplete() || !location || !selectedDepartment) {
+      setError("Please fill in all location fields.");
+      setLoading(false);
       return;
     }
-
-    setLoading(true);
-    setError("");
+    const category = selectedDepartment.categories.find((c) => c.name === formData.category);
 
     try {
       const data = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key === "additionalDetails") {
-          data.append("additional_details", value as string);
-        } else {
-          data.append(key, value as string);
-        }
-      });
+      data.append("department_id", String(selectedDepartment.id));
+      if (category) data.append("category_id", String(category.id));
+      data.append("priority", formData.priority);
+      data.append("title", formData.title);
+      data.append("description", formData.description);
+      data.append("location_id", String(location.id));
+      data.append("additional_details", formData.additionalDetails);
 
       files.forEach((file) => {
         data.append("files", file);
       });
 
       const response = await apis.complaints.registerComplaint(data);
-      if (response && response.success) {
-        setComplaintId(response.complaint_id);
-        setStep(4);
-      } else {
-        setError(response?.message || "Failed to submit complaint. Please try again.");
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "An error occurred while submitting the complaint");
+      setComplaintId(response.complaint_id);
+      setStep(4);
+    } catch (err) {
+      setError((err as Error).message || "An error occurred while submitting the complaint");
     } finally {
       setLoading(false);
     }
@@ -455,9 +489,9 @@ export default function RegisterComplaintPage() {
                     <option value="" disabled>
                       Select Department
                     </option>
-                    {DEPARTMENTS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.name}>
+                        {d.name}
                       </option>
                     ))}
                   </select>
@@ -487,10 +521,9 @@ export default function RegisterComplaintPage() {
                     <option value="" disabled>
                       Select Category
                     </option>
-                    {formData.department &&
-                      CATEGORIES[formData.department]?.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
+                    {selectedDepartment?.categories.map((c) => (
+                        <option key={c.id} value={c.name}>
+                          {c.name}
                         </option>
                       ))}
                   </select>
@@ -629,7 +662,7 @@ export default function RegisterComplaintPage() {
                     ref={fileInputRef}
                     className="hidden"
                     multiple
-                    accept="image/*,application/pdf,.csv,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.csv,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     onChange={handleFileSelect}
                   />
                 </div>
@@ -692,8 +725,9 @@ export default function RegisterComplaintPage() {
                        <div className="bg-blue-50 p-1.5 rounded-lg text-blue-500"><Globe size={18} /></div>
                        <div className="flex-1">
                          <label className="text-[10px] font-bold text-slate-500">Country <span className="text-red-500">*</span></label>
-                         <select value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
-                           <option value="India">India</option>
+                         <select value={formData.country} onChange={e => setLocationLevel(0, e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
+                           <option value="" disabled>Select</option>
+                           {locationOptions(0).map((n) => <option key={n.id} value={n.name}>{n.name}</option>)}
                          </select>
                        </div>
                        <ChevronDown size={16} className="text-slate-400" />
@@ -703,8 +737,9 @@ export default function RegisterComplaintPage() {
                        <div className="bg-blue-50 p-1.5 rounded-lg text-blue-500"><Map size={18} /></div>
                        <div className="flex-1">
                          <label className="text-[10px] font-bold text-slate-500">State <span className="text-red-500">*</span></label>
-                         <select value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
-                           <option value="Rajasthan">Rajasthan</option>
+                         <select value={formData.state} onChange={e => setLocationLevel(1, e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
+                           <option value="" disabled>Select</option>
+                           {locationOptions(1).map((n) => <option key={n.id} value={n.name}>{n.name}</option>)}
                          </select>
                        </div>
                        <ChevronDown size={16} className="text-slate-400" />
@@ -714,8 +749,9 @@ export default function RegisterComplaintPage() {
                        <div className="bg-blue-50 p-1.5 rounded-lg text-blue-500"><Building size={18} /></div>
                        <div className="flex-1">
                          <label className="text-[10px] font-bold text-slate-500">District <span className="text-red-500">*</span></label>
-                         <select value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
-                           <option value="Jaipur">Jaipur</option>
+                         <select value={formData.district} onChange={e => setLocationLevel(2, e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
+                           <option value="" disabled>Select</option>
+                           {locationOptions(2).map((n) => <option key={n.id} value={n.name}>{n.name}</option>)}
                          </select>
                        </div>
                        <ChevronDown size={16} className="text-slate-400" />
@@ -725,8 +761,9 @@ export default function RegisterComplaintPage() {
                        <div className="bg-blue-50 p-1.5 rounded-lg text-blue-500"><Building2 size={18} /></div>
                        <div className="flex-1">
                          <label className="text-[10px] font-bold text-slate-500">City <span className="text-red-500">*</span></label>
-                         <select value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
-                           <option value="Jaipur">Jaipur</option>
+                         <select value={formData.city} onChange={e => setLocationLevel(3, e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
+                           <option value="" disabled>Select</option>
+                           {locationOptions(3).map((n) => <option key={n.id} value={n.name}>{n.name}</option>)}
                          </select>
                        </div>
                        <ChevronDown size={16} className="text-slate-400" />
@@ -736,8 +773,9 @@ export default function RegisterComplaintPage() {
                        <div className="bg-blue-50 p-1.5 rounded-lg text-blue-500"><MapPin size={18} /></div>
                        <div className="flex-1">
                          <label className="text-[10px] font-bold text-slate-500">Area / Locality <span className="text-red-500">*</span></label>
-                         <select value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
-                           <option value="Mansarovar">Mansarovar</option>
+                         <select value={formData.area} onChange={e => setLocationLevel(4, e.target.value)} className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none appearance-none">
+                           <option value="" disabled>Select</option>
+                           {locationOptions(4).map((n) => <option key={n.id} value={n.name}>{n.name}</option>)}
                          </select>
                        </div>
                        <ChevronDown size={16} className="text-slate-400" />

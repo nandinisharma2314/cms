@@ -19,6 +19,8 @@ const RecentComplaints = () => {
  const [isFilterOpen, setIsFilterOpen] = useState(false);
  const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
  const [allComplaints, setAllComplaints] = useState<any[]>([]);
+ // bumped when the detail modal closes, so status changes made there show up
+ const [refreshKey, setRefreshKey] = useState(0);
 
  useEffect(() => {
  apis.complaints.getComplaints()
@@ -28,7 +30,7 @@ const RecentComplaints = () => {
  .catch((err) => {
  console.error("Failed to fetch complaints:", err);
  });
- }, []);
+ }, [refreshKey]);
 
  const filteredComplaints = useMemo(() => {
  const now = new Date();
@@ -169,7 +171,7 @@ const RecentComplaints = () => {
  <span
  className={`px-3 py-1 text-xs font-semibold ${getStatusStyles(item.status)}`}
  >
- {item.status ||"Submitted"}
+ {item.status_label || item.status}
  </span>
  </td>
  </tr>
@@ -206,7 +208,7 @@ const RecentComplaints = () => {
  <span
  className={`px-2.5 py-1 text-[10px] font-semibold ${getStatusStyles(item.status)}`}
  >
- {item.status ||"Submitted"}
+ {item.status_label || item.status}
  </span>
  <ChevronRight className="w-4 h-4 text-slate-400" />
  </div>
@@ -222,7 +224,10 @@ const RecentComplaints = () => {
  {selectedComplaint && (
  <ComplaintModal
  complaint={selectedComplaint}
- onClose={() => setSelectedComplaint(null)}
+ onClose={() => {
+ setSelectedComplaint(null);
+ setRefreshKey((k) => k + 1);
+ }}
  />
  )}
  </div>
