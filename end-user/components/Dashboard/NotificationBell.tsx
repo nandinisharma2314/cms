@@ -2,21 +2,17 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apis, CitizenNotification } from "@/lib/apis";
+import { apis, EndUserNotification } from "@/lib/apis";
+import { formatWhen } from "@/lib/utils";
 import { BellBadgeIcon } from "./DashboardIcons";
 
 const POLL_MS = 60_000;
 
-function formatWhen(iso: string) {
-  const date = new Date(iso.endsWith("Z") ? iso : `${iso}Z`);
-  return date.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-/** Updates about the citizen's complaints (status changes, replies, escalations). */
+/** Updates about the end user's complaints (status changes, replies, escalations). */
 export default function NotificationBell() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<CitizenNotification[]>([]);
+  const [items, setItems] = useState<EndUserNotification[]>([]);
   const [unread, setUnread] = useState(0);
 
   const load = useCallback(() => {
@@ -35,11 +31,11 @@ export default function NotificationBell() {
     return () => clearInterval(timer);
   }, [load]);
 
-  const openItem = async (n: CitizenNotification) => {
+  const openItem = async (n: EndUserNotification) => {
     setOpen(false);
     if (!n.read_at) await apis.notifications.markRead(n.id).catch(() => undefined);
     load();
-    if (n.complaint_id) router.push(`/dashboard/complaints?open=${encodeURIComponent(n.complaint_id)}`);
+    if (n.complaint_id) router.push(`/dashboard/complaints/${encodeURIComponent(n.complaint_id)}`);
   };
 
   return (

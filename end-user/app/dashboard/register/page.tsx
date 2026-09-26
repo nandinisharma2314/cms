@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Home,
@@ -33,7 +34,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { apis, LocationNode, PortalDepartment } from "../../../lib/apis";
-import { useCitizen } from "../../../lib/citizenSession";
+import { useEndUser } from "../../../lib/endUserSession";
 
 // Form fields for each level of the location tree, top down.
 const LOCATION_FIELDS = ["country", "state", "district", "city", "area"] as const;
@@ -47,11 +48,12 @@ const PRIORITIES = [
 
 export default function RegisterComplaintPage() {
   const router = useRouter();
-  const { profile } = useCitizen();
+  const { profile, can } = useEndUser();
+  const canAttach = can("portal.complaint.attach");
   const [departments, setDepartments] = useState<PortalDepartment[]>([]);
   const [locationTree, setLocationTree] = useState<LocationNode[]>([]);
 
-  // Location defaults to the citizen's registered area.
+  // Location defaults to the end user's registered area.
   const homePath = profile.location?.path_names ?? [];
   const [formData, setFormData] = useState({
     department: "",
@@ -266,6 +268,25 @@ export default function RegisterComplaintPage() {
       setLoading(false);
     }
   };
+
+  if (!can("portal.complaint.create")) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="max-w-sm rounded-2xl bg-white p-6 text-center shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
+          <h1 className="text-[17px] font-bold text-[#0b1a3f]">Registering complaints is turned off</h1>
+          <p className="mt-2 text-[14px] leading-snug text-slate-500">
+            Your account can&apos;t register new complaints right now. You can still follow your existing ones.
+          </p>
+          <Link
+            href="/dashboard/complaints"
+            className="mt-4 inline-block rounded-xl bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white"
+          >
+            View my complaints
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-80px)] overflow-y-auto lg:overflow-hidden bg-[#f4f7fe] flex flex-col font-sans relative pt-2 md:pb-2">
@@ -628,88 +649,90 @@ export default function RegisterComplaintPage() {
               </div>
 
               {/* Add Photos */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <UploadCloud size={14} className="text-indigo-600" /> Add Photos / Attachments
-                  </label>
-                  <span className="text-[10px] font-semibold text-slate-400">
-                    Max 5 files (10 MB each)
-                  </span>
-                </div>
-
-                <div
-                  className={`w-full border-2 border-dashed rounded-xl p-2 flex flex-col items-center justify-center text-center cursor-pointer transition-colors
-                  ${
-                    isDragging
-                      ? "border-indigo-400 bg-indigo-50/50"
-                      : "border-indigo-200/80 bg-[#f8faff] hover:bg-slate-50/50"
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <UploadCloud size={16} className="text-indigo-600 mb-1" />
-                  <p className="text-xs font-bold text-slate-800 mb-0.5">
-                    Tap to upload photos
-                  </p>
-                  <p className="text-[10px] font-semibold text-slate-400">
-                    JPG, PNG or PDF (Max 10 MB each)
-                  </p>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.csv,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    onChange={handleFileSelect}
-                  />
-                </div>
-                {files.length > 0 && (
-                  <div className="flex flex-col gap-2 mt-2">
-                    {files.map((file, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 bg-white border border-slate-100 rounded-xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]"
-                      >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          {file.type.startsWith("image/") ? (
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt="preview"
-                              className="w-8 h-8 object-cover rounded-lg border border-slate-100"
-                            />
-                          ) : file.type.includes("pdf") || file.name.endsWith(".pdf") ? (
-                            <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center shrink-0 font-bold text-[8px]">
-                              PDF
-                            </div>
-                          ) : (
-                            <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-                              <FileText size={14} />
-                            </div>
-                          )}
-                          <div className="flex flex-col overflow-hidden">
-                            <span className="text-[11px] font-bold text-slate-700 truncate">
-                              {file.name}
-                            </span>
-                            <span className="text-[9px] text-slate-400">
-                              {(file.size / 1024).toFixed(1)} KB
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
-                          className="text-red-500 hover:bg-red-50 p-1.5 rounded-full transition-colors"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
+              {canAttach && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <UploadCloud size={14} className="text-indigo-600" /> Add Photos / Attachments
+                    </label>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      Max 5 files (10 MB each)
+                    </span>
                   </div>
-                )}
-              </div>
+
+                  <div
+                    className={`w-full border-2 border-dashed rounded-xl p-2 flex flex-col items-center justify-center text-center cursor-pointer transition-colors
+                    ${
+                      isDragging
+                        ? "border-indigo-400 bg-indigo-50/50"
+                        : "border-indigo-200/80 bg-[#f8faff] hover:bg-slate-50/50"
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <UploadCloud size={16} className="text-indigo-600 mb-1" />
+                    <p className="text-xs font-bold text-slate-800 mb-0.5">
+                      Tap to upload photos
+                    </p>
+                    <p className="text-[10px] font-semibold text-slate-400">
+                      JPG, PNG or PDF (Max 10 MB each)
+                    </p>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.csv,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={handleFileSelect}
+                    />
+                  </div>
+                  {files.length > 0 && (
+                    <div className="flex flex-col gap-2 mt-2">
+                      {files.map((file, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 bg-white border border-slate-100 rounded-xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]"
+                        >
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            {file.type.startsWith("image/") ? (
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt="preview"
+                                className="w-8 h-8 object-cover rounded-lg border border-slate-100"
+                              />
+                            ) : file.type.includes("pdf") || file.name.endsWith(".pdf") ? (
+                              <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center shrink-0 font-bold text-[8px]">
+                                PDF
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+                                <FileText size={14} />
+                              </div>
+                            )}
+                            <div className="flex flex-col overflow-hidden">
+                              <span className="text-[11px] font-bold text-slate-700 truncate">
+                                {file.name}
+                              </span>
+                              <span className="text-[9px] text-slate-400">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                            className="text-red-500 hover:bg-red-50 p-1.5 rounded-full transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
                 </>
               )}
 
@@ -940,47 +963,49 @@ export default function RegisterComplaintPage() {
                       </div>
 
                       {/* Attachments Section */}
-                      <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-2 shadow-sm">
-                        <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200/60">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                              <Paperclip size={12} />
-                            </div>
-                            <h3 className="font-bold text-slate-900 text-xs">
-                              3. Attachments {files.length > 0 ? `(${files.length})` : ""}
-                            </h3>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setStep(1)}
-                            className="flex items-center gap-1 px-2 py-0.5 bg-white text-blue-600 rounded-md text-[10px] font-bold hover:bg-blue-50 transition-colors border border-blue-200 shadow-sm"
-                          >
-                            <Edit3 size={10} /> {files.length > 0 ? "Edit" : "+ Add"}
-                          </button>
-                        </div>
-
-                        {files.length > 0 ? (
-                          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                            {files.map((f, i) => (
-                              <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg border border-slate-100 shadow-sm shrink-0">
-                                {f.type.startsWith('image/') ? (
-                                  <img src={URL.createObjectURL(f)} className="w-6 h-6 object-cover rounded border border-slate-100" alt={f.name} />
-                                ) : (
-                                  <div className="w-6 h-6 rounded bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                                    <FileText size={12} />
-                                  </div>
-                                )}
-                                <div className="flex flex-col max-w-[100px]">
-                                  <span className="text-[10px] font-bold text-slate-800 truncate">{f.name}</span>
-                                  <span className="text-[8px] text-slate-400 font-medium">{(f.size / 1024).toFixed(1)} KB</span>
-                                </div>
+                      {canAttach && (
+                        <div className="bg-slate-50/90 rounded-xl border border-slate-200/80 p-2 shadow-sm">
+                          <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200/60">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                                <Paperclip size={12} />
                               </div>
-                            ))}
+                              <h3 className="font-bold text-slate-900 text-xs">
+                                3. Attachments {files.length > 0 ? `(${files.length})` : ""}
+                              </h3>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setStep(1)}
+                              className="flex items-center gap-1 px-2 py-0.5 bg-white text-blue-600 rounded-md text-[10px] font-bold hover:bg-blue-50 transition-colors border border-blue-200 shadow-sm"
+                            >
+                              <Edit3 size={10} /> {files.length > 0 ? "Edit" : "+ Add"}
+                            </button>
                           </div>
-                        ) : (
-                          <p className="text-[10px] text-slate-400 font-medium py-0.5 italic">No attachments uploaded (Optional)</p>
-                        )}
-                      </div>
+
+                          {files.length > 0 ? (
+                            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                              {files.map((f, i) => (
+                                <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg border border-slate-100 shadow-sm shrink-0">
+                                  {f.type.startsWith('image/') ? (
+                                    <img src={URL.createObjectURL(f)} className="w-6 h-6 object-cover rounded border border-slate-100" alt={f.name} />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                      <FileText size={12} />
+                                    </div>
+                                  )}
+                                  <div className="flex flex-col max-w-[100px]">
+                                    <span className="text-[10px] font-bold text-slate-800 truncate">{f.name}</span>
+                                    <span className="text-[8px] text-slate-400 font-medium">{(f.size / 1024).toFixed(1)} KB</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-slate-400 font-medium py-0.5 italic">No attachments uploaded (Optional)</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

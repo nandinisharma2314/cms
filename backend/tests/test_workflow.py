@@ -4,8 +4,8 @@ from conftest import ADMIN, ELEC_AGENT, ELEC_MANAGER, ELEC_SUPERVISOR, SUPER_ADM
 CITY_AGENT = "rohit.jain@civiccare.gov.in"  # Electricity @ Jaipur city
 
 
-def departments(client, citizen):
-    return {d["name"]: d for d in client.get("/portal/departments", headers=citizen).json()}
+def departments(client, end_user):
+    return {d["name"]: d for d in client.get("/portal/departments", headers=end_user).json()}
 
 
 def location_id(client, headers, *names, portal=True):
@@ -17,12 +17,12 @@ def location_id(client, headers, *names, portal=True):
     return node["id"]
 
 
-def file_complaint(client, citizen, department="Electricity", location=None, title="Street light out"):
-    dept = departments(client, citizen)[department]
+def file_complaint(client, end_user, department="Electricity", location=None, title="Street light out"):
+    dept = departments(client, end_user)[department]
     data = {"department_id": dept["id"], "title": title, "description": "Near the park", "priority": "High"}
     if location:
         data["location_id"] = location
-    response = client.post("/portal/complaints", headers=citizen, data=data)
+    response = client.post("/portal/complaints", headers=end_user, data=data)
     assert response.status_code == 201, response.text
     return response.json()["complaint_id"]
 
@@ -37,11 +37,11 @@ def detail(client, headers, complaint_id):
     return response.json()
 
 
-def test_routing_prefers_the_most_specific_agent(client, login, citizen_login):
-    citizen = citizen_login()
-    mansarovar = file_complaint(client, citizen)  # defaults to the citizen's area
+def test_routing_prefers_the_most_specific_agent(client, login, end_user_login):
+    end_user = end_user_login()
+    mansarovar = file_complaint(client, end_user)  # defaults to the end user's area
     cscheme = file_complaint(
-        client, citizen, location=location_id(client, citizen, "India", "Rajasthan", "Jaipur", "Jaipur", "C-Scheme"),
+        client, end_user, location=location_id(client, end_user, "India", "Rajasthan", "Jaipur", "Jaipur", "C-Scheme"),
     )
     supervisor = login(ELEC_SUPERVISOR)
     # both Amit (Mansarovar) and Rohit (all of Jaipur city) cover Mansarovar; the area agent wins
@@ -68,7 +68,7 @@ def test_routing_balances_workload_and_skips_unavailable_staff(client, login):
 
     def quick(title):
         response = client.post("/complaints/quick-create", headers=admin, json={
-            "title": title, "department_id": roads, "location_id": sardarpura, "citizen_name": "Walk-in",
+            "title": title, "department_id": roads, "location_id": sardarpura, "end_user_name": "Walk-in",
         })
         assert response.status_code == 201, response.text
         return response.json()["assignee"]
@@ -106,10 +106,10 @@ def test_unrouted_complaint_waits_in_the_department_queue(client, login):
     assert assigned.json()["status"] == "ASSIGNED"
 
 
-def test_full_lifecycle_between_officer_and_citizen(client, login, citizen_login):
-    citizen = citizen_login()
+def test_full_lifecycle_between_officer_and_end_user(client, login, end_user_login):
+    end_user = end_user_login()
     agent = login(ELEC_AGENT)
-    cid = file_complaint(client, citizen, title="Transformer sparking")
+    cid = file_complaint(client, end_user, title="Transformer sparking")
 
     assert [a["key"] for a in detail(client, agent, cid)["actions"]] == ["acknowledge", "start", "resolve"]
     assert act(client, agent, cid, "acknowledge", "On it").status_code == 200
@@ -117,17 +117,17 @@ def test_full_lifecycle_between_officer_and_citizen(client, login, citizen_login
     assert act(client, agent, cid, "request_info").status_code == 400  # question required
     assert act(client, agent, cid, "request_info", "Which pole number?").json()["status"] == "WAITING_FOR_INFORMATION"
 
-    view = client.get(f"/portal/complaints/{cid}", headers=citizen).json()
+    view = client.get(f"/portal/complaints/{cid}", headers=end_user).json()
     assert view["comments"][-1]["body"] == "Which pole number?"
     assert view["comments"][-1]["author_name"] == "Electricity Department"  # officer names are not exposed
     assert "assignee" not in view
 
-    reply = client.post(f"/portal/complaints/{cid}/comments", headers=citizen, data={"body": "Pole 14"})
+    reply = client.post(f"/portal/complaints/{cid}/comments", headers=end_user, data={"body": "Pole 14"})
     assert reply.json()["status"] == "IN_PROGRESS"  # answering puts it back in progress
 
     note = client.post(f"/complaints/{cid}/comments", headers=agent, data={"body": "Needs a crane", "is_internal": "true"})
     assert note.status_code == 201
-    view = client.get(f"/portal/complaints/{cid}", headers=citizen).json()
+    view = client.get(f"/portal/complaints/{cid}", headers=end_user).json()
     assert all(c["body"] != "Needs a crane" for c in view["comments"])
     assert all("internal" not in e["message"] for e in view["timeline"])
 
@@ -135,22 +135,22 @@ def test_full_lifecycle_between_officer_and_citizen(client, login, citizen_login
     resolved = act(client, agent, cid, "resolve", "Transformer replaced").json()
     assert resolved["status"] == "RESOLVED" and resolved["acknowledged_at"] and resolved["resolved_at"]
 
-    view = client.get(f"/portal/complaints/{cid}", headers=citizen).json()
+    view = client.get(f"/portal/complaints/{cid}", headers=end_user).json()
     assert set(view["actions"]) == {"comment", "confirm", "reopen", "feedback"}
-    closed = client.post(f"/portal/complaints/{cid}/confirm", headers=citizen, json={"rating": 5, "comment": "Quick"}).json()
+    closed = client.post(f"/portal/complaints/{cid}/confirm", headers=end_user, json={"rating": 5, "comment": "Quick"}).json()
     assert closed["status"] == "CLOSED" and closed["feedback_rating"] == 5
     assert closed["actions"] == ["reopen"]
-    assert client.post(f"/portal/complaints/{cid}/comments", headers=citizen, data={"body": "hi"}).status_code == 409
+    assert client.post(f"/portal/complaints/{cid}/comments", headers=end_user, data={"body": "hi"}).status_code == 409
 
-    reopened = client.post(f"/portal/complaints/{cid}/reopen", headers=citizen, json={"reason": "Sparking again"}).json()
+    reopened = client.post(f"/portal/complaints/{cid}/reopen", headers=end_user, json={"reason": "Sparking again"}).json()
     assert reopened["status"] == "REOPENED" and reopened["reopen_count"] == 1
     again = detail(client, agent, cid)
     assert again["assignee"]["name"] == "Amit Kumar"  # same officer keeps it
     assert "acknowledge" in [a["key"] for a in again["actions"]]
 
 
-def test_only_the_handler_or_a_supervisor_can_act(client, login, citizen_login):
-    cid = file_complaint(client, citizen_login(), title="Loose cable")
+def test_only_the_handler_or_a_supervisor_can_act(client, login, end_user_login):
+    cid = file_complaint(client, end_user_login(), title="Loose cable")
     other_agent = login(CITY_AGENT)  # covers Mansarovar too, but it's not theirs
     assert detail(client, other_agent, cid)["actions"] == []
     assert act(client, other_agent, cid, "acknowledge").status_code == 409
@@ -166,8 +166,8 @@ def test_only_the_handler_or_a_supervisor_can_act(client, login, citizen_login):
     assert rejected["status"] == "REJECTED" and rejected["closed_at"]
 
 
-def test_manual_reassignment_by_supervisor(client, login, citizen_login):
-    cid = file_complaint(client, citizen_login(), title="Meter burnt")
+def test_manual_reassignment_by_supervisor(client, login, end_user_login):
+    cid = file_complaint(client, end_user_login(), title="Meter burnt")
     agent, supervisor = login(ELEC_AGENT), login(ELEC_SUPERVISOR)
     options = {o["name"]: o for o in client.get(f"/complaints/{cid}/assignee-options", headers=supervisor).json()}
     assert {"Amit Kumar", "Rohit Jain", "Priya Patel"} <= set(options)

@@ -4,7 +4,7 @@ Two clocks run on every complaint:
   * response: the handler must acknowledge/act within `response_hours` of being
     assigned (or of submission while it sits unassigned, or of a reopen);
   * resolution: it must be resolved within `resolution_hours` of submission.
-    The resolution clock is paused while waiting for information from the citizen.
+    The resolution clock is paused while waiting for information from the end user.
 
 When a clock passes its due time the complaint is escalated one level up the
 assignee's reporting line (reports_to), falling back to the nearest supervisor

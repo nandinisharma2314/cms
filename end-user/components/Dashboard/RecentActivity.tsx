@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Send,
   User,
@@ -17,7 +18,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { apis } from "@/lib/apis";
-import ComplaintModal from "./ComplaintModal";
 
 interface ActivityItem {
   id: number;
@@ -34,22 +34,15 @@ const RecentActivity = () => {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isViewAllOpen, setIsViewAllOpen] = useState(false);
-  const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
-  const [allComplaints, setAllComplaints] = useState<any[]>([]);
+  const router = useRouter();
 
   const fetchActivities = async (showRefresh = false) => {
     try {
       if (showRefresh) setIsRefreshing(true);
-      const [actRes, cmpRes] = await Promise.all([
-        apis.notifications.getActivities(),
-        apis.complaints.getComplaints().catch(() => []),
-      ]);
+      const actRes = await apis.notifications.getActivities();
 
       if (actRes && actRes.success) {
         setActivities(actRes.activities || []);
-      }
-      if (Array.isArray(cmpRes)) {
-        setAllComplaints(cmpRes);
       }
     } catch (err) {
       console.warn("Could not fetch activities:", err);
@@ -69,28 +62,7 @@ const RecentActivity = () => {
   }, []);
 
   const handleActivityClick = (item: ActivityItem) => {
-    if (item.complaint_id) {
-      const match = allComplaints.find(
-        (c) => c.id === item.complaint_id || c.generated_id === item.complaint_id
-      );
-      if (match) {
-        setSelectedComplaint(match);
-      } else {
-        // Fallback placeholder object if complaint not in initial slice
-        setSelectedComplaint({
-          id: item.complaint_id,
-          generated_id: item.complaint_id,
-          title: item.title,
-          description: item.desc,
-          department: "Municipal Administration",
-          category: "General",
-          priority: "Medium",
-          status: "In Progress",
-          date: item.time,
-          attachments: [],
-        });
-      }
-    }
+    if (item.complaint_id) router.push(`/dashboard/complaints/${encodeURIComponent(item.complaint_id)}`);
   };
 
   const getIconData = (type: string) => {
@@ -330,13 +302,6 @@ const RecentActivity = () => {
         </div>
       )}
 
-      {/* Selected Complaint Modal */}
-      {selectedComplaint && (
-        <ComplaintModal
-          complaint={selectedComplaint}
-          onClose={() => setSelectedComplaint(null)}
-        />
-      )}
     </>
   );
 };

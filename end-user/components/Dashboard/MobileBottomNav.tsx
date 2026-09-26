@@ -1,102 +1,103 @@
 "use client";
 
-import React from"react";
-import Link from"next/link";
-import { usePathname } from"next/navigation";
-import { Home, FileText, Plus, Bell, User } from"lucide-react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Bell, FileText, Home, Plus, User } from "lucide-react";
+import { apis } from "@/lib/apis";
+import { useEndUser } from "@/lib/endUserSession";
 
-const MobileBottomNav = ({
- activeTab,
- onTabChange,
- onCenterAction,
-}: {
- activeTab?: string;
- onTabChange?: React.Dispatch<React.SetStateAction<string>>;
- onCenterAction?: () => void;
-}) => {
- const pathname = usePathname();
+type NavIcon = React.ComponentType<{ className?: string; strokeWidth?: number }>;
 
- const navItems = [
- { name:"Home", icon: Home, href:"/dashboard", exact: true },
- { name:"My Complaints", icon: FileText, href:"/dashboard/complaints" },
- ];
+interface NavItem {
+  name: string;
+  icon: NavIcon;
+  activeIcon?: NavIcon;
+  href: string;
+  exact?: boolean;
+}
 
- const rightNavItems = [
- {
- name:"Notifications",
- icon: Bell,
- href:"/dashboard/notifications",
- hasDot: true,
- },
- { name:"Profile", icon: User, href:"/dashboard/profile" },
- ];
+interface MobileBottomNavProps {
+  activeTab?: string;
+  onTabChange?: React.Dispatch<React.SetStateAction<string>>;
+  onCenterAction?: () => void;
+}
 
- return (
- <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-100 flex justify-between items-center px-4 pb-4 pt-3 z-50 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
- {/* Left Items */}
- <div className="flex justify-around flex-1 pr-6">
- {navItems.map((item) => {
- const isActive = item.exact
- ? pathname === item.href
- : pathname?.startsWith(item.href);
- return (
- <Link
- key={item.name}
- href={item.href}
- className={`flex flex-col items-center gap-1 min-w-[64px] ${isActive ?"text-blue-600" :"text-slate-400"}`}
- >
- <item.icon
- className={`w-6 h-6 ${isActive ?"text-blue-600" :"text-slate-400"}`}
- />
- <span
- className={`text-[10px] ${isActive ?"font-semibold text-blue-600" :"font-medium"}`}
- >
- {item.name}
- </span>
- </Link>
- );
- })}
- </div>
+// Filled house with the door cut out, for the active Home tab.
+function HomeSolid({ className }: { className?: string; strokeWidth?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M10.7 2.6a2 2 0 0 1 2.6 0l7.3 6.3a2 2 0 0 1 .7 1.5V19a2 2 0 0 1-2 2h-3.8v-5.3a1.5 1.5 0 0 0-1.5-1.5h-4a1.5 1.5 0 0 0-1.5 1.5V21H4.7a2 2 0 0 1-2-2v-8.6a2 2 0 0 1 .7-1.5z" />
+    </svg>
+  );
+}
 
- {/* Center FAB */}
- <div className="absolute left-1/2 -top-5 -translate-x-1/2">
- <Link
- href="/dashboard/complaints/new"
- className="bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/30 transition-transform active:scale-95"
- >
- <Plus size={28} />
- </Link>
- </div>
+const LEFT_ITEMS: NavItem[] = [
+  { name: "Home", icon: Home, activeIcon: HomeSolid, href: "/dashboard", exact: true },
+  { name: "My Complaints", icon: FileText, href: "/dashboard/complaints" },
+];
 
- {/* Right Items */}
- <div className="flex justify-around flex-1 pl-6">
- {rightNavItems.map((item) => {
- const isActive = pathname?.startsWith(item.href);
- return (
- <Link
- key={item.name}
- href={item.href}
- className={`flex flex-col items-center gap-1 min-w-[64px] ${isActive ?"text-blue-600" :"text-slate-400"}`}
- >
- <div className="relative">
- <item.icon
- className={`w-6 h-6 ${isActive ?"text-blue-600" :"text-slate-400"}`}
- />
- {item.hasDot && (
- <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-white transform translate-x-1/4 -translate-y-1/4"></span>
- )}
- </div>
- <span
- className={`text-[10px] ${isActive ?"font-semibold text-blue-600" :"font-medium"}`}
- >
- {item.name}
- </span>
- </Link>
- );
- })}
- </div>
- </div>
- );
+const RIGHT_ITEMS: NavItem[] = [
+  { name: "Notifications", icon: Bell, href: "/dashboard/notifications" },
+  { name: "Profile", icon: User, href: "/dashboard/profile" },
+];
+
+// The tabs follow the URL; the props are only accepted for older callers.
+const MobileBottomNav: React.FC<MobileBottomNavProps> = () => {
+  const pathname = usePathname();
+  const canCreate = useEndUser().can("portal.complaint.create");
+  const [hasUnread, setHasUnread] = useState(false);
+
+  useEffect(() => {
+    apis.notifications
+      .list()
+      .then((res) => setHasUnread(res.unread_count > 0))
+      .catch(() => undefined);
+  }, [pathname]);
+
+  const renderItem = (item: NavItem) => {
+    const isActive = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
+    const Icon = (isActive && item.activeIcon) || item.icon;
+    return (
+      <Link
+        key={item.name}
+        href={item.href}
+        aria-current={isActive ? "page" : undefined}
+        className={`relative flex flex-1 flex-col items-center justify-center gap-1.5 ${isActive ? "text-blue-600" : "text-slate-500"}`}
+      >
+        <span className="relative">
+          <Icon className="h-6 w-6" strokeWidth={1.9} />
+          {item.href === "/dashboard/notifications" && hasUnread && (
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+          )}
+        </span>
+        <span className={`whitespace-nowrap text-[11.5px] leading-none ${isActive ? "font-semibold" : "font-medium"}`}>
+          {item.name}
+        </span>
+        <span className={`absolute bottom-2 h-[3px] w-11 rounded-full bg-blue-600 ${isActive ? "" : "invisible"}`} />
+      </Link>
+    );
+  };
+
+  return (
+    <nav className="md:hidden fixed inset-x-0 bottom-0 z-50">
+      <div className="relative flex h-[76px] items-stretch rounded-t-[28px] bg-white px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_-14px_rgba(15,23,42,0.25)]">
+        {LEFT_ITEMS.map(renderItem)}
+        {canCreate && <div className="w-[72px] shrink-0" />}
+        {RIGHT_ITEMS.map(renderItem)}
+
+        {canCreate && (
+          <Link
+            href="/dashboard/register"
+            aria-label="Register a complaint"
+            className="absolute left-1/2 -top-7 flex h-[60px] w-[60px] -translate-x-1/2 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-[6px] ring-slate-50 transition-transform active:scale-95"
+          >
+            <Plus className="h-7 w-7" strokeWidth={2.6} />
+          </Link>
+        )}
+      </div>
+    </nav>
+  );
 };
 
 export default MobileBottomNav;

@@ -90,7 +90,7 @@ function NewRoleDialog({
           <select className={inputClass} value={copyFrom ?? ""} onChange={(e) => setCopyFrom(e.target.value ? Number(e.target.value) : null)}>
             <option value="">No permissions</option>
             {roles
-              .filter((r) => !r.is_root)
+              .filter((r) => !r.is_root && r.audience === "staff")
               .map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
@@ -130,7 +130,12 @@ function RoleDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const grouped = useMemo(() => groupPermissions(permissions), [permissions]);
+  // The End User role only takes portal permissions; staff roles never do.
+  const endUserRole = role.audience === "end_user";
+  const grouped = useMemo(
+    () => groupPermissions(permissions.filter((p) => p.audience === role.audience)),
+    [permissions, role.audience],
+  );
   const parentOptions = roles.filter((r) => r.id !== role.id && (r.id === me.role.id || r.assignable));
   const dirty =
     draftParent !== role.parent_id ||
@@ -171,6 +176,11 @@ function RoleDetailPanel({
             <span className="font-mono text-[10px] text-slate-400">{role.key}</span>
           </h2>
           {role.description && <p className="text-xs text-slate-500 mt-1">{role.description}</p>}
+          {endUserRole && (
+            <p className="text-[11px] text-slate-400 mt-1">
+              Every end user holds this role. It sits outside the staff hierarchy and can&apos;t be given to staff.
+            </p>
+          )}
           {!role.editable && (
             <p className="text-[11px] text-amber-600 mt-1">
               {role.is_root
@@ -186,7 +196,7 @@ function RoleDetailPanel({
         )}
       </div>
 
-      {role.editable && (
+      {role.editable && !endUserRole && (
         <Field label="Parent role" hint="Move a role to insert or remove a level in the hierarchy.">
           <select
             className={`${inputClass} max-w-xs`}
@@ -211,8 +221,9 @@ function RoleDetailPanel({
             <p className="text-[11px] font-bold text-slate-700 mb-2">{group}</p>
             <div className="space-y-1.5">
               {list.map((p) => {
-                // Only permissions you hold yourself can be granted.
-                const grantable = role.editable && can(p.key);
+                // Only permissions you hold yourself can be granted. Staff never hold
+                // portal permissions, so anyone who manages roles may grant those.
+                const grantable = role.editable && (endUserRole || can(p.key));
                 return (
                   <label key={p.key} className={`flex items-start gap-2 text-xs ${grantable ? "cursor-pointer" : "opacity-60"}`}>
                     <input
@@ -308,13 +319,34 @@ function RolesEditor() {
     return { roles, permissions };
   }, []);
   const roles = data?.roles ?? [];
+  const staffRoles = roles.filter((r) => r.audience === "staff");
+  const endUserRoles = roles.filter((r) => r.audience === "end_user");
   const selected =
-    roles.find((r) => r.id === selectedId) ?? roles.find((r) => r.editable) ?? roles[0] ?? null;
+    roles.find((r) => r.id === selectedId) ?? staffRoles.find((r) => r.editable) ?? roles[0] ?? null;
 
   const select = (id: number | null) => {
     setSelectedId(id);
     setNotice(null);
   };
+
+  const renderRole = (r: RoleDetail, unit: string) => (
+    <button
+      key={r.id}
+      onClick={() => select(r.id)}
+      className={`w-full flex items-center justify-between py-2 pr-3 rounded-lg text-left text-xs cursor-pointer ${
+        r.id === selected?.id ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50 text-slate-700"
+      }`}
+      style={{ paddingLeft: 12 + r.depth * 16 }}
+    >
+      <span className="font-semibold">
+        {r.depth > 0 && <span className="text-slate-300 mr-1">└</span>}
+        {r.name}
+      </span>
+      <span className="text-[10px] text-slate-400">
+        {r.user_count} {unit}
+      </span>
+    </button>
+  );
 
   return (
     <>
@@ -342,26 +374,27 @@ function RolesEditor() {
           </button>
         ))}
       </div>
-      {mode === "matrix" && data && <PermissionMatrix roles={roles} permissions={data.permissions} />}
+      {mode === "matrix" && data && (
+        <>
+          <PermissionMatrix roles={staffRoles} permissions={data.permissions.filter((p) => p.audience === "staff")} />
+          <PermissionMatrix
+            roles={endUserRoles}
+            permissions={data.permissions.filter((p) => p.audience === "end_user")}
+          />
+        </>
+      )}
       <div className={`grid grid-cols-1 lg:grid-cols-12 gap-5 ${mode === "matrix" ? "hidden" : ""}`}>
         <Card className="lg:col-span-4 p-3 self-start">
           <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Hierarchy</p>
-          {roles.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => select(r.id)}
-              className={`w-full flex items-center justify-between py-2 pr-3 rounded-lg text-left text-xs cursor-pointer ${
-                r.id === selected?.id ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50 text-slate-700"
-              }`}
-              style={{ paddingLeft: 12 + r.depth * 16 }}
-            >
-              <span className="font-semibold">
-                {r.depth > 0 && <span className="text-slate-300 mr-1">└</span>}
-                {r.name}
-              </span>
-              <span className="text-[10px] text-slate-400">{r.user_count} users</span>
-            </button>
-          ))}
+          {staffRoles.map((r) => renderRole(r, "users"))}
+          {endUserRoles.length > 0 && (
+            <>
+              <p className="px-2 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                End user portal
+              </p>
+              {endUserRoles.map((r) => renderRole(r, "end users"))}
+            </>
+          )}
         </Card>
 
         <Card className="lg:col-span-8 p-5 space-y-4">

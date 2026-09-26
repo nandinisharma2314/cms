@@ -74,7 +74,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     return {"success": True, **tokens, "user": staff_profile(db, ctx)}
 
 
-# Works for both staff and citizen refresh tokens; the old token is revoked (rotation)
+# Works for both staff and end user refresh tokens; the old token is revoked (rotation)
 @router.post("/refresh")
 def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     token = consume_refresh_token(db, payload.refresh_token)

@@ -20,7 +20,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { apis } from "@/lib/apis";
-import ComplaintModal from "@/components/Dashboard/ComplaintModal";
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -28,7 +27,6 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<"all" | "unread" | "alerts">("all");
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
 
   const fetchNotifications = async (showRefresh = false) => {
     try {
@@ -255,6 +253,7 @@ export default function NotificationsPage() {
                   key={item.id}
                   onClick={() => {
                     if (!item.is_read) handleMarkRead(item.id);
+                    if (item.complaint_id) router.push(`/dashboard/complaints/${encodeURIComponent(item.complaint_id)}`);
                   }}
                   className={`p-4 md:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors cursor-pointer relative ${
                     !item.is_read ? "bg-indigo-50/20" : ""

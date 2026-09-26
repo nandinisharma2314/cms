@@ -46,8 +46,8 @@ def login(client):
 
 
 @pytest.fixture(scope="session")
-def citizen_login(client):
-    """Citizen tokens, cached: requesting a second OTP within 30 s is throttled."""
+def end_user_login(client):
+    """End user tokens, cached: requesting a second OTP within 30 s is throttled."""
     tokens: dict[tuple[str, str], dict] = {}
 
     def _login(mobile: str = "9876543210", email: str = "rahul@example.com") -> dict:

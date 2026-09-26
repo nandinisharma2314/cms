@@ -8,7 +8,7 @@ import { useSession } from "@/lib/session";
 import { RequirePermission } from "@/components/RequirePermission";
 import { Card, ErrorBanner, formatDateTime, inputClass, PageHeader } from "@/components/ui";
 
-const KIND_LABEL: Record<ImportKind, string> = { locations: "Locations", end_users: "Citizens" };
+const KIND_LABEL: Record<ImportKind, string> = { locations: "Locations", end_users: "End Users" };
 const STATUS_STYLE: Record<ImportBatch["status"], string> = {
   completed: "bg-emerald-50 text-emerald-700 border-emerald-100",
   validated: "bg-blue-50 text-blue-700 border-blue-100",
@@ -85,7 +85,7 @@ function ImportHistory() {
       <select className={`${inputClass} max-w-[180px]`} value={kind} onChange={(e) => setKind(e.target.value as ImportKind | "")}>
         <option value="">All imports</option>
         {can("location.import") && <option value="locations">Locations</option>}
-        {can("end_user.import") && <option value="end_users">Citizens</option>}
+        {can("end_user.import") && <option value="end_users">End Users</option>}
       </select>
       <ErrorBanner message={error} />
       <Card className="divide-y divide-slate-50">

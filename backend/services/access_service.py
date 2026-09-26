@@ -19,7 +19,7 @@ from sqlalchemy import and_, false, or_
 from sqlalchemy.orm import Session
 
 from models import Location, Role, User
-from services.permission_catalog import PERMISSIONS, SUPER_ADMIN_ROLE_KEY
+from services.permission_catalog import STAFF_PERMISSIONS, SUPER_ADMIN_ROLE_KEY
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,7 @@ class AccessContext:
         self.role: Role = user.role
         self.is_super_admin = self.role.key == SUPER_ADMIN_ROLE_KEY
         if self.is_super_admin:
-            self.permissions = frozenset(PERMISSIONS)
+            self.permissions = frozenset(STAFF_PERMISSIONS)
             self.scopes: tuple[Scope, ...] = (Scope(None, None),)
         else:
             self.permissions = frozenset(p.key for p in self.role.permissions)
@@ -91,7 +91,7 @@ class AccessContext:
         return any(s.covers(department_id, location_path) for s in self.scopes)
 
     def covers_location(self, location_path: str | None) -> bool:
-        """Location-only check, for records that have no department (citizens,
+        """Location-only check, for records that have no department (end users,
         the location tree itself)."""
         return any(s.covers_location(location_path) for s in self.scopes)
 

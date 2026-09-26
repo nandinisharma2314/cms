@@ -57,7 +57,7 @@ export function NeedHelpModal({ isOpen, onClose }: NeedHelpModalProps) {
  </a>
  </li>
  <li>
- <span className="contact-label">Citizen Helpline:</span>
+ <span className="contact-label">End User Helpline:</span>
  {""}
  <span className="contact-value">
  1800-112-345 (Toll Free, 24/7)

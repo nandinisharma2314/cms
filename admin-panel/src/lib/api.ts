@@ -52,8 +52,12 @@ export interface Me extends StaffUser {
   is_super_admin: boolean;
 }
 
+/** Staff roles form the hierarchy; the End User role holds portal permissions. */
+export type RoleAudience = "staff" | "end_user";
+
 export interface RoleDetail extends RoleRef {
   description: string | null;
+  audience: RoleAudience;
   parent_id: number | null;
   depth: number;
   is_system: boolean;
@@ -68,6 +72,7 @@ export interface PermissionDef {
   key: string;
   group: string;
   description: string;
+  audience: RoleAudience;
 }
 
 export interface Category {
@@ -214,8 +219,8 @@ export interface ComplaintData {
   priority: string;
   location: string;
   location_detail: LocationRef | null;
-  citizen_name?: string | null;
-  citizen_phone?: string | null;
+  end_user_name?: string | null;
+  end_user_phone?: string | null;
   status: ComplaintStatus;
   status_label: string;
   status_group: StatusGroup;
@@ -728,8 +733,8 @@ export const api = {
       location_id: number;
       priority?: string;
       description?: string;
-      citizen_name?: string;
-      citizen_phone?: string;
+      end_user_name?: string;
+      end_user_phone?: string;
     }) => request<{ id: string; assignee: string | null }>("/complaints/quick-create", { method: "POST", body: data }),
   },
   users: {

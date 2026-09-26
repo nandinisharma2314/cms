@@ -26,37 +26,37 @@ def notifications(client, headers, portal=False):
     return client.get("/portal/notifications" if portal else "/notifications/", headers=headers).json()
 
 
-def test_new_complaint_gets_default_targets(client, login, citizen_login):
-    cid = file_complaint(client, citizen_login(), title="SLA defaults")
+def test_new_complaint_gets_default_targets(client, login, end_user_login):
+    cid = file_complaint(client, end_user_login(), title="SLA defaults")
     d = detail(client, login(ELEC_AGENT), cid)
     assigned = parse(d["assigned_at"])
     assert parse(d["sla_due"]["response_due_at"]) == assigned + timedelta(hours=24)
     assert parse(d["sla_due"]["resolution_due_at"]) == parse(d["created_at"]) + timedelta(hours=72)  # High
     assert d["sla"] == {"response": "on_track", "resolution": "on_track"}
 
-    citizen_view = client.get(f"/portal/complaints/{cid}", headers=citizen_login()).json()
-    assert citizen_view["response_due_at"] and citizen_view["resolution_due_at"]
-    assert "sla" not in citizen_view  # breach details stay internal
+    end_user_view = client.get(f"/portal/complaints/{cid}", headers=end_user_login()).json()
+    assert end_user_view["response_due_at"] and end_user_view["resolution_due_at"]
+    assert "sla" not in end_user_view  # breach details stay internal
 
 
-def test_department_override_applies_to_new_complaints(client, login, citizen_login):
-    root, citizen = login(SUPER_ADMIN), citizen_login()
-    electricity = departments(client, citizen)["Electricity"]["id"]
+def test_department_override_applies_to_new_complaints(client, login, end_user_login):
+    root, end_user = login(SUPER_ADMIN), end_user_login()
+    electricity = departments(client, end_user)["Electricity"]["id"]
     rule = client.put("/sla/rules", headers=root, json={
         "priority": "High", "department_id": electricity, "response_hours": 4, "resolution_hours": 12,
         "warning_minutes": 30,
     })
     assert rule.status_code == 200, rule.text
     try:
-        d = detail(client, login(ELEC_AGENT), file_complaint(client, citizen, title="SLA override"))
+        d = detail(client, login(ELEC_AGENT), file_complaint(client, end_user, title="SLA override"))
         assert parse(d["sla_due"]["response_due_at"]) == parse(d["assigned_at"]) + timedelta(hours=4)
     finally:
         client.delete(f"/sla/rules/{rule.json()['id']}", headers=root)
 
 
-def test_warning_breach_and_escalation_up_the_reporting_line(client, login, citizen_login):
-    citizen = citizen_login()
-    cid = file_complaint(client, citizen, title="Nobody picked this up")
+def test_warning_breach_and_escalation_up_the_reporting_line(client, login, end_user_login):
+    end_user = end_user_login()
+    cid = file_complaint(client, end_user, title="Nobody picked this up")
     agent = login(ELEC_AGENT)
     due = parse(detail(client, agent, cid)["sla_due"]["response_due_at"])
 
@@ -73,9 +73,9 @@ def test_warning_breach_and_escalation_up_the_reporting_line(client, login, citi
     assert any(n["kind"] == "complaint.escalated" and cid in n["title"] for n in notifications(client, supervisor)["items"])
     # the manager above the supervisor hears about the breach
     assert any(n["kind"] == "sla.breached" and cid in n["title"] for n in notifications(client, login(ELEC_MANAGER))["items"])
-    # the citizen sees that it was escalated, not to whom
-    citizen_timeline = client.get(f"/portal/complaints/{cid}", headers=citizen).json()["timeline"]
-    assert any("senior officer" in e["message"] for e in citizen_timeline)
+    # the end user sees that it was escalated, not to whom
+    end_user_timeline = client.get(f"/portal/complaints/{cid}", headers=end_user).json()["timeline"]
+    assert any("senior officer" in e["message"] for e in end_user_timeline)
 
     # each level gets 24h before it climbs: supervisor -> manager -> admin -> super admin, then stops
     chain = []
@@ -111,8 +111,8 @@ def test_unassigned_complaint_escalates_to_the_nearest_supervisor_in_scope(clien
     assert detail(client, admin, cid)["escalation"]["to"]["name"] == "Ananya Verma"
 
 
-def test_reassignment_restarts_the_response_clock(client, login, citizen_login):
-    cid = file_complaint(client, citizen_login(), title="Stuck with one agent")
+def test_reassignment_restarts_the_response_clock(client, login, end_user_login):
+    cid = file_complaint(client, end_user_login(), title="Stuck with one agent")
     supervisor = login(ELEC_SUPERVISOR)
     due = parse(detail(client, supervisor, cid)["sla_due"]["response_due_at"])
     check(cid, due + timedelta(minutes=1))
@@ -126,40 +126,40 @@ def test_reassignment_restarts_the_response_clock(client, login, citizen_login):
     assert parse(moved["sla_due"]["response_due_at"]) == parse(moved["assigned_at"]) + timedelta(hours=24)
 
 
-def test_resolution_clock_pauses_while_waiting_for_the_citizen(client, citizen_login):
-    cid = file_complaint(client, citizen_login(), title="Pause the clock")
+def test_resolution_clock_pauses_while_waiting_for_the_end_user(client, end_user_login):
+    cid = file_complaint(client, end_user_login(), title="Pause the clock")
     with SessionLocal() as db:
         complaint = db.query(Complaint).filter(Complaint.generated_id == cid).one()
         agent = AccessContext(db, db.query(User).filter(User.email == ELEC_AGENT).one())
-        citizen = db.query(EndUser).filter(EndUser.external_id == "USR001").one()
+        end_user = db.query(EndUser).filter(EndUser.external_id == "USR001").one()
         start = complaint.created_at + timedelta(hours=1)
         workflow_service.apply_staff_action(agent, complaint, "start", None, at=start)
         due_before = complaint.resolution_due_at
         workflow_service.apply_staff_action(agent, complaint, "request_info", "Photo please?", at=start + timedelta(hours=1))
         assert complaint.sla_paused_at is not None
         assert sla_service.check_complaint(db, complaint, due_before + timedelta(hours=1)) == []  # paused: no breach
-        workflow_service.add_comment(db, complaint, citizen, "Here it is", at=start + timedelta(hours=11))
+        workflow_service.add_comment(db, complaint, end_user, "Here it is", at=start + timedelta(hours=11))
         assert complaint.status == "IN_PROGRESS" and complaint.sla_paused_at is None
         assert complaint.resolution_due_at == due_before + timedelta(hours=10)
         db.commit()
 
 
-def test_notifications_reach_citizens_and_can_be_marked_read(client, login, citizen_login):
-    citizen, agent = citizen_login(), login(ELEC_AGENT)
-    cid = file_complaint(client, citizen, title="Notify me")
+def test_notifications_reach_end_users_and_can_be_marked_read(client, login, end_user_login):
+    end_user, agent = end_user_login(), login(ELEC_AGENT)
+    cid = file_complaint(client, end_user, title="Notify me")
     act(client, agent, cid, "acknowledge")
     act(client, agent, cid, "request_info", "Which lane exactly?")
 
-    inbox = notifications(client, citizen, portal=True)
+    inbox = notifications(client, end_user, portal=True)
     mine = [n for n in inbox["items"] if n["complaint_id"] == cid]
     assert any("waiting for information" in n["title"] and "Which lane" in n["body"] for n in mine)
     unread = inbox["unread_count"]
-    client.post(f"/portal/notifications/{mine[0]['id']}/read", headers=citizen)
-    assert notifications(client, citizen, portal=True)["unread_count"] == unread - 1
+    client.post(f"/portal/notifications/{mine[0]['id']}/read", headers=end_user)
+    assert notifications(client, end_user, portal=True)["unread_count"] == unread - 1
 
-    # the citizen's reply notifies the handler
-    client.post(f"/portal/complaints/{cid}/comments", headers=citizen, data={"body": "Lane 4"})
-    assert any(n["title"] == f"Citizen replied on {cid}" for n in notifications(client, agent)["items"])
+    # the end user's reply notifies the handler
+    client.post(f"/portal/complaints/{cid}/comments", headers=end_user, data={"body": "Lane 4"})
+    assert any(n["title"] == f"End user replied on {cid}" for n in notifications(client, agent)["items"])
     client.post("/notifications/read-all", headers=agent)
     assert notifications(client, agent)["unread_count"] == 0
 

@@ -1,4 +1,4 @@
-"""CSV imports for the location hierarchy and for end users (citizens).
+"""CSV imports for the location hierarchy and for end users.
 
 Each row is validated completely before anything is written for it, so a bad
 row is reported and skipped without leaving partial data behind. Row numbers
@@ -302,14 +302,14 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
         )
         by_pair = db.query(EndUser).filter(EndUser.mobile == mobile, EndUser.email == email).first()
         if by_external is not None and by_pair is not None and by_pair.id != by_external.id:
-            result.fail(row_number, f"Mobile + email already belong to another citizen ({by_pair.external_id or by_pair.name})", row)
+            result.fail(row_number, f"Mobile + email already belong to another end user ({by_pair.external_id or by_pair.name})", row)
             continue
         if by_external is None and by_pair is not None and external_id and by_pair.external_id not in (None, external_id):
             result.fail(row_number, f"Mobile + email already belong to user_id {by_pair.external_id}", row)
             continue
         existing = by_external or by_pair
         if existing is not None and not ctx.covers_location(existing.location.path if existing.location else None):
-            result.fail(row_number, "Existing citizen is outside your scope", row)
+            result.fail(row_number, "Existing end user is outside your scope", row)
             continue
 
         # Imported, but worth a second look.
@@ -326,10 +326,10 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
         for other in others:
             if other.mobile == mobile and other.email != email:
                 result.warn(row_number, f"Mobile already registered to {other.name} with email {other.email}; "
-                                        "possibly outdated data (two separate citizens now)", row)
+                                        "possibly outdated data (two separate end users now)", row)
             elif other.email == email and other.mobile != mobile:
                 result.warn(row_number, f"Email already registered to {other.name} with mobile {other.mobile}; "
-                                        "possibly outdated data (two separate citizens now)", row)
+                                        "possibly outdated data (two separate end users now)", row)
 
         if existing is not None:
             new_values = {
@@ -365,7 +365,7 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
 
 
 IMPORTERS = {"locations": import_locations, "end_users": import_end_users}
-KIND_LABELS = {"locations": "locations", "end_users": "citizens"}
+KIND_LABELS = {"locations": "locations", "end_users": "end users"}
 AUDIT_ACTIONS = {"locations": "location.import", "end_users": "end_user.import"}
 
 

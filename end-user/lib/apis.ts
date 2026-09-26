@@ -1,3 +1,5 @@
+import { formatWhen } from "./utils";
+
 export const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
@@ -5,7 +7,7 @@ const ACCESS_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
 /** Fired on window when the session is gone; the dashboard layout redirects to /login. */
-export const UNAUTHORIZED_EVENT = "citizen:unauthorized";
+export const UNAUTHORIZED_EVENT = "end-user:unauthorized";
 
 export type OtpChannel = "sms" | "email";
 
@@ -28,14 +30,31 @@ export interface LocationNode {
   children: LocationNode[];
 }
 
-export interface CitizenProfile {
+export interface EndUserProfile {
   id: number;
   external_id: string | null;
   name: string;
   mobile: string;
   email: string;
   location: LocationRef | null;
+  dob: string;
+  gender: string;
+  address: string;
+  language: string;
+  notify_sms: boolean;
+  notify_email: boolean;
+  notify_alerts: boolean;
+  role: { key: string; name: string };
+  /** Portal permissions of the End User role, e.g. "portal.complaint.create". */
+  permissions: string[];
 }
+
+export type ProfileUpdate = Partial<
+  Pick<
+    EndUserProfile,
+    "name" | "email" | "mobile" | "dob" | "gender" | "address" | "language" | "notify_sms" | "notify_email" | "notify_alerts"
+  >
+>;
 
 export interface PortalDepartment {
   id: number;
@@ -88,7 +107,7 @@ export interface Complaint {
   is_escalated: boolean;
 }
 
-export type CitizenAction = "comment" | "confirm" | "reopen" | "feedback";
+export type EndUserAction = "comment" | "confirm" | "reopen" | "feedback";
 
 export interface ComplaintDetail extends Complaint {
   timeline: {
@@ -107,11 +126,11 @@ export interface ComplaintDetail extends Complaint {
     created_at: string;
     attachments: Attachment[];
   }[];
-  actions: CitizenAction[];
+  actions: EndUserAction[];
   reopen_until: string | null;
 }
 
-export interface CitizenNotification {
+export interface EndUserNotification {
   id: number;
   kind: string;
   title: string;
@@ -119,6 +138,16 @@ export interface CitizenNotification {
   complaint_id: string | null;
   created_at: string;
   read_at: string | null;
+}
+
+/** A public update on one of the end user's complaints. */
+export interface EndUserActivity {
+  id: number;
+  title: string;
+  desc: string;
+  type: string;
+  complaint_id: string;
+  created_at: string;
 }
 
 export interface ComplaintStats {
@@ -143,7 +172,7 @@ export interface LoginResponse {
   success: boolean;
   access_token: string;
   refresh_token: string;
-  user: CitizenProfile;
+  user: EndUserProfile;
 }
 
 export class ApiError extends Error {
@@ -236,8 +265,9 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 
 export const apis = {
   auth: {
-    // Citizens are pre-registered by CSV; both mobile and email must match.
-    requestOtp: (payload: { mobile: string; email: string; channel: OtpChannel }) =>
+    // End users are pre-registered by CSV. The channel's own identifier is enough;
+    // a 409 means it is shared by more than one end user, so send both.
+    requestOtp: (payload: { mobile?: string; email?: string; channel: OtpChannel }) =>
       fetchApi<OtpChallengeResponse>("/portal/auth/request-otp", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -247,7 +277,7 @@ export const apis = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    me: () => fetchApi<CitizenProfile>("/portal/me"),
+    me: () => fetchApi<EndUserProfile>("/portal/me"),
     logout: async () => {
       const refreshToken = storage()?.getItem(REFRESH_TOKEN_KEY);
       clearSession();
@@ -260,11 +290,45 @@ export const apis = {
       }
     },
   },
+  // The dashboard profile screens read the { success, user } shape.
+  profile: {
+    getProfile: async () => ({ success: true, user: await fetchApi<EndUserProfile>("/portal/me") }),
+    updateProfile: (data: ProfileUpdate) =>
+      fetchApi<{ success: boolean; message: string; user: EndUserProfile }>("/portal/profile", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
   notifications: {
     list: () =>
-      fetchApi<{ items: CitizenNotification[]; unread_count: number }>("/portal/notifications?limit=30"),
+      fetchApi<{ items: EndUserNotification[]; unread_count: number }>("/portal/notifications?limit=30"),
+    // Shaped for the notification panel and page, which render `time` as is.
+    getNotifications: async () => {
+      const res = await fetchApi<{ items: EndUserNotification[]; unread_count: number }>(
+        "/portal/notifications?limit=30",
+      );
+      return {
+        success: true,
+        unread_count: res.unread_count,
+        notifications: res.items.map((n) => ({
+          id: n.id,
+          title: n.title,
+          message: n.body || "",
+          type: n.kind,
+          complaint_id: n.complaint_id ?? undefined,
+          is_read: !!n.read_at,
+          time: formatWhen(n.created_at),
+          created_at: n.created_at,
+        })),
+      };
+    },
     markRead: (id: number) => fetchApi(`/portal/notifications/${id}/read`, { method: "POST" }),
     markAllRead: () => fetchApi("/portal/notifications/read-all", { method: "POST" }),
+    clearAll: () => fetchApi<{ success: boolean }>("/portal/notifications", { method: "DELETE" }),
+    getActivities: async () => {
+      const res = await fetchApi<{ success: boolean; activities: EndUserActivity[] }>("/portal/activities");
+      return { ...res, activities: res.activities.map((a) => ({ ...a, time: formatWhen(a.created_at) })) };
+    },
   },
   reference: {
     departments: () => fetchApi<PortalDepartment[]>("/portal/departments"),

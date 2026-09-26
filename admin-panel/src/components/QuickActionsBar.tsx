@@ -58,8 +58,8 @@ const actions: QuickAction[] = [
     borderClass: "border-emerald-100",
   },
   {
-    id: "import-citizens",
-    label: "Import Citizens",
+    id: "import-end-users",
+    label: "Import End Users",
     icon: FileSpreadsheet,
     permission: "end_user.import",
     href: "/end-users?import=1",
@@ -86,8 +86,8 @@ const EMPTY_COMPLAINT = {
   location_id: null as number | null,
   priority: "Medium",
   description: "",
-  citizen_name: "",
-  citizen_phone: "",
+  end_user_name: "",
+  end_user_phone: "",
 };
 
 export function QuickActionsBar({ onRefresh }: { onRefresh?: () => void }) {
@@ -215,7 +215,7 @@ export function QuickActionsBar({ onRefresh }: { onRefresh?: () => void }) {
       {registerOpen && (
         <Modal
           title="Register Complaint"
-          description="Log a grievance on behalf of a citizen. It must fall inside your department/location scope."
+          description="Log a grievance on behalf of an end user. It must fall inside your department/location scope."
           onClose={() => {
             setRegisterOpen(false);
             setFormError(null);
@@ -295,17 +295,17 @@ export function QuickActionsBar({ onRefresh }: { onRefresh?: () => void }) {
                   ))}
                 </select>
               </Field>
-              <Field label="Citizen Name">
+              <Field label="End User Name">
                 <input
-                  value={newComplaint.citizen_name}
-                  onChange={(e) => setNewComplaint({ ...newComplaint, citizen_name: e.target.value })}
+                  value={newComplaint.end_user_name}
+                  onChange={(e) => setNewComplaint({ ...newComplaint, end_user_name: e.target.value })}
                   className={inputClass}
                 />
               </Field>
-              <Field label="Citizen Mobile">
+              <Field label="End User Mobile">
                 <input
-                  value={newComplaint.citizen_phone}
-                  onChange={(e) => setNewComplaint({ ...newComplaint, citizen_phone: e.target.value })}
+                  value={newComplaint.end_user_phone}
+                  onChange={(e) => setNewComplaint({ ...newComplaint, end_user_phone: e.target.value })}
                   className={inputClass}
                 />
               </Field>

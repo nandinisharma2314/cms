@@ -26,8 +26,8 @@ STATUS_LABELS = {
     REJECTION_REQUESTED: "Rejection Requested",
 }
 
-# Citizens never see that a rejection is being considered, only that it is under review.
-CITIZEN_STATUS_LABELS = {**STATUS_LABELS, REJECTION_REQUESTED: "Under Review"}
+# End users never see that a rejection is being considered, only that it is under review.
+END_USER_STATUS_LABELS = {**STATUS_LABELS, REJECTION_REQUESTED: "Under Review"}
 
 # Coarse buckets for dashboards and filters.
 STATUS_GROUPS = {
@@ -40,7 +40,7 @@ GROUP_OF = {s: group for group, statuses in STATUS_GROUPS.items() for s in statu
 # Complaints that still count toward an officer's workload.
 ACTIVE_STATUSES = STATUS_GROUPS["open"] + STATUS_GROUPS["in_progress"]
 
-# Statuses in which the citizen is still waiting for a first response from the handler.
+# Statuses in which the end user is still waiting for a first response from the handler.
 AWAITING_RESPONSE = [SUBMITTED, ASSIGNED, REOPENED]
 
 
@@ -48,5 +48,5 @@ def status_label(value: str) -> str:
     return STATUS_LABELS.get(value, value)
 
 
-def citizen_status_label(value: str) -> str:
-    return CITIZEN_STATUS_LABELS.get(value, value)
+def end_user_status_label(value: str) -> str:
+    return END_USER_STATUS_LABELS.get(value, value)

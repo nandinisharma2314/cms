@@ -71,7 +71,7 @@ function DepartmentForm({
         {editing ? (
           <label className="flex items-center gap-2 text-xs text-slate-700">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            Active (inactive departments are hidden from the citizen portal)
+            Active (inactive departments are hidden from the end user portal)
           </label>
         ) : (
           <Field label="Complaint categories" hint="Comma separated, e.g. Street Light, Power Cut, Other">
@@ -200,7 +200,7 @@ function DepartmentsList() {
     <>
       <PageHeader
         title="Departments"
-        description="Departments and the complaint categories citizens can choose from."
+        description="Departments and the complaint categories end users can choose from."
         actions={
           can("department.create") && (
             <button className={primaryButtonClass} onClick={() => setCreating(true)}>

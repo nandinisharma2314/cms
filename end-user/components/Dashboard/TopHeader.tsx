@@ -14,6 +14,10 @@ interface TopHeaderProps {
  onSignOut?: () => void;
  userName?: string;
  userEmail?: string;
+ /** The account's role name, e.g. "End User". */
+ userRole?: string;
+ /** The phone home screen has its own greeting header instead. */
+ hideOnMobile?: boolean;
 }
 
 export function TopHeader({
@@ -21,8 +25,10 @@ export function TopHeader({
  onSearchChange,
  onProfileClick,
  onSignOut,
- userName ="Citizen",
+ userName ="End User",
  userEmail ="",
+ userRole ="",
+ hideOnMobile = false,
 }: TopHeaderProps) {
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -53,7 +59,7 @@ export function TopHeader({
       .toUpperCase() || "C";
 
   return (
-    <header className="bg-white border-b border-slate-200 px-4 md:px-8 lg:px-12 py-2 md:py-3 flex items-center justify-between sticky top-0 z-30">
+    <header className={`bg-white border-b border-slate-200 px-4 md:px-8 lg:px-12 py-2 md:py-3 ${hideOnMobile ? "hidden md:flex" : "flex"} items-center justify-between sticky top-0 z-30`}>
       {/* Left: Logo */}
       <div
         className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
@@ -104,7 +110,7 @@ export function TopHeader({
  {userName}
  </span>
  <span className="text-[11px] font-medium text-slate-500 leading-tight mt-0.5">
- Community Member
+ {userRole}
  </span>
  </div>
  <span className="hidden md:block ml-1">

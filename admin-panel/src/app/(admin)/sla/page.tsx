@@ -217,7 +217,7 @@ function SlaSettings() {
         <h3 className="text-sm font-bold text-slate-800">Targets by priority</h3>
         <p className="text-xs text-slate-500 mt-1 mb-3">
           Response: hours for the assigned officer to acknowledge. Resolution: hours from submission (paused while
-          waiting for the citizen). Warning: how long before a target the &ldquo;due soon&rdquo; alert fires.
+          waiting for the end user). Warning: how long before a target the &ldquo;due soon&rdquo; alert fires.
         </p>
         <table className="text-left text-xs">
           <thead className="text-[11px] uppercase tracking-wider text-slate-400">

@@ -22,7 +22,7 @@ function EndUsersList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState<string | null>(null);
-  // "Import Citizens" quick action links here with ?import=1
+  // "Import End Users" quick action links here with ?import=1
   const [importOpen, setImportOpen] = useState(() => searchParams.get("import") === "1" && can("end_user.import"));
   const debouncedSearch = useDebounced(search.trim());
 
@@ -52,13 +52,13 @@ function EndUsersList() {
   return (
     <>
       <PageHeader
-        title="Citizens"
-        description="Registered end users who can sign in to the citizen portal with mobile + email + OTP."
+        title="End Users"
+        description="Registered end users who can sign in to the end user portal with their mobile or email + OTP."
         actions={
           <>
             <button
               className={secondaryButtonClass}
-              title="Citizens in your scope, in the import format"
+              title="End users in your scope, in the import format"
               onClick={() => api.endUsers.exportCsv(debouncedSearch || undefined).catch((err: Error) => setActionError(err.message))}
             >
               <Download className="w-3.5 h-3.5" /> Export CSV
@@ -106,7 +106,7 @@ function EndUsersList() {
             ) : data.items.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
-                  No citizens found in your scope.
+                  No end users found in your scope.
                 </td>
               </tr>
             ) : (
@@ -142,7 +142,7 @@ function EndUsersList() {
       {data && data.total > PAGE_SIZE && (
         <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
           <span>
-            Page {page} of {totalPages} ({data.total} citizens)
+            Page {page} of {totalPages} ({data.total} end users)
           </span>
           <button className={secondaryButtonClass} disabled={page <= 1} onClick={() => setPage(page - 1)}>
             Previous
@@ -155,7 +155,7 @@ function EndUsersList() {
 
       {importOpen && (
         <Modal
-          title="Import Citizens from CSV"
+          title="Import End Users from CSV"
           description="Rows are matched by user_id (or mobile + email) and updated; new rows are created. Locations must already exist."
           onClose={() => setImportOpen(false)}
           wide
@@ -165,7 +165,7 @@ function EndUsersList() {
             sampleRows={[
               ["USR001", "Rahul Sharma", "9876543210", "rahul@example.com", "India", "Rajasthan", "Jaipur", "Jaipur", "Mansarovar"],
             ]}
-            templateName="citizens-template.csv"
+            templateName="end-users-template.csv"
             onImport={api.endUsers.importCsv}
             onDone={reload}
           />

@@ -84,7 +84,7 @@ function Tiles({ m, prev, periodLabel }: { m: ReportMetrics; prev: ReportMetrics
         />
         <StatTile
           {...tile}
-          label="Citizen rating"
+          label="End user rating"
           value={m.avg_rating === null ? "—" : `${m.avg_rating.toFixed(2)} / 5`}
           detail={`${m.rated} rated`}
           current={m.avg_rating}

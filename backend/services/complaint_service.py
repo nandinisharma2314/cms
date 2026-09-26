@@ -13,10 +13,10 @@ from models import (
 from services import rejection_service, routing_service, sla_service
 from services.access_service import AccessContext
 from services.location_service import path_names, serialize_location
-from services.statuses import AWAITING_RESPONSE, citizen_status_label
+from services.statuses import AWAITING_RESPONSE, end_user_status_label
 from services.workflow_service import (
-    ACTIVE_STATUSES, CLOSED, GROUP_OF, REJECTED, STATUS_GROUPS, SUBMITTED, citizen_actions_for,
-    record_event, reopen_deadline, staff_actions_for, status_label,
+    ACTION_PERMISSIONS, ACTIVE_STATUSES, CLOSED, GROUP_OF, REJECTED, STATUS_GROUPS, SUBMITTED,
+    end_user_actions_for, record_event, reopen_deadline, staff_actions_for, status_label,
 )
 from utils.security import utcnow
 
@@ -67,8 +67,8 @@ def register_complaint(
     additional_details: str | None = None,
     end_user: EndUser | None = None,
     created_by: User | None = None,
-    citizen_name: str | None = None,
-    citizen_phone: str | None = None,
+    end_user_name: str | None = None,
+    end_user_phone: str | None = None,
     at: datetime | None = None,
 ) -> Complaint:
     """Creates a complaint, records its submission and routes it to an officer.
@@ -85,8 +85,8 @@ def register_complaint(
         title=title,
         description=description,
         additional_details=additional_details,
-        citizen_name=citizen_name or (end_user.name if end_user else None),
-        citizen_phone=citizen_phone or (end_user.mobile if end_user else None),
+        end_user_name=end_user_name or (end_user.name if end_user else None),
+        end_user_phone=end_user_phone or (end_user.mobile if end_user else None),
         status=SUBMITTED,
         reopen_count=0,
         created_at=now,
@@ -100,7 +100,7 @@ def register_complaint(
     if end_user is not None:
         message = public = f"Complaint submitted by {end_user.name}"
     else:
-        message = f"Registered by {created_by.name} on behalf of {citizen_name or 'a citizen'}"
+        message = f"Registered by {created_by.name} on behalf of {end_user_name or 'an end user'}"
         public = "Complaint registered by a municipal officer"
     record_event(db, complaint, "submitted", submitter, message, public_message=public, to_status=SUBMITTED, at=now)
     record_event(
@@ -172,14 +172,14 @@ def _attachment(a: ComplaintAttachment) -> dict:
     }
 
 
-def serialize_complaints(db: Session, complaints: list[Complaint], for_citizen: bool = False) -> list[dict]:
+def serialize_complaints(db: Session, complaints: list[Complaint], for_end_user: bool = False) -> list[dict]:
     names = path_names(db, [c.location for c in complaints])
     now = utcnow()
     result = []
     for num, c in enumerate(complaints, start=1):
         attachments = [
             a for a in c.attachments
-            if not (for_citizen and a.comment is not None and a.comment.is_internal)
+            if not (for_end_user and a.comment is not None and a.comment.is_internal)
         ]
         item = {
             "num": num,
@@ -195,10 +195,10 @@ def serialize_complaints(db: Session, complaints: list[Complaint], for_citizen: 
             "priority": c.priority,
             "location": c.location.name,
             "location_detail": serialize_location(c.location, names),
-            "citizen_name": c.citizen_name,
-            "citizen_phone": c.citizen_phone,
+            "end_user_name": c.end_user_name,
+            "end_user_phone": c.end_user_phone,
             "status": c.status,
-            "status_label": citizen_status_label(c.status) if for_citizen else status_label(c.status),
+            "status_label": end_user_status_label(c.status) if for_end_user else status_label(c.status),
             "status_group": GROUP_OF.get(c.status, "open"),
             "date": c.created_at.strftime("%d %b %Y"),
             "created_at": c.created_at.isoformat(),
@@ -212,12 +212,12 @@ def serialize_complaints(db: Session, complaints: list[Complaint], for_citizen: 
             "feedback_rating": c.feedback_rating,
             "feedback_comment": c.feedback_comment,
             "attachments": [_attachment(a) for a in attachments],
-            # targets the citizen can see; breach details stay internal
+            # targets the end user can see; breach details stay internal
             "response_due_at": _iso(c.response_due_at) if c.status in AWAITING_RESPONSE else None,
             "resolution_due_at": _iso(c.resolution_due_at) if c.status in ACTIVE_STATUSES else None,
             "is_escalated": c.escalated_to_id is not None,
         }
-        if not for_citizen:
+        if not for_end_user:
             item["assignee"] = (
                 {"id": c.assigned_to.id, "name": c.assigned_to.name, "role": c.assigned_to.role.name}
                 if c.assigned_to else None
@@ -237,13 +237,13 @@ def serialize_complaints(db: Session, complaints: list[Complaint], for_citizen: 
     return result
 
 
-def _comment(comment: ComplaintComment, for_citizen: bool, department_name: str) -> dict:
+def _comment(comment: ComplaintComment, for_end_user: bool, department_name: str) -> dict:
     staff = comment.author_type == "staff"
     return {
         "id": comment.id,
         "author_type": comment.author_type,
-        # Citizens see the department rather than the individual officer.
-        "author_name": f"{department_name} Department" if (staff and for_citizen) else comment.author_name,
+        # End users see the department rather than the individual officer.
+        "author_name": f"{department_name} Department" if (staff and for_end_user) else comment.author_name,
         "body": comment.body,
         "is_internal": comment.is_internal,
         "created_at": comment.created_at.isoformat(),
@@ -320,15 +320,17 @@ def staff_detail(ctx: AccessContext, complaint: Complaint) -> dict:
     return data
 
 
-def citizen_detail(db: Session, end_user: EndUser, complaint: Complaint) -> dict:
-    data = serialize_complaints(db, [complaint], for_citizen=True)[0]
+def end_user_detail(db: Session, end_user: EndUser, complaint: Complaint, permissions: frozenset[str]) -> dict:
+    """The end user's view of their complaint. `actions` lists only what both the
+    complaint's state and the End User role's `permissions` allow."""
+    data = serialize_complaints(db, [complaint], for_end_user=True)[0]
     department = complaint.department.name
     timeline = []
     for e in complaint.events:
         if e.public_message is None:
             continue
         if e.actor_type == "end_user":
-            actor = "You" if e.actor_id == end_user.id else "Citizen"
+            actor = "You" if e.actor_id == end_user.id else "End User"
         elif e.actor_type == "staff":
             actor = f"{department} Department"
         else:
@@ -337,7 +339,7 @@ def citizen_detail(db: Session, end_user: EndUser, complaint: Complaint) -> dict
             "id": e.id,
             "type": e.event_type,
             "message": e.public_message,
-            # routing/assignment notes are internal; status notes are addressed to the citizen
+            # routing/assignment notes are internal; status notes are addressed to the end user
             "note": e.note if e.event_type in ("status_changed", "feedback") else None,
             "from_status": e.from_status,
             "to_status": e.to_status,
@@ -346,7 +348,7 @@ def citizen_detail(db: Session, end_user: EndUser, complaint: Complaint) -> dict
         })
     data["timeline"] = timeline
     data["comments"] = [_comment(c, True, department) for c in complaint.comments if not c.is_internal]
-    data["actions"] = citizen_actions_for(complaint)
+    data["actions"] = [a for a in end_user_actions_for(complaint) if ACTION_PERMISSIONS[a] in permissions]
     deadline = reopen_deadline(complaint)
     data["reopen_until"] = _iso(deadline) if "reopen" in data["actions"] else None
     return data

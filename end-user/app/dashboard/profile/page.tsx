@@ -7,8 +7,10 @@ import {
   ChevronLeft, Camera, CheckCircle, Mail, MapPin, Calendar, ChevronDown, Check, Info
 } from "lucide-react";
 import { apis } from "@/lib/apis";
+import { useEndUser } from "@/lib/endUserSession";
 
 export default function ProfilePage() {
+  const canEdit = useEndUser().can("portal.profile.update");
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState("personal");
@@ -91,6 +93,7 @@ export default function ProfilePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) return;
     setIsSaving(true);
     setSaveMessage({ type: "", text: "" });
 
@@ -185,7 +188,7 @@ export default function ProfilePage() {
                 <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 scale-90 md:scale-100">
                   <User size={16} />
                 </div>
-                <input 
+                <input disabled={!canEdit} 
                   type="text" 
                   value={name} 
                   onChange={e => setName(e.target.value)}
@@ -199,6 +202,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2">
                 <button 
                   type="button" 
+                  disabled={!canEdit}
                   onClick={() => setGender("Male")}
                   className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl text-xs font-bold transition-all border ${gender === 'Male' ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20' : 'bg-[#F8FAFC] text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                 >
@@ -206,6 +210,7 @@ export default function ProfilePage() {
                 </button>
                 <button 
                   type="button" 
+                  disabled={!canEdit}
                   onClick={() => setGender("Female")}
                   className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl text-xs font-bold transition-all border ${gender === 'Female' ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20' : 'bg-[#F8FAFC] text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                 >
@@ -213,6 +218,7 @@ export default function ProfilePage() {
                 </button>
                 <button 
                   type="button" 
+                  disabled={!canEdit}
                   onClick={() => setGender("Other")}
                   className={`flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl text-xs font-bold transition-all border ${gender === 'Other' ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20' : 'bg-[#F8FAFC] text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                 >
@@ -228,7 +234,7 @@ export default function ProfilePage() {
                 <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 scale-90 md:scale-100">
                   <Calendar size={16} />
                 </div>
-                <input 
+                <input disabled={!canEdit} 
                   type="date" 
                   value={dob} 
                   onChange={e => setDob(e.target.value)}
@@ -257,7 +263,7 @@ export default function ProfilePage() {
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isSaving}
+                  disabled={isSaving || !canEdit}
                   className="flex-1 py-2.5 md:py-3 rounded-lg md:rounded-xl bg-[#0F62FE] text-white text-xs md:text-sm font-bold hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20 disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {isSaving ? (
@@ -282,7 +288,7 @@ export default function ProfilePage() {
                   <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 scale-90 md:scale-100">
                     <Phone size={16} />
                   </div>
-                  <input 
+                  <input disabled={!canEdit} 
                     type="text" 
                     value={mobile} 
                     onChange={e => setMobile(e.target.value)}
@@ -300,7 +306,7 @@ export default function ProfilePage() {
                   <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 scale-90 md:scale-100">
                     <Mail size={16} />
                   </div>
-                  <input 
+                  <input disabled={!canEdit} 
                     type="email" 
                     value={email} 
                     onChange={e => setEmail(e.target.value)}
@@ -319,7 +325,7 @@ export default function ProfilePage() {
                 <div className="absolute left-3 md:left-4 top-2.5 md:top-3.5 text-slate-400 scale-90 md:scale-100">
                   <MapPin size={16} />
                 </div>
-                <textarea 
+                <textarea disabled={!canEdit} 
                   value={address} 
                   onChange={e => setAddress(e.target.value)}
                   rows={2}
@@ -338,7 +344,7 @@ export default function ProfilePage() {
                 <h4 className="text-sm font-bold text-slate-800">SMS Status Alerts</h4>
                 <p className="text-xs font-medium text-slate-500 mt-0.5">Receive real-time text messages for updates.</p>
               </div>
-              <input
+              <input disabled={!canEdit}
                 type="checkbox"
                 checked={notifySms}
                 onChange={(e) => setNotifySms(e.target.checked)}
@@ -350,7 +356,7 @@ export default function ProfilePage() {
                 <h4 className="text-sm font-bold text-slate-800">Email Digest & Tracking</h4>
                 <p className="text-xs font-medium text-slate-500 mt-0.5">Formal email acknowledgements with tracking links.</p>
               </div>
-              <input
+              <input disabled={!canEdit}
                 type="checkbox"
                 checked={notifyEmail}
                 onChange={(e) => setNotifyEmail(e.target.checked)}
@@ -362,7 +368,7 @@ export default function ProfilePage() {
                 <h4 className="text-sm font-bold text-slate-800">Civic Alerts</h4>
                 <p className="text-xs font-medium text-slate-500 mt-0.5">Urgent municipal announcements and alerts.</p>
               </div>
-              <input
+              <input disabled={!canEdit}
                 type="checkbox"
                 checked={notifyAlerts}
                 onChange={(e) => setNotifyAlerts(e.target.checked)}
@@ -380,7 +386,7 @@ export default function ProfilePage() {
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                 <Globe size={16} />
               </div>
-              <input 
+              <input disabled={!canEdit} 
                 type="text" 
                 value={language} 
                 onChange={e => setLanguage(e.target.value)}
@@ -564,6 +570,11 @@ export default function ProfilePage() {
                   {saveMessage.text}
                 </div>
               )}
+              {!canEdit && activeTab !== "help" && (
+                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-sm font-semibold">
+                  Your account can&apos;t change profile details. Contact support if something needs updating.
+                </div>
+              )}
               {renderTabContent()}
             </div>
             
@@ -588,7 +599,7 @@ export default function ProfilePage() {
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isSaving}
+                  disabled={isSaving || !canEdit}
                   className="flex-1 md:flex-none px-8 py-2.5 rounded-xl bg-[#0F62FE] text-white text-sm font-bold hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20 disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {isSaving ? (

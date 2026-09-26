@@ -148,7 +148,7 @@ function SlaPanel({ detail }: { detail: ComplaintDetail }) {
       <SlaClock label="First response" state={detail.sla.response} due={detail.sla_due.response_due_at} />
       <SlaClock label="Resolution" state={detail.sla.resolution} due={detail.sla_due.resolution_due_at} />
       {detail.sla_paused && (
-        <p className="text-[11px] text-violet-700">The resolution clock is paused while waiting for the citizen.</p>
+        <p className="text-[11px] text-violet-700">The resolution clock is paused while waiting for the end user.</p>
       )}
       {detail.escalation && (
         <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 text-xs">
@@ -334,7 +334,7 @@ function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="font-semibold text-slate-800">
               {c.author_name}
-              {c.author_type === "end_user" && <span className="text-slate-400 font-normal"> · citizen</span>}
+              {c.author_type === "end_user" && <span className="text-slate-400 font-normal"> · end user</span>}
             </span>
             <span className="flex items-center gap-1 text-[10px] text-slate-400">
               {c.is_internal && (
@@ -357,7 +357,7 @@ function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
             required
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder={internal ? "Internal note for staff only..." : "Reply to the citizen..."}
+            placeholder={internal ? "Internal note for staff only..." : "Reply to the end user..."}
             className={`w-full p-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
               internal ? "border-amber-200 bg-amber-50/40" : "border-slate-200"
             }`}
@@ -481,15 +481,15 @@ function ComplaintView() {
                 </span>
               </DetailRow>
             </div>
-            <DetailRow label="Citizen">{detail.citizen_name ?? "—"}</DetailRow>
-            <DetailRow label="Contact">{detail.end_user?.mobile ?? detail.citizen_phone ?? "—"}</DetailRow>
+            <DetailRow label="End User">{detail.end_user_name ?? "—"}</DetailRow>
+            <DetailRow label="Contact">{detail.end_user?.mobile ?? detail.end_user_phone ?? "—"}</DetailRow>
             <DetailRow label="Registered">{formatDateTime(detail.created_at)}</DetailRow>
             <DetailRow label="First response">{formatDateTime(detail.acknowledged_at)}</DetailRow>
             <DetailRow label="Resolved">{formatDateTime(detail.resolved_at)}</DetailRow>
             <DetailRow label="Closed">{formatDateTime(detail.closed_at)}</DetailRow>
             {detail.feedback_rating !== null && (
               <div className="col-span-2">
-                <DetailRow label="Citizen feedback">
+                <DetailRow label="End user feedback">
                   <span className="flex items-center gap-0.5">
                     {[1, 2, 3, 4, 5].map((n) => (
                       <Star

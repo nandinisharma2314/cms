@@ -1,23 +1,17 @@
 "use client";
 
-import React, { Suspense, useState, useEffect, useMemo } from"react";
-import { useRouter, useSearchParams } from"next/navigation";
+import React, { useState, useEffect, useMemo } from"react";
+import { useRouter } from"next/navigation";
 import { MapPin, Search, Filter } from"lucide-react";
 import {
  getPriorityStyles,
  getStatusStyles,
 } from"@/lib/utils";
-import ComplaintModal from"@/components/Dashboard/ComplaintModal";
 import { apis } from"@/lib/apis";
 
-function MyComplaints() {
+export default function MyComplaintsPage() {
  const router = useRouter();
- // ?open=CMP-... (from a notification) opens that complaint once the list loads
- const openId = useSearchParams().get("open");
- const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
  const [allComplaints, setAllComplaints] = useState<any[]>([]);
- // bumped when the detail modal closes, so status changes made there show up
- const [refreshKey, setRefreshKey] = useState(0);
  const [searchTerm, setSearchTerm] = useState("");
  const [statusFilter, setStatusFilter] = useState("All");
  const [locationFilter, setLocationFilter] = useState("All");
@@ -29,18 +23,12 @@ function MyComplaints() {
  .then((data) => {
  setAllComplaints(data || []);
  setLoading(false);
- if (openId) {
- const match = (data || []).find((c) => c.id === openId);
- if (match) setSelectedComplaint(match);
- router.replace("/dashboard/complaints");
- }
  })
  .catch((err) => {
  console.error("Failed to fetch complaints:", err);
  setLoading(false);
  });
- // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [refreshKey, openId]);
+ }, []);
 
  const locations = useMemo(
  () => [
@@ -185,7 +173,7 @@ function MyComplaints() {
  filteredComplaints.map((item, index) => (
  <tr
  key={item.id}
- onClick={() => setSelectedComplaint(item)}
+ onClick={() => router.push(`/dashboard/complaints/${encodeURIComponent(item.id)}`)}
  className="hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0 cursor-pointer group"
  >
  <td className="px-5 py-4 font-semibold text-slate-700">
@@ -243,23 +231,6 @@ function MyComplaints() {
  </div>
  </div>
 
- {selectedComplaint && (
- <ComplaintModal
- complaint={selectedComplaint}
- onClose={() => {
- setSelectedComplaint(null);
- setRefreshKey((k) => k + 1);
- }}
- />
- )}
  </>
- );
-}
-
-export default function MyComplaintsPage() {
- return (
- <Suspense>
- <MyComplaints />
- </Suspense>
  );
 }

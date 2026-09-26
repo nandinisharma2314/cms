@@ -56,7 +56,7 @@ export function RejectionDecision({
       {mode && (
         <form onSubmit={submit} className="space-y-2">
           <Field
-            label={mode === "approve" ? "Message to the citizen (optional)" : "Why is it denied? (sent to the officer)"}
+            label={mode === "approve" ? "Message to the end user (optional)" : "Why is it denied? (sent to the officer)"}
             hint={mode === "approve" ? `Defaults to: ${request.category}. ${request.reason}` : undefined}
           >
             <textarea rows={2} required={mode === "deny"} value={note} onChange={(e) => setNote(e.target.value)} className={textareaClass} />
@@ -103,7 +103,7 @@ function RequestForm({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: 
       }}
     >
       <p className="text-[11px] text-slate-500">
-        You can&apos;t reject a complaint yourself. Your supervisor reviews the request; until then the citizen sees
+        You can&apos;t reject a complaint yourself. Your supervisor reviews the request; until then the end user sees
         &ldquo;Under Review&rdquo;.
       </p>
       <Field label="Reason category">

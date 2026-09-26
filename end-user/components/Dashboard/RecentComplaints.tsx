@@ -1,237 +1,118 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from"react";
-import Link from"next/link";
-import {
- MapPin,
- ChevronRight,
- Calendar,
- Filter,
- FileText,
- ChevronDown,
-} from"lucide-react";
-import { getPriorityStyles, getStatusStyles } from"@/lib/utils";
-import ComplaintModal from"./ComplaintModal";
-import { apis } from"@/lib/apis";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
+import { apis, Complaint, StatusGroup } from "@/lib/apis";
+import { useEndUser } from "@/lib/endUserSession";
+import { formatDateTime, shortPlace } from "@/lib/utils";
 
+// Same buckets and names as the counts in StatCard.
+const STATUS_PILLS: Record<StatusGroup, { label: string; className: string }> = {
+  open: { label: "Open", className: "bg-red-50 text-red-500" },
+  in_progress: { label: "In Progress", className: "bg-blue-50 text-blue-600" },
+  resolved: { label: "Resolved", className: "bg-emerald-50 text-emerald-600" },
+  rejected: { label: "Rejected", className: "bg-slate-100 text-slate-600" },
+};
+
+// Each department keeps one dot color; departments not listed get a stable pick.
+const DOT_COLORS = [
+  "bg-amber-400", "bg-blue-600", "bg-red-500", "bg-violet-500",
+  "bg-emerald-500", "bg-orange-400", "bg-cyan-500", "bg-pink-500",
+];
+const DEPARTMENT_DOTS: Record<string, number> = { Electricity: 0, Water: 1, Sanitation: 2, Roads: 3, Parks: 4 };
+
+function dotColor(department: string) {
+  const index =
+    DEPARTMENT_DOTS[department] ??
+    [...department].reduce((hash, ch) => (hash * 31 + ch.charCodeAt(0)) >>> 0, 0) % DOT_COLORS.length;
+  return DOT_COLORS[index];
+}
+
+/** The end user's five most recent complaints; a row opens its detail page. */
 const RecentComplaints = () => {
- const [dateFilter, setDateFilter] = useState("All Time");
- const [isFilterOpen, setIsFilterOpen] = useState(false);
- const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
- const [allComplaints, setAllComplaints] = useState<any[]>([]);
- // bumped when the detail modal closes, so status changes made there show up
- const [refreshKey, setRefreshKey] = useState(0);
+  const [complaints, setComplaints] = useState<Complaint[] | null>(null);
+  const canCreate = useEndUser().can("portal.complaint.create");
 
- useEffect(() => {
- apis.complaints.getComplaints()
- .then((data) => {
- setAllComplaints(data || []);
- })
- .catch((err) => {
- console.error("Failed to fetch complaints:", err);
- });
- }, [refreshKey]);
+  useEffect(() => {
+    apis.complaints
+      .getComplaints()
+      .then(setComplaints)
+      .catch((err) => {
+        console.error("Failed to fetch complaints:", err);
+        setComplaints([]);
+      });
+  }, []);
 
- const filteredComplaints = useMemo(() => {
- const now = new Date();
+  const recent = (complaints ?? []).slice(0, 5);
 
- return allComplaints.filter((item) => {
- if (dateFilter ==="All Time") return true;
+  return (
+    <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-1 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)] md:px-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[16px] font-bold text-[#0b1a3f] md:text-[17px]">Recent Complaints</h2>
+        <Link
+          href="/dashboard/complaints"
+          className="flex items-center text-[14px] font-semibold text-blue-600 hover:text-blue-700"
+        >
+          View All <ChevronRight className="ml-0.5 h-4 w-4" strokeWidth={2.4} />
+        </Link>
+      </div>
 
- const rawDate = item.created_at || item.date;
- const itemDate = rawDate ? new Date(rawDate) : null;
- if (!itemDate || isNaN(itemDate.getTime())) return true;
-
- const diffTime = now.getTime() - itemDate.getTime();
- const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
- if (dateFilter ==="Today") return diffDays <= 1;
- if (dateFilter ==="Yesterday") return diffDays > 0 && diffDays <= 2;
- if (dateFilter ==="Last 7 Days") return diffDays <= 7;
- if (dateFilter ==="This Month") return diffDays <= 30;
-
- return true;
- });
- }, [allComplaints, dateFilter]);
-
- const topComplaints = filteredComplaints.slice(0, 5);
-
- return (
- <div className="md:bg-white md:-2xl md:shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] md:border border-slate-100 flex-1 flex flex-col overflow-hidden mb-6">
- {/* Header */}
- <div className="p-0 md:p-3 md:px-4 md:border-b shrink-0 border-slate-100 flex justify-between items-center mb-4 md:mb-0">
- <h3 className="text-lg font-bold text-slate-800">Recent Complaints</h3>
- <div className="flex items-center gap-4">
- <div className="relative hidden md:block">
- <button
- onClick={() => setIsFilterOpen(!isFilterOpen)}
- className="flex items-center gap-2 text-xs font-medium border border-slate-200 px-3 py-1.5 bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
- >
- <Filter className="w-3.5 h-3.5 text-slate-400" />
- {dateFilter}
- <ChevronDown
- className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isFilterOpen ?"rotate-180" :""}`}
- />
- </button>
-
- {isFilterOpen && (
- <>
- <div
- className="fixed inset-0 z-40"
- onClick={() => setIsFilterOpen(false)}
- />
- <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] z-50 overflow-hidden transform opacity-100 scale-100 transition-all duration-200">
- <div className="py-1.5">
- {[
-"All Time",
-"Today",
-"Yesterday",
-"Last 7 Days",
-"This Month",
- ].map((option) => (
- <button
- key={option}
- onClick={() => {
- setDateFilter(option);
- setIsFilterOpen(false);
- }}
- className={`w-full text-left px-4 py-2 text-xs font-medium transition-colors ${dateFilter === option ?"bg-blue-50 text-blue-600" :"text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
- >
- {option}
- </button>
- ))}
- </div>
- </div>
- </>
- )}
- </div>
- <Link
- href="/dashboard/complaints"
- className="text-blue-600 text-sm font-semibold flex items-center hover:text-blue-700"
- >
- View All <ChevronRight className="w-4 h-4 ml-1" />
- </Link>
- </div>
- </div>
-
- <div className="overflow-auto flex-1">
- {/* Desktop Table View */}
- <table className="hidden md:table w-full text-left border-collapse">
- <thead>
- <tr className="bg-slate-50/50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
- <th className="px-4 py-2 border-b border-slate-100">#</th>
- <th className="px-4 py-2 border-b border-slate-100">
- Complaint ID
- </th>
- <th className="px-4 py-2 border-b border-slate-100">Title</th>
- <th className="px-4 py-2 border-b border-slate-100">
- <div className="flex items-center gap-1.5">
- <MapPin className="w-3.5 h-3.5" />
- <span>Location</span>
- </div>
- </th>
- <th className="px-4 py-2 border-b border-slate-100">Priority</th>
- <th className="px-4 py-2 border-b border-slate-100">Date</th>
- <th className="px-4 py-2 border-b border-slate-100">Status</th>
- </tr>
- </thead>
- <tbody className="text-sm">
- {topComplaints.map((item, index) => (
- <tr
- key={item.id}
- onClick={() => setSelectedComplaint(item)}
- className="hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0 cursor-pointer group"
- >
- <td className="px-4 py-2.5 font-semibold text-slate-700">
- {index + 1}
- </td>
- <td className="px-4 py-2.5 text-slate-600 font-mono text-xs font-semibold">
- {item.generated_id || item.cmpId || item.id ||"N/A"}
- </td>
- <td className="px-4 py-2.5 font-bold text-slate-800">
- {item.title ||"Untitled"}
- </td>
-
- <td className="px-4 py-2.5">
- <span className="text-slate-500">
- {item.location || (item.area ? `${item.area}${item.city ? `, ${item.city}` :""}` :"Jaipur, Rajasthan")}
- </span>
- </td>
- <td className="px-4 py-2.5">
- <span
- className={`px-2.5 py-1 text-xs font-semibold ${getPriorityStyles(item.priority)}`}
- >
- {item.priority ||"Low"}
- </span>
- </td>
- <td className="px-4 py-2.5 text-slate-500">
- {item.created_at ? new Date(item.created_at).toLocaleDateString() : (item.date ||"N/A")}
- </td>
- <td className="px-4 py-2.5">
- <span
- className={`px-3 py-1 text-xs font-semibold ${getStatusStyles(item.status)}`}
- >
- {item.status_label || item.status}
- </span>
- </td>
- </tr>
- ))}
- </tbody>
- </table>
-
- {/* Mobile List View */}
- <div className="md:hidden flex flex-col gap-3">
- {topComplaints.map((item) => (
- <div
- key={item.id}
- onClick={() => setSelectedComplaint(item)}
- className="cursor-pointer flex gap-4 items-center bg-white p-4 shadow-xs border border-slate-100 hover:shadow-md transition-shadow"
- >
- <div
- className={`w-12 h-12 flex items-center justify-center shrink-0 ${item.priority ==="High" ?"bg-orange-50 text-orange-500" : item.priority ==="Medium" ?"bg-blue-50 text-blue-500" :"bg-red-50 text-red-500"}`}
- >
- <FileText className="w-5 h-5" />
- </div>
- <div className="flex-1 min-w-0">
- <h4 className="text-[13px] font-bold text-slate-800 truncate mb-1">
- {item.title ||"Untitled"}
- </h4>
- <p className="text-[11px] text-slate-500 truncate mb-1.5 font-medium">
- <span className="font-mono">{item.generated_id || item.cmpId || item.id ||"N/A"}</span> • {item.location || (item.area ? `${item.area}${item.city ? `, ${item.city}` :""}` :"Jaipur, Rajasthan")}
- </p>
- <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
- <Calendar className="w-3 h-3" />
- {item.created_at ? new Date(item.created_at).toLocaleDateString() : (item.date ||"N/A")}
- </div>
- </div>
- <div className="flex flex-col items-end gap-3 shrink-0">
- <span
- className={`px-2.5 py-1 text-[10px] font-semibold ${getStatusStyles(item.status)}`}
- >
- {item.status_label || item.status}
- </span>
- <ChevronRight className="w-4 h-4 text-slate-400" />
- </div>
- </div>
- ))}
- </div>
- </div>
-
- <div className="hidden md:block p-3 border-t shrink-0 border-slate-100 text-xs text-slate-500">
- Showing {topComplaints.length} of {allComplaints.length} complaints
- </div>
-
- {selectedComplaint && (
- <ComplaintModal
- complaint={selectedComplaint}
- onClose={() => {
- setSelectedComplaint(null);
- setRefreshKey((k) => k + 1);
- }}
- />
- )}
- </div>
- );
+      {complaints === null ? (
+        <ul aria-hidden="true" className="animate-pulse">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="flex items-center gap-3 py-4">
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+              <span className="flex-1 space-y-2">
+                <span className="block h-3.5 w-2/3 rounded bg-slate-200" />
+                <span className="block h-3 w-1/2 rounded bg-slate-100" />
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : recent.length === 0 ? (
+        <p className="py-8 text-center text-[14px] text-slate-500">
+          You haven&apos;t raised any complaints yet.{" "}
+          {canCreate && (
+            <Link href="/dashboard/register" className="font-semibold text-blue-600">
+              Register one
+            </Link>
+          )}
+        </p>
+      ) : (
+        <ul>
+          {recent.map((c) => {
+            const pill = STATUS_PILLS[c.status_group] ?? STATUS_PILLS.open;
+            return (
+              <li key={c.id} className="group">
+                <Link
+                  href={`/dashboard/complaints/${encodeURIComponent(c.id)}`}
+                  className="flex w-full items-center gap-3.5 text-left"
+                >
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotColor(c.department)}`} />
+                  <span className="flex min-w-0 flex-1 items-center gap-2 border-b border-slate-100 py-3.5 group-last:border-b-0">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14.5px] font-bold text-[#0b1a3f]">{c.title}</span>
+                      <span className="mt-1 block truncate text-[12.5px] text-slate-500">
+                        {c.generated_id}
+                        <span className="mx-1.5 text-slate-300">|</span>
+                        {shortPlace(c)}
+                      </span>
+                      <span className="mt-0.5 block text-[12.5px] text-slate-500">{formatDateTime(c.created_at)}</span>
+                    </span>
+                    <span className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[11.5px] font-medium ${pill.className}`}>
+                      {pill.label}
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
 };
 
 export default RecentComplaints;

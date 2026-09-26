@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState } from"react";
+import { usePathname } from "next/navigation";
 import MobileBottomNav from"@/components/Dashboard/MobileBottomNav";
 import { TopHeader } from"@/components/Dashboard/TopHeader";
-import { CitizenSessionProvider, useCitizen } from"@/lib/citizenSession";
+import { EndUserSessionProvider, useEndUser } from"@/lib/endUserSession";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
- const { profile, logout } = useCitizen();
+ const { profile, logout } = useEndUser();
  const [searchQuery, setSearchQuery] = useState("");
+ const isHome = usePathname() === "/dashboard";
 
  return (
  <div className="flex h-screen overflow-hidden bg-slate-50 md:bg-slate-100 font-sans relative">
@@ -17,7 +19,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
  onSearchChange={setSearchQuery}
  userName={profile.name}
  userEmail={profile.email}
+ userRole={profile.role.name}
  onSignOut={logout}
+ hideOnMobile={isHome}
  />
  {children}
  </main>
@@ -32,8 +36,8 @@ export default function DashboardLayout({
  children: React.ReactNode;
 }) {
  return (
- <CitizenSessionProvider>
+ <EndUserSessionProvider>
  <DashboardShell>{children}</DashboardShell>
- </CitizenSessionProvider>
+ </EndUserSessionProvider>
  );
 }

@@ -34,7 +34,7 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 MAX_CSV_UPLOAD_BYTES = int(os.getenv("MAX_CSV_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 
-# Citizens may reopen a resolved complaint within this many days, at most MAX_REOPENS times.
+# End users may reopen a resolved complaint within this many days, at most MAX_REOPENS times.
 REOPEN_WINDOW_DAYS = int(os.getenv("REOPEN_WINDOW_DAYS", "7"))
 
 # How often the in-process SLA checker runs (warnings, breaches, escalations).

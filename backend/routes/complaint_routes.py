@@ -1,5 +1,5 @@
 """Complaint endpoints for staff. Every query goes through `_scoped`, so a user
-only ever sees complaints inside their department/location scopes. Citizens
+only ever sees complaints inside their department/location scopes. End users
 use /portal/complaints instead."""
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
@@ -26,8 +26,8 @@ class ComplaintCreateJSON(BaseModel):
     location_id: int
     priority: str | None = "Medium"
     description: str | None = None
-    citizen_name: str | None = None
-    citizen_phone: str | None = None
+    end_user_name: str | None = None
+    end_user_phone: str | None = None
 
 
 class ActionRequest(BaseModel):
@@ -157,7 +157,7 @@ def get_complaint(complaint_id: str, ctx: AccessContext = Depends(require_permis
     return staff_detail(ctx, _get_scoped(ctx, complaint_id))
 
 
-# Staff registering a complaint on behalf of a citizen (walk-in, phone call)
+# Staff registering a complaint on behalf of an end user (walk-in, phone call)
 @router.post("/quick-create", status_code=201)
 def quick_create_complaint(
     data: ComplaintCreateJSON, request: Request,
@@ -179,12 +179,12 @@ def quick_create_complaint(
         title=title,
         description=(data.description or "").strip() or title,
         created_by=ctx.user,
-        citizen_name=(data.citizen_name or "").strip()[:150] or None,
-        citizen_phone=normalize_mobile(data.citizen_phone),
+        end_user_name=(data.end_user_name or "").strip()[:150] or None,
+        end_user_phone=normalize_mobile(data.end_user_phone),
     )
     audit_service.record(
         db, actor=ctx.user, action="complaint.create", entity_type="complaint", entity_id=complaint.generated_id,
-        summary=f"Registered {complaint.generated_id} ({department.name}, {location.name}) on behalf of a citizen",
+        summary=f"Registered {complaint.generated_id} ({department.name}, {location.name}) on behalf of an end user",
         request=request,
     )
     db.commit()

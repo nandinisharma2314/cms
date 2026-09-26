@@ -87,7 +87,7 @@ STAGE_WEIGHTS = {"ASSIGNED": 12, "ACKNOWLEDGED": 10, "IN_PROGRESS": 18, "WAITING
 OLD_STAGE_WEIGHTS = {"IN_PROGRESS": 4, "WAITING": 2, "RESOLVED": 10, "CLOSED": 78, "REJECTED": 6}
 
 
-def seed_complaints(db, rng, departments, citizens, count=240) -> None:
+def seed_complaints(db, rng, departments, end_users, count=240) -> None:
     """Creates complaints through the real workflow (routing, actions, comments)
     with back-dated timestamps, so timelines look like real usage."""
     now = utcnow()
@@ -96,10 +96,10 @@ def seed_complaints(db, rng, departments, citizens, count=240) -> None:
     created_times = sorted(now - timedelta(days=rng.randint(0, 45), hours=rng.randint(0, 23)) for _ in range(count))
 
     for created_at in created_times:
-        citizen = rng.choice(citizens)
+        end_user = rng.choice(end_users)
         department = departments[rng.choices(list(DEPARTMENT_WEIGHTS), weights=list(DEPARTMENT_WEIGHTS.values()))[0]]
-        # most complaints are about the citizen's own area
-        location = citizen.location if rng.random() < 0.7 else location_by_path(db, *rng.choice(LOCATIONS))
+        # most complaints are about the end user's own area
+        location = end_user.location if rng.random() < 0.7 else location_by_path(db, *rng.choice(LOCATIONS))
         complaint = register_complaint(
             db,
             department=department,
@@ -107,8 +107,8 @@ def seed_complaints(db, rng, departments, citizens, count=240) -> None:
             location=location,
             priority=rng.choices(["Low", "Medium", "High", "Critical"], weights=[30, 45, 20, 5])[0],
             title=rng.choice(TITLES[department.name]),
-            description=f"Reported by {citizen.name}: {department.name.lower()} issue in {location.name}.",
-            end_user=citizen,
+            description=f"Reported by {end_user.name}: {department.name.lower()} issue in {location.name}.",
+            end_user=end_user,
             at=created_at,
         )
         db.flush()
@@ -161,18 +161,18 @@ def seed_complaints(db, rng, departments, citizens, count=240) -> None:
                 if stage == "WAITING" or (stage in ("RESOLVED", "CLOSED") and rng.random() < 0.2):
                     act(handler, "request_info", "Could you share the exact landmark or a photo?", 1, 12)
                     if stage != "WAITING":
-                        workflow_service.add_comment(db, complaint, citizen, "It is next to the community park gate.",
+                        workflow_service.add_comment(db, complaint, end_user, "It is next to the community park gate.",
                                                      at=later(1, 24))
                 if stage in ("RESOLVED", "CLOSED"):
                     act(handler, "resolve", rng.choice(RESOLUTIONS), 4, 72)
                 if stage == "CLOSED" and rng.random() < 0.06:
-                    # not actually fixed: the citizen reopens it and it gets resolved again
-                    workflow_service.citizen_reopen(db, citizen, complaint, "Still not working.", at=later(2, 48))
+                    # not actually fixed: the end user reopens it and it gets resolved again
+                    workflow_service.end_user_reopen(db, end_user, complaint, "Still not working.", at=later(2, 48))
                     act(handler, "start", None, 1, 12)
                     act(handler, "resolve", "Replaced the faulty part this time.", 4, 48)
                 if stage == "CLOSED":
-                    workflow_service.citizen_confirm(
-                        db, citizen, complaint, rng.choice([3, 4, 4, 5, 5]), None, at=later(1, 48),
+                    workflow_service.end_user_confirm(
+                        db, end_user, complaint, rng.choice([3, 4, 4, 5, 5]), None, at=later(1, 48),
                     )
         db.flush()
 
@@ -263,8 +263,8 @@ def seed_database() -> None:
     staff("Imran Khan", "delhi.general@civiccare.gov.in", "9876543222", "agent", admin,
           [(None, delhi)])
 
-    print("--- Citizens ---")
-    citizens = [
+    print("--- End users ---")
+    end_users = [
         EndUser(external_id="USR001", name="Rahul Sharma", mobile="9876543210", email="rahul@example.com",
                 location=mansarovar),
         EndUser(external_id="USR002", name="Amit Kumar", mobile="9876543211", email="amit@example.com",
@@ -274,11 +274,11 @@ def seed_database() -> None:
         EndUser(external_id="USR004", name="Mohan Lal", mobile="9876543213", email="mohan@example.com",
                 location=location_by_path(db, "India", "Rajasthan", "Jodhpur", "Jodhpur", "Sardarpura")),
     ]
-    db.add_all(citizens)
+    db.add_all(end_users)
     db.flush()
 
     print("--- Complaints ---")
-    seed_complaints(db, rng, departments, citizens)
+    seed_complaints(db, rng, departments, end_users)
 
     db.add(PasswordResetTicket(
         ticket_id="RST-4821",

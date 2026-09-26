@@ -1,9 +1,9 @@
 """Controlled rejection: an agent may not reject a complaint on their own.
 
     handler requests rejection (category + reason required)
-        -> complaint goes to REJECTION_REQUESTED ("Under Review" for the citizen)
+        -> complaint goes to REJECTION_REQUESTED ("Under Review" for the end user)
         -> someone above them with complaint.reject.approve decides:
-             approve  -> REJECTED, citizen told why
+             approve  -> REJECTED, end user told why
              deny     -> back to work (note required)
         (or the requester withdraws it)
 
@@ -106,7 +106,7 @@ def request_rejection(
         public_message="Your complaint is under review by a senior officer",
         at=now,
     )
-    # The reason is internal until an approver decides what to tell the citizen.
+    # The reason is internal until an approver decides what to tell the end user.
     record_event(db, complaint, "rejection_requested", ctx.user, f"Reason given by {ctx.user.name}",
                  note=reason, at=now)
     notification_service.notify(
@@ -123,14 +123,14 @@ def _restore_status(request: RejectionRequest) -> str:
 
 
 def approve(
-    ctx: AccessContext, request: RejectionRequest, message_to_citizen: str | None, at: datetime | None = None,
+    ctx: AccessContext, request: RejectionRequest, message_to_end_user: str | None, at: datetime | None = None,
 ) -> None:
     from services.workflow_service import change_status
 
     if not can_decide(ctx, request):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot decide this rejection request")
     db, now, complaint = ctx.db, at or utcnow(), request.complaint
-    public_reason = (message_to_citizen or "").strip() or f"{request.category}. {request.reason}"
+    public_reason = (message_to_end_user or "").strip() or f"{request.category}. {request.reason}"
     request.status = APPROVED
     request.decided_by = ctx.user
     request.decided_at = now

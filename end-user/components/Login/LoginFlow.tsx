@@ -20,7 +20,7 @@ import {
  QuestionCircleIcon,
  IndiaFlagIcon,
 } from"./AuthIcons";
-import { apis, OtpChannel, saveSession } from"../../lib/apis";
+import { apis, ApiError, OtpChannel, saveSession } from "../../lib/apis";
 
 export type AuthScreenStep =
    | "welcome" // Screen 1
@@ -75,6 +75,9 @@ export function LoginFlow() {
  const [showCountryPicker, setShowCountryPicker] = useState(false);
  const [mobileNumber, setMobileNumber] = useState("");
  const [emailAddress, setEmailAddress] = useState("");
+ // Set when the entered mobile/email is shared by more than one end user; the
+ // other identifier is then asked for as well.
+ const [needsBoth, setNeedsBoth] = useState(false);
  // Returned by request-otp; identifies the code being verified.
  const [challengeId, setChallengeId] = useState("");
  const [sentTo, setSentTo] = useState("");
@@ -132,13 +135,15 @@ export function LoginFlow() {
       return `${mins.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`;
    };
 
- // Citizens must match on both mobile and email; the channel only decides
- // where the code is delivered.
+ // Only the chosen method's identifier is sent, plus the other one when the
+ // first is shared by more than one end user.
  const requestOtp = async (channel: OtpChannel) => {
+ const mobile = `${countryCode}${mobileNumber.replace(/\s+/g, "")}`;
+ const email = emailAddress.trim();
  const response = await apis.auth.requestOtp({
- mobile: `${countryCode}${mobileNumber.replace(/\s+/g,"")}`,
- email: emailAddress.trim(),
  channel,
+ ...(channel === "sms" || needsBoth ? { mobile } : {}),
+ ...(channel === "email" || needsBoth ? { email } : {}),
  });
  setChallengeId(response.challenge_id);
  setSentTo(response.sent_to);
@@ -155,10 +160,18 @@ export function LoginFlow() {
  await requestOtp(channel);
  setCurrentStep(channel ==="sms" ?"otp_mobile" :"otp_email");
  } catch (err) {
+ if (err instanceof ApiError && err.status === 409) setNeedsBoth(true);
  setErrorMessage((err as Error).message ||"Could not send verification code.");
  } finally {
  setLoading(false);
  }
+ };
+
+ // Picking a login method asks for just that identifier again.
+ const chooseMethod = (step: AuthScreenStep) => {
+ setErrorMessage("");
+ setNeedsBoth(false);
+ setCurrentStep(step);
  };
 
  // Resend OTP
@@ -425,10 +438,7 @@ export function LoginFlow() {
                               <button
                                  type="button"
                                  className="w-full flex items-center justify-between bg-white border border-[#bae6fd] hover:bg-[#f0f9ff] rounded-full p-2 pr-5 transition-transform active:scale-[0.98] h-[64px]"
-                                 onClick={() => {
-                                    setErrorMessage("");
-                                    setCurrentStep("mobile_login");
-                                 }}
+                                 onClick={() => chooseMethod("mobile_login")}
                               >
                                  <div className="flex items-center gap-2 overflow-hidden pl-1">
                                     <div className="w-12 h-12 shrink-0 rounded-full bg-[#e0f2fe] flex items-center justify-center">
@@ -442,10 +452,7 @@ export function LoginFlow() {
                               <button
                                  type="button"
                                  className="w-full flex items-center justify-between bg-white border border-[#e9d5ff] hover:bg-[#faf5ff] rounded-full p-2 pr-5 transition-transform active:scale-[0.98] h-[64px]"
-                                 onClick={() => {
-                                    setErrorMessage("");
-                                    setCurrentStep("email_login");
-                                 }}
+                                 onClick={() => chooseMethod("email_login")}
                               >
                                  <div className="flex items-center gap-2 overflow-hidden pl-1">
                                     <div className="w-12 h-12 shrink-0 rounded-full bg-[#f3e8ff] flex items-center justify-center">
@@ -480,10 +487,7 @@ export function LoginFlow() {
                         <div className="w-full flex justify-start mb-2">
                            <button
                               type="button"
-                              onClick={() => {
-                                 setErrorMessage("");
-                                 setCurrentStep("welcome");
-                              }}
+                              onClick={() => chooseMethod("welcome")}
                               className="w-[42px] h-[42px] bg-white rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-transform active:scale-95"
                            >
                               <ChevronLeftIcon size={20} color="#0f172a" />
@@ -499,8 +503,8 @@ export function LoginFlow() {
  <div className="auth-header-block centered">
  <h3 className="auth-title">Login with Mobile Number</h3>
  <p className="auth-subtitle">
- Enter your registered mobile number and email address.
- We&apos;ll text a verification code to your mobile.
+ Enter your registered mobile number.
+ We&apos;ll text you a verification code.
  </p>
  </div>
 
@@ -557,6 +561,8 @@ export function LoginFlow() {
  </div>
  </div>
 
+ {/* Only asked for when this number is shared by more than one end user */}
+ {needsBoth && (
  <div className="email-input-wrapper">
  <span className="input-prefix-icon">
  <MailEnvelopeIcon size={18} color="#64748b" />
@@ -570,6 +576,7 @@ export function LoginFlow() {
  required
  />
  </div>
+ )}
 
  {/* Primary Submit Button */}
  <button
@@ -593,10 +600,7 @@ export function LoginFlow() {
  <button
  type="button"
  className="secondary-action-btn"
- onClick={() => {
- setErrorMessage("");
- setCurrentStep("email_login");
- }}
+ onClick={() => chooseMethod("email_login")}
  >
  <MailEnvelopeIcon size={18} color="#059669" />
  <span>Get the code by email instead</span>
@@ -625,10 +629,7 @@ export function LoginFlow() {
                         <div className="w-full flex justify-start mb-2">
                            <button
                               type="button"
-                              onClick={() => {
-                                 setErrorMessage("");
-                                 setCurrentStep("welcome");
-                              }}
+                              onClick={() => chooseMethod("welcome")}
                               className="w-[40px] h-[40px] bg-white rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-transform active:scale-95"
                            >
                               <ChevronLeftIcon size={20} color="#0f172a" />
@@ -644,13 +645,29 @@ export function LoginFlow() {
  <div className="auth-header-block centered">
  <h3 className="auth-title">Login with Email Address</h3>
  <p className="auth-subtitle">
- Enter your registered email address and mobile number.
+ Enter your registered email address.
  We&apos;ll email you a verification code.
  </p>
  </div>
 
  {/* Email Form */}
  <form onSubmit={handleOtpRequest("email")} className="auth-form">
+ <div className="email-input-wrapper">
+ <span className="input-prefix-icon">
+ <MailEnvelopeIcon size={18} color="#64748b" />
+ </span>
+ <input
+ type="email"
+ className="auth-text-input with-prefix"
+ value={emailAddress}
+ onChange={(e) => setEmailAddress(e.target.value)}
+ placeholder="rahul.sharma@example.com"
+ required
+ />
+ </div>
+
+ {/* Only asked for when this email is shared by more than one end user */}
+ {needsBoth && (
  <div className="phone-input-row">
  {/* Country Selector */}
  <div className="country-selector-wrapper">
@@ -701,20 +718,7 @@ export function LoginFlow() {
  />
  </div>
  </div>
-
- <div className="email-input-wrapper">
- <span className="input-prefix-icon">
- <MailEnvelopeIcon size={18} color="#64748b" />
- </span>
- <input
- type="email"
- className="auth-text-input with-prefix"
- value={emailAddress}
- onChange={(e) => setEmailAddress(e.target.value)}
- placeholder="rahul.sharma@example.com"
- required
- />
- </div>
+ )}
 
                            {/* Submit Button */}
                            <button 
@@ -738,10 +742,7 @@ export function LoginFlow() {
  <button
  type="button"
  className="secondary-action-btn"
- onClick={() => {
- setErrorMessage("");
- setCurrentStep("mobile_login");
- }}
+ onClick={() => chooseMethod("mobile_login")}
  >
  <SmartphoneIcon size={18} color="#3b82f6" />
  <span>Get the code by SMS instead</span>

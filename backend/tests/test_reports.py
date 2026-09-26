@@ -10,7 +10,7 @@ from utils.security import utcnow
 
 
 @pytest.fixture(scope="module")
-def parks(client, login, citizen_login):
+def parks(client, login, end_user_login):
     """A Parks department with one agent covering Jaipur, and two complaints:
     one handled well and rated 4, one that missed its response target."""
     root = login(SUPER_ADMIN)
@@ -25,14 +25,14 @@ def parks(client, login, citizen_login):
     })
     agent = client.post("/auth/login", json={"email": "parks.agent@civiccare.gov.in", "password": "Str0ngPass!"}).json()
     agent_headers = {"Authorization": f"Bearer {agent['access_token']}"}
-    citizen = citizen_login()
+    end_user = end_user_login()
 
-    good = file_complaint(client, citizen, department="Parks", title="Bench broken")
+    good = file_complaint(client, end_user, department="Parks", title="Bench broken")
     act(client, agent_headers, good, "acknowledge")
     act(client, agent_headers, good, "resolve", "Bench replaced")
-    client.post(f"/portal/complaints/{good}/confirm", headers=citizen, json={"rating": 4})
+    client.post(f"/portal/complaints/{good}/confirm", headers=end_user, json={"rating": 4})
 
-    late = file_complaint(client, citizen, department="Parks", title="Swing broken")
+    late = file_complaint(client, end_user, department="Parks", title="Swing broken")
     due = parse(client.get(f"/complaints/{late}", headers=root).json()["sla_due"]["response_due_at"])
     check(late, due + timedelta(minutes=5))
     return {"id": department["id"], "good": good, "late": late}

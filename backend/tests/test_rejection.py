@@ -16,9 +16,9 @@ def pending_for(client, headers):
     return client.get("/rejection-requests/", params={"view": "to_decide"}, headers=headers).json()
 
 
-def test_agent_cannot_reject_directly_only_request(client, login, citizen_login):
+def test_agent_cannot_reject_directly_only_request(client, login, end_user_login):
     agent = login(ELEC_AGENT)
-    cid = file_complaint(client, citizen_login(), title="Railway pole")
+    cid = file_complaint(client, end_user_login(), title="Railway pole")
     d = detail(client, agent, cid)
     assert "reject" not in [a["key"] for a in d["actions"]]
     assert d["rejection"]["can_request"]
@@ -33,15 +33,15 @@ def test_agent_cannot_reject_directly_only_request(client, login, citizen_login)
     assert pending["status"] == "PENDING" and pending["approver"] == "Priya Patel" and pending["can_withdraw"]
     assert request_rejection(client, agent, cid).status_code == 409  # one at a time
 
-    # the citizen only sees that it is under review, never the reason
-    view = client.get(f"/portal/complaints/{cid}", headers=citizen_login()).json()
+    # the end user only sees that it is under review, never the reason
+    view = client.get(f"/portal/complaints/{cid}", headers=end_user_login()).json()
     assert view["status_label"] == "Under Review"
     assert all("railways" not in (e["note"] or "") for e in view["timeline"])
 
 
-def test_who_can_decide(client, login, citizen_login):
+def test_who_can_decide(client, login, end_user_login):
     agent = login(ELEC_AGENT)
-    cid = file_complaint(client, citizen_login(), title="Who decides")
+    cid = file_complaint(client, end_user_login(), title="Who decides")
     request_id = request_rejection(client, agent, cid).json()["rejection"]["requests"][-1]["id"]
 
     assert client.post(f"/rejection-requests/{request_id}/approve", headers=agent, json={}).status_code == 403
@@ -60,9 +60,9 @@ def test_who_can_decide(client, login, citizen_login):
     assert stats["pending_summary"]["rejection_requests"] >= 1
 
 
-def test_denied_request_puts_the_complaint_back_to_work(client, login, citizen_login):
+def test_denied_request_puts_the_complaint_back_to_work(client, login, end_user_login):
     agent, supervisor = login(ELEC_AGENT), login(ELEC_SUPERVISOR)
-    cid = file_complaint(client, citizen_login(), title="Deny me")
+    cid = file_complaint(client, end_user_login(), title="Deny me")
     request_id = request_rejection(client, agent, cid).json()["rejection"]["requests"][-1]["id"]
 
     assert client.post(f"/rejection-requests/{request_id}/deny", headers=supervisor, json={}).status_code == 400
@@ -76,9 +76,9 @@ def test_denied_request_puts_the_complaint_back_to_work(client, login, citizen_l
     assert "start" in [a["key"] for a in detail(client, agent, cid)["actions"]]
 
 
-def test_approved_request_rejects_and_tells_the_citizen_why(client, login, citizen_login):
-    citizen, agent, supervisor = citizen_login(), login(ELEC_AGENT), login(ELEC_SUPERVISOR)
-    cid = file_complaint(client, citizen, title="Approve me")
+def test_approved_request_rejects_and_tells_the_end_user_why(client, login, end_user_login):
+    end_user, agent, supervisor = end_user_login(), login(ELEC_AGENT), login(ELEC_SUPERVISOR)
+    cid = file_complaint(client, end_user, title="Approve me")
     request_id = request_rejection(client, agent, cid).json()["rejection"]["requests"][-1]["id"]
     d = client.post(f"/rejection-requests/{request_id}/approve", headers=supervisor,
                     json={"note": "This pole is maintained by Indian Railways; we have forwarded it to them."}).json()
@@ -86,19 +86,19 @@ def test_approved_request_rejects_and_tells_the_citizen_why(client, login, citiz
     record = d["rejection"]["requests"][-1]
     assert (record["status"], record["decided_by"], record["direct"]) == ("APPROVED", "Priya Patel", False)
 
-    view = client.get(f"/portal/complaints/{cid}", headers=citizen).json()
+    view = client.get(f"/portal/complaints/{cid}", headers=end_user).json()
     assert view["status_label"] == "Rejected"
     assert any("Indian Railways" in (e["note"] or "") for e in view["timeline"])
-    inbox = client.get("/portal/notifications", headers=citizen).json()["items"]
+    inbox = client.get("/portal/notifications", headers=end_user).json()["items"]
     assert any(n["complaint_id"] == cid and "rejected" in n["title"] for n in inbox)
 
     log = client.get("/audit-logs/", params={"entity_id": cid}, headers=login(SUPER_ADMIN)).json()["items"]
     assert {"complaint.rejection_request", "complaint.rejection_approve"} <= {e["action"] for e in log}
 
 
-def test_requester_can_withdraw(client, login, citizen_login):
+def test_requester_can_withdraw(client, login, end_user_login):
     agent = login(ELEC_AGENT)
-    cid = file_complaint(client, citizen_login(), title="Withdraw me")
+    cid = file_complaint(client, end_user_login(), title="Withdraw me")
     act(client, agent, cid, "start")
     request_id = request_rejection(client, agent, cid).json()["rejection"]["requests"][-1]["id"]
     assert client.post(f"/rejection-requests/{request_id}/withdraw", headers=login(ELEC_SUPERVISOR)).status_code == 403
@@ -106,9 +106,9 @@ def test_requester_can_withdraw(client, login, citizen_login):
     assert d["status"] == "IN_PROGRESS" and d["rejection"]["requests"][-1]["status"] == "WITHDRAWN"
 
 
-def test_direct_rejection_by_an_approver_is_recorded_the_same_way(client, login, citizen_login):
+def test_direct_rejection_by_an_approver_is_recorded_the_same_way(client, login, end_user_login):
     supervisor = login(ELEC_SUPERVISOR)
-    cid = file_complaint(client, citizen_login(), title="Direct reject")
+    cid = file_complaint(client, end_user_login(), title="Direct reject")
     d = act(client, supervisor, cid, "reject", "Spam: the same report was filed 5 times").json()
     record = d["rejection"]["requests"][-1]
     assert record["direct"] and record["status"] == "APPROVED" and record["decided_by"] == "Priya Patel"

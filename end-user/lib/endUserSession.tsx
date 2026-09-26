@@ -2,18 +2,20 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apis, CitizenProfile, clearSession, hasSession, UNAUTHORIZED_EVENT } from "./apis";
+import { apis, EndUserProfile, clearSession, hasSession, UNAUTHORIZED_EVENT } from "./apis";
 
-interface CitizenSession {
-  profile: CitizenProfile;
+interface EndUserSession {
+  profile: EndUserProfile;
+  /** Whether the End User role grants a portal permission; the backend enforces it too. */
+  can: (permission: string) => boolean;
   logout: () => Promise<void>;
 }
 
-const CitizenContext = createContext<CitizenSession | null>(null);
+const EndUserContext = createContext<EndUserSession | null>(null);
 
-export function CitizenSessionProvider({ children }: { children: React.ReactNode }) {
+export function EndUserSessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [profile, setProfile] = useState<CitizenProfile | null>(null);
+  const [profile, setProfile] = useState<EndUserProfile | null>(null);
 
   useEffect(() => {
     if (!hasSession()) {
@@ -35,10 +37,11 @@ export function CitizenSessionProvider({ children }: { children: React.ReactNode
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
   }, [router]);
 
-  const value = useMemo<CitizenSession | null>(
+  const value = useMemo<EndUserSession | null>(
     () =>
       profile && {
         profile,
+        can: (permission: string) => profile.permissions.includes(permission),
         logout: async () => {
           await apis.auth.logout();
           router.replace("/login");
@@ -57,11 +60,11 @@ export function CitizenSessionProvider({ children }: { children: React.ReactNode
       </div>
     );
   }
-  return <CitizenContext.Provider value={value}>{children}</CitizenContext.Provider>;
+  return <EndUserContext.Provider value={value}>{children}</EndUserContext.Provider>;
 }
 
-export function useCitizen(): CitizenSession {
-  const session = useContext(CitizenContext);
-  if (!session) throw new Error("useCitizen must be used inside <CitizenSessionProvider>");
+export function useEndUser(): EndUserSession {
+  const session = useContext(EndUserContext);
+  if (!session) throw new Error("useEndUser must be used inside <EndUserSessionProvider>");
   return session;
 }

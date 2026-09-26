@@ -45,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/reports", label: "Reports", icon: BarChart3, anyOf: ["reports.view"] },
   { href: "/users", label: "Staff Users", icon: Users, anyOf: ["user.view"] },
-  { href: "/end-users", label: "Citizens", icon: Contact, anyOf: ["end_user.view"] },
+  { href: "/end-users", label: "End Users", icon: Contact, anyOf: ["end_user.view"] },
   { href: "/departments", label: "Departments", icon: Building2, anyOf: ["department.view"] },
   { href: "/locations", label: "Locations", icon: MapPin, anyOf: ["location.view"] },
   { href: "/roles", label: "Roles & Permissions", icon: ShieldCheck, anyOf: ["role.manage"] },

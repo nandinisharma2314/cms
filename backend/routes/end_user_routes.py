@@ -84,7 +84,7 @@ def update_end_user(
     db = ctx.db
     end_user = _scoped_query(ctx).filter(EndUser.id == end_user_id).first()
     if end_user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Citizen not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "End user not found")
     before = {
         "name": end_user.name, "mobile": end_user.mobile, "email": end_user.email,
         "location_id": end_user.location_id, "is_active": end_user.is_active,
@@ -120,7 +120,7 @@ def update_end_user(
         EndUser.mobile == end_user.mobile, EndUser.email == end_user.email, EndUser.id != end_user.id
     ).first()
     if clash is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Another citizen already has this mobile + email")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Another end user already has this mobile + email")
 
     after = {
         "name": end_user.name, "mobile": end_user.mobile, "email": end_user.email,
@@ -130,7 +130,7 @@ def update_end_user(
     if changes:
         audit_service.record(
             db, actor=ctx.user, action="end_user.update", entity_type="end_user", entity_id=end_user.id,
-            summary=f"Updated citizen {end_user.name}: {', '.join(changes)}", changes=changes, request=request,
+            summary=f"Updated end user {end_user.name}: {', '.join(changes)}", changes=changes, request=request,
         )
     db.commit()
     return serialize_end_users(db, [end_user])[0]
@@ -153,7 +153,7 @@ def export_end_users(
     search: str | None = None, include_inactive: bool = True,
     ctx: AccessContext = Depends(require_permission("end_user.view")),
 ):
-    """Citizens in your location scope, in the import format."""
+    """End users in your location scope, in the import format."""
     levels = [t.key for t in location_types_by_depth(ctx.db)]
     query = _scoped_query(ctx)
     if not include_inactive:
@@ -164,10 +164,10 @@ def export_end_users(
             EndUser.name.ilike(like) | EndUser.email.ilike(like)
             | EndUser.mobile.ilike(like) | EndUser.external_id.ilike(like)
         )
-    citizens = query.order_by(EndUser.name).all()
-    names = path_names(ctx.db, [c.location for c in citizens])
+    end_users = query.order_by(EndUser.name).all()
+    names = path_names(ctx.db, [c.location for c in end_users])
     rows = []
-    for c in citizens:
+    for c in end_users:
         path = names.get(c.location_id, []) if c.location_id else []
         rows.append([c.external_id or "", c.name, c.mobile, c.email] + path + [""] * (len(levels) - len(path)))
-    return csv_response("citizens", ["user_id", "name", "mobile", "email"] + levels, rows)
+    return csv_response("end_users", ["user_id", "name", "mobile", "email"] + levels, rows)

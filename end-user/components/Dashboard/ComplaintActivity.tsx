@@ -3,11 +3,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { CheckCircle2, MessageSquare, Paperclip, RotateCcw, Send, Star, History } from "lucide-react";
 import { apis, BACKEND_URL, ComplaintDetail } from "@/lib/apis";
-
-function formatWhen(iso: string) {
-  const date = new Date(iso.endsWith("Z") ? iso : `${iso}Z`);
-  return date.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-}
+import { useEndUser } from "@/lib/endUserSession";
+import { formatWhen } from "@/lib/utils";
 
 function Stars({ value, onChange }: { value: number; onChange?: (n: number) => void }) {
   return (
@@ -29,17 +26,20 @@ function Stars({ value, onChange }: { value: number; onChange?: (n: number) => v
 }
 
 /**
- * Live part of the complaint modal: resolution, citizen actions (confirm,
+ * Live part of a complaint's details: resolution, end user actions (confirm,
  * reopen, rate), the conversation with the department and the timeline.
  */
 export default function ComplaintActivity({
   complaintId,
+  initialDetail,
   onUpdate,
 }: {
   complaintId: string;
+  /** Already-loaded details; skips the first fetch. */
+  initialDetail?: ComplaintDetail;
   onUpdate?: (detail: ComplaintDetail) => void;
 }) {
-  const [detail, setDetail] = useState<ComplaintDetail | null>(null);
+  const [detail, setDetail] = useState<ComplaintDetail | null>(initialDetail ?? null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -49,8 +49,10 @@ export default function ComplaintActivity({
   const [reopening, setReopening] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const canAttach = useEndUser().can("portal.complaint.attach");
 
   useEffect(() => {
+    if (initialDetail) return;
     apis.complaints
       .getComplaint(complaintId)
       .then((d) => {
@@ -114,14 +116,18 @@ export default function ComplaintActivity({
               <p className="text-sm font-semibold text-slate-800">
                 {can("confirm") ? "Is your issue resolved?" : "How was the resolution?"}
               </p>
-              <Stars value={rating} onChange={setRating} />
-              <textarea
-                rows={2}
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="Anything you'd like to tell us? (optional)"
-                className="w-full p-2 text-sm border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
+              {can("feedback") && (
+                <>
+                  <Stars value={rating} onChange={setRating} />
+                  <textarea
+                    rows={2}
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    placeholder="Anything you'd like to tell us? (optional)"
+                    className="w-full p-2 text-sm border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </>
+              )}
             </>
           )}
           <div className="flex flex-wrap gap-2">
@@ -252,18 +258,24 @@ export default function ComplaintActivity({
               className="w-full p-2 text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
             <div className="flex items-center justify-between">
-              <input
-                ref={fileInput}
-                type="file"
-                multiple
-                className="hidden"
-                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-              />
-              <button type="button" onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600">
-                <Paperclip className="w-3.5 h-3.5" />
-                {files.length ? `${files.length} file${files.length > 1 ? "s" : ""} attached` : "Attach photo or PDF"}
-              </button>
+              {canAttach ? (
+                <>
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                    onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                  />
+                  <button type="button" onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600">
+                    <Paperclip className="w-3.5 h-3.5" />
+                    {files.length ? `${files.length} file${files.length > 1 ? "s" : ""} attached` : "Attach photo or PDF"}
+                  </button>
+                </>
+              ) : (
+                <span />
+              )}
               <button
                 type="submit"
                 disabled={busy}

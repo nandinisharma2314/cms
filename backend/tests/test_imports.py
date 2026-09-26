@@ -54,7 +54,7 @@ def test_location_near_duplicates_are_matched_or_flagged(client, login):
     assert "C Scheme" not in areas and "Mansarowar" in areas
 
 
-def test_citizen_import_flags_likely_duplicates(client, login):
+def test_end_user_import_flags_likely_duplicates(client, login):
     root = login(SUPER_ADMIN)
     body = (
         "user_id,name,mobile,email,country,state,district,city,area\n"
@@ -84,9 +84,9 @@ def test_failed_rows_report_can_be_fixed_and_reuploaded(client, login):
         "USR300,Good Row,9000000300,good300@example.com\n"
         "USR301,No Mobile,,nomobile@example.com\n"
     )
-    batch_id = upload(client, root, "/end-users/import", body, name="citizens.csv").json()["batch_id"]
+    batch_id = upload(client, root, "/end-users/import", body, name="end_users.csv").json()["batch_id"]
     detail = client.get(f"/imports/{batch_id}", headers=root).json()
-    assert detail["filename"] == "citizens.csv" and detail["failed"] == 1
+    assert detail["filename"] == "end_users.csv" and detail["failed"] == 1
     assert detail["issues"] == [{"row": 3, "severity": "error", "message": "Mobile must be a 10-digit number"}]
 
     report = client.get(f"/imports/{batch_id}/report", headers=root)
@@ -124,7 +124,7 @@ def test_exports_round_trip_and_respect_scope(client, login):
     assert reimport["created"] == 0 and reimport["failed"] == 0 and reimport["unchanged"] == reimport["total_rows"]
 
     manager_csv = client.get("/end-users/export", headers=login(ELEC_MANAGER)).text
-    assert "Sunita Devi" not in manager_csv  # Delhi citizen, outside a Jaipur scope
+    assert "Sunita Devi" not in manager_csv  # Delhi end user, outside a Jaipur scope
     assert "Amit Kumar" in manager_csv
 
 

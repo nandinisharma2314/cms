@@ -1,4 +1,4 @@
-"""In-app notifications for staff and citizens.
+"""In-app notifications for staff and end users.
 
 `notify` is the single entry point; email/SMS delivery can be added here later
 without touching the callers.

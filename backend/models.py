@@ -151,7 +151,7 @@ class UserScope(Base):
 
 
 # ---------------------------------------------------------------------------
-# End users (citizens who raise complaints; imported via CSV)
+# End users (people who raise complaints; imported via CSV)
 # ---------------------------------------------------------------------------
 
 class EndUser(Base):
@@ -166,7 +166,7 @@ class EndUser(Base):
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
 
-    # Profile details the citizen maintains in the portal
+    # Profile details the end user maintains in the portal
     dob = Column(String(20), nullable=True)
     gender = Column(String(20), nullable=True)
     address = Column(String(500), nullable=True)
@@ -249,8 +249,8 @@ class Complaint(Base):
     description = Column(Text, nullable=False)
     additional_details = Column(String(500), nullable=True)
 
-    citizen_name = Column(String(150), nullable=True)
-    citizen_phone = Column(String(20), nullable=True)
+    end_user_name = Column(String(150), nullable=True)
+    end_user_phone = Column(String(20), nullable=True)
 
     # Workflow state; see services/workflow_service.py for the allowed transitions.
     status = Column(String(30), default="SUBMITTED", nullable=False, index=True)
@@ -272,7 +272,7 @@ class Complaint(Base):
     resolution_warn_at = Column(DateTime, nullable=True)
     resolution_warned_at = Column(DateTime, nullable=True)
     resolution_breached_at = Column(DateTime, nullable=True)
-    sla_paused_at = Column(DateTime, nullable=True)  # set while waiting for the citizen
+    sla_paused_at = Column(DateTime, nullable=True)  # set while waiting for the end user
 
     # Active escalation, if any; history lives in complaint_escalations.
     escalation_level = Column(Integer, default=0, nullable=False)
@@ -280,7 +280,7 @@ class Complaint(Base):
     escalated_to_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     escalation_due_at = Column(DateTime, nullable=True, index=True)
 
-    feedback_rating = Column(Integer, nullable=True)  # 1-5, given by the citizen
+    feedback_rating = Column(Integer, nullable=True)  # 1-5, given by the end user
     feedback_comment = Column(String(1000), nullable=True)
     feedback_at = Column(DateTime, nullable=True)
 
@@ -357,7 +357,7 @@ class ComplaintComment(Base):
 
 
 class ComplaintEvent(Base):
-    """One entry of a complaint's timeline. `public_message` is what the citizen
+    """One entry of a complaint's timeline. `public_message` is what the end user
     sees; events without it are staff-only."""
     __tablename__ = "complaint_history"
 
@@ -449,7 +449,7 @@ class ComplaintEscalation(Base):
 
 
 class Notification(Base):
-    """In-app notification for a staff user or a citizen."""
+    """In-app notification for a staff user or an end user."""
     __tablename__ = "notifications"
     __table_args__ = (Index("ix_notifications_recipient", "recipient_type", "recipient_id", "read_at"),)
 

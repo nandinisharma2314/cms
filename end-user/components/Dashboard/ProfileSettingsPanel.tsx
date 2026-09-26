@@ -20,6 +20,7 @@ import {
   Map,
 } from "lucide-react";
 import { apis } from "@/lib/apis";
+import { useEndUser } from "@/lib/endUserSession";
 
 interface ProfileSettingsPanelProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export default function ProfileSettingsPanel({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
-  const [role, setRole] = useState("Community Member");
+  const role = useEndUser().profile.role.name;
 
   // Address fields (stored in local preferences & profile)
   const [area, setArea] = useState("Mansarovar");
@@ -73,7 +74,6 @@ export default function ProfileSettingsPanel({
         setName(parsed.name || "");
         setEmail(parsed.email || "");
         setMobile(parsed.mobile || "");
-        if (parsed.role) setRole(parsed.role === "citizen" ? "Community Member" : parsed.role);
       }
 
       const storedAddress = localStorage.getItem("user_profile_address");
@@ -105,7 +105,6 @@ export default function ProfileSettingsPanel({
           setName(res.user.name || "");
           setEmail(res.user.email || "");
           setMobile(res.user.mobile || "");
-          if (res.user.role) setRole(res.user.role === "citizen" ? "Community Member" : res.user.role);
 
           localStorage.setItem(
             "user",
@@ -114,7 +113,7 @@ export default function ProfileSettingsPanel({
               name: res.user.name || "",
               email: res.user.email || "",
               mobile: res.user.mobile || "",
-              role: res.user.role || "citizen",
+              role: res.user.role.name,
             })
           );
         }
@@ -293,7 +292,7 @@ export default function ProfileSettingsPanel({
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-white truncate">{displayName}</h3>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold border border-emerald-400/30">
-                  <ShieldCheck size={11} /> Verified Citizen
+                  <ShieldCheck size={11} /> Verified End User
                 </span>
               </div>
               <p className="text-xs text-indigo-200 truncate mt-0.5">
@@ -373,7 +372,7 @@ export default function ProfileSettingsPanel({
                     <span>
                       Full Name <span className="text-red-500">*</span>
                     </span>
-                    <span className="text-[10px] text-slate-400 font-normal">Official citizen name</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Official end user name</span>
                   </label>
                   <div className="relative">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">

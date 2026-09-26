@@ -4,10 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func
 
-from models import Permission, Role, User
+from models import EndUser, Permission, Role, User
 from services import audit_service
 from services.access_service import AccessContext
-from services.permission_catalog import PERMISSIONS, SUPER_ADMIN_ROLE_KEY
+from services.permission_catalog import (
+    END_USER_ROLE_KEY, STAFF_PERMISSIONS, SUPER_ADMIN_ROLE_KEY, is_portal_permission,
+)
 from utils.auth_middleware import require_permission
 
 router = APIRouter()
@@ -39,8 +41,13 @@ def _depth(role: Role, roles_by_id: dict[int, Role]) -> int:
     return depth
 
 
+def _is_end_user_role(role: Role) -> bool:
+    return role.key == END_USER_ROLE_KEY
+
+
 def _serialize(ctx: AccessContext, roles: list[Role]) -> list[dict]:
     counts = dict(ctx.db.query(User.role_id, func.count(User.id)).group_by(User.role_id).all())
+    end_user_count = ctx.db.query(func.count(EndUser.id)).filter(EndUser.is_active.is_(True)).scalar()
     roles_by_id = ctx.roles_by_id
     ordered = sorted(roles, key=lambda r: (_depth(r, roles_by_id), r.name))
     return [
@@ -49,22 +56,41 @@ def _serialize(ctx: AccessContext, roles: list[Role]) -> list[dict]:
             "key": r.key,
             "name": r.name,
             "description": r.description,
+            "audience": "end_user" if _is_end_user_role(r) else "staff",
             "parent_id": r.parent_id,
             "depth": _depth(r, roles_by_id),
             "is_system": r.is_system,
             "is_root": r.key == SUPER_ADMIN_ROLE_KEY,
-            # the Super Admin implicitly holds every permission
-            "permissions": sorted(PERMISSIONS) if r.key == SUPER_ADMIN_ROLE_KEY
+            # the Super Admin implicitly holds every staff permission
+            "permissions": sorted(STAFF_PERMISSIONS) if r.key == SUPER_ADMIN_ROLE_KEY
             else sorted(p.key for p in r.permissions),
-            "user_count": counts.get(r.id, 0),
+            "user_count": end_user_count if _is_end_user_role(r) else counts.get(r.id, 0),
             "assignable": ctx.is_role_below(r),
-            "editable": ctx.has("role.manage") and ctx.is_role_below(r),
+            # the End User role sits outside the staff hierarchy; role managers edit it
+            "editable": ctx.has("role.manage") and (_is_end_user_role(r) or ctx.is_role_below(r)),
         }
         for r in ordered
     ]
 
 
+def _resolve_end_user_permissions(ctx: AccessContext, keys: list[str]) -> list[Permission]:
+    """Staff never hold portal permissions, so anyone managing roles may grant them."""
+    staff_keys = [k for k in keys if not is_portal_permission(k)]
+    if staff_keys:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"The End User role only takes portal permissions, not: {', '.join(sorted(staff_keys))}",
+        )
+    return ctx.db.query(Permission).filter(Permission.key.in_(keys)).all() if keys else []
+
+
 def _resolve_permissions(ctx: AccessContext, keys: list[str]) -> list[Permission]:
+    portal_keys = [k for k in keys if is_portal_permission(k)]
+    if portal_keys:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Portal permissions only apply to the End User role: {', '.join(sorted(portal_keys))}",
+        )
     unknown_or_ungrantable = [k for k in keys if not ctx.has(k)]
     if unknown_or_ungrantable:
         raise HTTPException(
@@ -78,6 +104,8 @@ def _parent_for(ctx: AccessContext, parent_id: int, role: Role | None = None) ->
     parent = ctx.db.get(Role, parent_id)
     if parent is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Parent role not found")
+    if _is_end_user_role(parent):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Staff roles cannot sit under the End User role")
     if parent.id != ctx.role.id and not ctx.is_role_below(parent):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Parent role must be your own role or below it")
     if role is not None and (parent.id == role.id or ctx.is_role_below(parent, above=role)):
@@ -88,7 +116,10 @@ def _parent_for(ctx: AccessContext, parent_id: int, role: Role | None = None) ->
 @router.get("/permissions")
 def list_permissions(ctx: AccessContext = Depends(require_permission("role.view"))):
     return [
-        {"key": p.key, "group": p.group, "description": p.description}
+        {
+            "key": p.key, "group": p.group, "description": p.description,
+            "audience": "end_user" if is_portal_permission(p.key) else "staff",
+        }
         for p in ctx.db.query(Permission).order_by(Permission.id).all()
     ]
 
@@ -133,8 +164,11 @@ def update_role(role_id: int, payload: UpdateRoleRequest, request: Request, ctx:
     role = db.get(Role, role_id)
     if role is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Role not found")
-    if not ctx.is_role_below(role):
+    end_user_role = _is_end_user_role(role)
+    if not end_user_role and not ctx.is_role_below(role):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only edit roles below your own")
+    if end_user_role and payload.parent_id is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The End User role sits outside the staff hierarchy")
 
     before = {
         "name": role.name, "description": role.description, "parent_id": role.parent_id,
@@ -149,7 +183,9 @@ def update_role(role_id: int, payload: UpdateRoleRequest, request: Request, ctx:
         role.description = payload.description.strip()[:255] or None
     if payload.parent_id is not None and payload.parent_id != role.parent_id:
         role.parent = _parent_for(ctx, payload.parent_id, role)
-    if payload.permissions is not None:
+    if payload.permissions is not None and end_user_role:
+        role.permissions = _resolve_end_user_permissions(ctx, payload.permissions)
+    elif payload.permissions is not None:
         # Keep grants the actor cannot see/grant; only toggle the ones they hold.
         kept = [p for p in role.permissions if not ctx.has(p.key)]
         role.permissions = kept + _resolve_permissions(ctx, payload.permissions)

@@ -24,7 +24,7 @@ from utils.security import utcnow
 
 from services.statuses import (  # noqa: F401  (re-exported for callers)
     ACKNOWLEDGED, ACTIVE_STATUSES, ASSIGNED, CLOSED, GROUP_OF, IN_PROGRESS, REJECTED, REJECTION_REQUESTED,
-    REOPENED, RESOLVED, STATUS_GROUPS, STATUS_LABELS, SUBMITTED, WAITING, citizen_status_label, status_label,
+    REOPENED, RESOLVED, STATUS_GROUPS, STATUS_LABELS, SUBMITTED, WAITING, end_user_status_label, status_label,
 )
 
 
@@ -39,7 +39,7 @@ class StaffAction:
     handler_only: bool
     note: str  # "required" | "optional"
     note_label: str
-    # Whether the note is shown to the citizen.
+    # Whether the note is shown to the end user.
     public_note: bool
 
 
@@ -47,30 +47,30 @@ _WORKING = frozenset({ASSIGNED, ACKNOWLEDGED, IN_PROGRESS, WAITING, REOPENED})
 
 STAFF_ACTIONS = [
     StaffAction("acknowledge", "Acknowledge", frozenset({ASSIGNED, REOPENED}), ACKNOWLEDGED,
-                "complaint.respond", True, "optional", "Message to the citizen (optional)", True),
+                "complaint.respond", True, "optional", "Message to the end user (optional)", True),
     StaffAction("start", "Start Work", frozenset({ASSIGNED, ACKNOWLEDGED, REOPENED}), IN_PROGRESS,
-                "complaint.respond", True, "optional", "Message to the citizen (optional)", True),
-    StaffAction("request_info", "Ask Citizen for Information", frozenset({ACKNOWLEDGED, IN_PROGRESS, REOPENED}),
-                WAITING, "complaint.respond", True, "required", "What do you need from the citizen?", True),
+                "complaint.respond", True, "optional", "Message to the end user (optional)", True),
+    StaffAction("request_info", "Ask End User for Information", frozenset({ACKNOWLEDGED, IN_PROGRESS, REOPENED}),
+                WAITING, "complaint.respond", True, "required", "What do you need from the end user?", True),
     StaffAction("resume", "Resume Work", frozenset({WAITING}), IN_PROGRESS,
                 "complaint.respond", True, "optional", "Note (optional)", True),
     StaffAction("resolve", "Mark Resolved", _WORKING, RESOLVED,
-                "complaint.resolve", True, "required", "Resolution (shown to the citizen)", True),
+                "complaint.resolve", True, "required", "Resolution (shown to the end user)", True),
     StaffAction("close", "Close", frozenset({RESOLVED}), CLOSED,
                 "complaint.close", False, "optional", "Closing note (optional)", True),
     StaffAction("reopen", "Reopen", frozenset({RESOLVED, CLOSED}), REOPENED,
                 "complaint.close", False, "required", "Why is it being reopened?", True),
     StaffAction("reject", "Reject", frozenset({SUBMITTED}) | _WORKING, REJECTED,
-                "complaint.reject.approve", False, "required", "Reason for rejection (shown to the citizen)", True),
+                "complaint.reject.approve", False, "required", "Reason for rejection (shown to the end user)", True),
 ]
 STAFF_ACTIONS_BY_KEY = {a.key: a for a in STAFF_ACTIONS}
 
-# Staff actions that count as the first response to the citizen.
+# Staff actions that count as the first response to the end user.
 _RESPONSE_ACTIONS = {"acknowledge", "start", "request_info", "resolve", "reject"}
 
 
 def _handlers(complaint: Complaint) -> list[User | None]:
-    """Staff to tell when the citizen does something."""
+    """Staff to tell when the end user does something."""
     return [complaint.assigned_to, complaint.escalated_to]
 
 
@@ -78,18 +78,18 @@ def change_status(
     db, complaint, new_status, actor, *, note=None, at=None, public=True, message=None, public_message=None,
 ):
     """Sets the status, records it on the timeline, updates SLA clocks and
-    notifies the other side. `public=False` keeps it off the citizen's view;
-    `public_message` overrides the citizen-facing text."""
+    notifies the other side. `public=False` keeps it off the end user's view;
+    `public_message` overrides the end-user-facing text."""
     now = at or utcnow()
     old = complaint.status
     complaint.status = new_status
     text = message or f"Status changed from {status_label(old)} to {status_label(new_status)}"
-    citizen_text = public_message or message or (
-        f"Status changed from {citizen_status_label(old)} to {citizen_status_label(new_status)}"
+    end_user_text = public_message or message or (
+        f"Status changed from {end_user_status_label(old)} to {end_user_status_label(new_status)}"
     )
     record_event(
         db, complaint, "status_changed", actor, text,
-        public_message=citizen_text if public else None,
+        public_message=end_user_text if public else None,
         from_status=old, to_status=new_status, note=note, at=now,
     )
     sla_service.on_status_change(db, complaint, old, new_status, now)
@@ -98,12 +98,12 @@ def change_status(
     if isinstance(actor, User) and public:
         body = f"{complaint.title}. {note}" if note else complaint.title
         notification_service.notify(
-            db, [complaint.end_user], "complaint.status", f"{gid} is now {citizen_status_label(new_status).lower()}",
+            db, [complaint.end_user], "complaint.status", f"{gid} is now {end_user_status_label(new_status).lower()}",
             body, complaint, at=now,
         )
     elif isinstance(actor, EndUser):
         notification_service.notify(
-            db, _handlers(complaint), "complaint.citizen_update", f"{gid}: {text.lower()}", note, complaint, at=now,
+            db, _handlers(complaint), "complaint.end_user_update", f"{gid}: {text.lower()}", note, complaint, at=now,
         )
 
 
@@ -161,12 +161,12 @@ def apply_staff_action(
     if key == "reject":
         rejection_service.record_direct_rejection(db, ctx.user, complaint, previous_status, note, now)
     elif key == "request_info":
-        # The question goes into the conversation so the citizen can reply to it.
+        # The question goes into the conversation so the end user can reply to it.
         add_comment(db, complaint, ctx.user, note, is_internal=False, at=now, record=False)
 
 
 # ---------------------------------------------------------------------------
-# Citizen
+# End user
 # ---------------------------------------------------------------------------
 
 def reopen_deadline(complaint: Complaint) -> datetime | None:
@@ -174,7 +174,18 @@ def reopen_deadline(complaint: Complaint) -> datetime | None:
     return reference + timedelta(days=REOPEN_WINDOW_DAYS) if reference else None
 
 
-def citizen_actions_for(complaint: Complaint, now: datetime | None = None) -> list[str]:
+# The End User role permission each end-user action needs.
+ACTION_PERMISSIONS = {
+    "comment": "portal.complaint.comment",
+    "confirm": "portal.complaint.confirm",
+    "reopen": "portal.complaint.reopen",
+    "feedback": "portal.complaint.feedback",
+}
+
+
+def end_user_actions_for(complaint: Complaint, now: datetime | None = None) -> list[str]:
+    """What the complaint's state allows the end user to do; permissions are
+    checked separately (see ACTION_PERMISSIONS)."""
     actions = []
     if complaint.status not in (CLOSED, REJECTED):
         actions.append("comment")
@@ -189,8 +200,8 @@ def citizen_actions_for(complaint: Complaint, now: datetime | None = None) -> li
     return actions
 
 
-def _require_citizen_action(complaint: Complaint, action: str, now: datetime | None = None) -> None:
-    if action not in citizen_actions_for(complaint, now):
+def _require_end_user_action(complaint: Complaint, action: str, now: datetime | None = None) -> None:
+    if action not in end_user_actions_for(complaint, now):
         raise HTTPException(status.HTTP_409_CONFLICT, "This action is not available for this complaint")
 
 
@@ -204,22 +215,22 @@ def _store_feedback(complaint: Complaint, rating: int | None, comment: str | Non
     complaint.feedback_at = now
 
 
-def citizen_confirm(
+def end_user_confirm(
     db: Session, end_user: EndUser, complaint: Complaint, rating: int | None, comment: str | None,
     at: datetime | None = None,
 ) -> None:
-    _require_citizen_action(complaint, "confirm")
+    _require_end_user_action(complaint, "confirm")
     now = at or utcnow()
     if complaint.feedback_rating is None:
         _store_feedback(complaint, rating, comment, now)
     complaint.closed_at = now
-    change_status(db, complaint, CLOSED, end_user, at=now, message="Citizen confirmed the resolution; complaint closed")
+    change_status(db, complaint, CLOSED, end_user, at=now, message="End user confirmed the resolution; complaint closed")
 
 
-def citizen_reopen(
+def end_user_reopen(
     db: Session, end_user: EndUser, complaint: Complaint, reason: str, at: datetime | None = None,
 ) -> None:
-    _require_citizen_action(complaint, "reopen", at)
+    _require_end_user_action(complaint, "reopen", at)
     reason = (reason or "").strip()
     if not reason:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Please tell us why the issue is not resolved")
@@ -227,19 +238,19 @@ def citizen_reopen(
     complaint.resolved_at = None
     complaint.closed_at = None
     complaint.reopen_count += 1
-    change_status(db, complaint, REOPENED, end_user, note=reason, at=now, message="Citizen reopened the complaint")
+    change_status(db, complaint, REOPENED, end_user, note=reason, at=now, message="End user reopened the complaint")
 
 
-def citizen_feedback(
+def end_user_feedback(
     db: Session, end_user: EndUser, complaint: Complaint, rating: int, comment: str | None,
     at: datetime | None = None,
 ) -> None:
-    _require_citizen_action(complaint, "feedback")
+    _require_end_user_action(complaint, "feedback")
     now = at or utcnow()
     _store_feedback(complaint, rating, comment, now)
     record_event(
         db, complaint, "feedback", end_user,
-        f"Citizen rated the resolution {rating}/5", public_message=f"You rated the resolution {rating}/5",
+        f"End user rated the resolution {rating}/5", public_message=f"You rated the resolution {rating}/5",
         note=complaint.feedback_comment, at=now,
     )
     notification_service.notify(
@@ -262,7 +273,7 @@ def add_comment(
     at: datetime | None = None,
     record: bool = True,
 ) -> ComplaintComment:
-    """Adds a comment (and a timeline entry unless record=False). A citizen reply
+    """Adds a comment (and a timeline entry unless record=False). An end user reply
     to a WAITING_FOR_INFORMATION complaint puts it back in progress."""
     body = (body or "").strip()
     if not body:
@@ -293,19 +304,19 @@ def add_comment(
         elif staff:
             if complaint.acknowledged_at is None:
                 complaint.acknowledged_at = now
-            record_event(db, complaint, "comment_added", author, f"{author.name} replied to the citizen",
+            record_event(db, complaint, "comment_added", author, f"{author.name} replied to the end user",
                          public_message="An officer replied", at=now)
             notification_service.notify(
                 db, [complaint.end_user], "complaint.reply", f"New reply on {gid}", body[:300], complaint, at=now,
             )
         else:
-            record_event(db, complaint, "comment_added", author, "Citizen added a comment",
+            record_event(db, complaint, "comment_added", author, "End user added a comment",
                          public_message="You added a comment", at=now)
             notification_service.notify(
-                db, _handlers(complaint), "complaint.citizen_update", f"Citizen replied on {gid}",
+                db, _handlers(complaint), "complaint.end_user_update", f"End user replied on {gid}",
                 body[:300], complaint, at=now,
             )
             if complaint.status == WAITING:
                 change_status(db, complaint, IN_PROGRESS, author, at=now,
-                            message="Citizen provided the requested information; back in progress")
+                            message="End user provided the requested information; back in progress")
     return comment
