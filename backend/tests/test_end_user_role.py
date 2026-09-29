@@ -1,4 +1,7 @@
 from conftest import ELEC_MANAGER, SUPER_ADMIN
+from factories import email
+
+JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
 
 
 def _roles(client, headers):
@@ -19,7 +22,7 @@ def test_end_user_role_sits_outside_the_staff_hierarchy(client, login):
 
     # never given to staff, never a parent, never mixed with staff permissions
     staff = client.post("/users/", headers=root, json={
-        "name": "Portal Staff", "email": "portal.staff@civiccare.gov.in", "role_id": role["id"],
+        "name": "Portal Staff", "email": email("portal.staff"), "role_id": role["id"],
         "password": "Str0ngPass!", "scopes": [],
     })
     assert staff.status_code == 403
@@ -30,7 +33,8 @@ def test_end_user_role_sits_outside_the_staff_hierarchy(client, login):
     })
     assert mixed.status_code == 400
     assert client.patch(f"/roles/{role['id']}", headers=root, json={"permissions": ["complaint.view"]}).status_code == 400
-    assert client.patch(f"/roles/{role['id']}", headers=root, json={"parent_id": roles["admin"]["id"]}).status_code == 400
+    assert client.patch(f"/roles/{role['id']}", headers=root,
+                        json={"parent_id": roles["admin"]["id"]}).status_code == 400
     assert client.delete(f"/roles/{role['id']}", headers=root).status_code == 400
     # editing it needs role.manage like any other role
     assert client.patch(f"/roles/{role['id']}", headers=login(ELEC_MANAGER), json={"name": "X"}).status_code == 403
@@ -45,8 +49,8 @@ def test_end_user_role_permissions_are_enforced(client, login, end_user_login):
     assert me["role"] == {"key": "end_user", "name": "End User"}
     assert sorted(me["permissions"]) == sorted(role["permissions"])
 
-    open_complaint = next(c for c in client.get("/portal/complaints", headers=end_user).json()
-                          if c["status_group"] in ("open", "in_progress"))
+    listing = client.get("/portal/complaints", params={"page_size": 100}, headers=end_user).json()["items"]
+    open_complaint = next(c for c in listing if c["status_group"] in ("open", "in_progress"))
     detail_url = f"/portal/complaints/{open_complaint['id']}"
     assert "comment" in client.get(detail_url, headers=end_user).json()["actions"]
 
@@ -61,10 +65,11 @@ def test_end_user_role_permissions_are_enforced(client, login, end_user_login):
         assert client.put("/portal/profile", headers=end_user, json={"name": "Rahul"}).status_code == 403
         assert "portal.profile.update" not in client.get("/portal/me", headers=end_user).json()["permissions"]
 
-        departments = client.get("/portal/departments", headers=end_user).json()
+        department = client.get("/portal/departments", headers=end_user).json()[0]
         with_file = client.post("/portal/complaints", headers=end_user, data={
-            "department_id": departments[0]["id"], "title": "Photo attached", "description": "See photo",
-        }, files={"files": ("photo.jpg", b"\xff\xd8\xff", "image/jpeg")})
+            "department_id": department["id"], "category_id": department["categories"][0]["id"],
+            "location_id": me["location"]["id"], "title": "Photo attached", "description": "See photo",
+        }, files={"files": ("photo.jpg", JPEG, "image/jpeg")})
         assert with_file.status_code == 403  # creating is still allowed, attaching is not
     finally:
         assert client.patch(f"/roles/{role['id']}", headers=root,

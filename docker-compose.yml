@@ -1,64 +1,102 @@
+# The whole stack: MariaDB, the API, the background worker and both web apps.
+#
+#   cp .env.example .env                    # database credentials and public URLs
+#   cp backend/.env.example backend/.env    # API settings (DATABASE_URI is set here instead)
+#   docker compose up --build -d
+#   docker compose run --rm api python manage.py create-super-admin --name "..." --email ...
+#
+# Every variable marked :? must be set in .env; compose refuses to start otherwise.
+
+# The API's database URL points at the db service; it overrides the one in backend/.env.
+# A password with URL-special characters (@ : / ? #) must be percent-encoded in .env.
+x-database-uri: &database-uri mysql+pymysql://${DB_USER:?set DB_USER in .env}:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:3306/${DB_NAME:?set DB_NAME in .env}?charset=utf8mb4
+
+x-api-image: &api-image
+  build:
+    context: ./backend
+  env_file: ./backend/.env
+  environment:
+    DATABASE_URI: *database-uri
 
 services:
-  # MySQL Database Service
-  mysql_db:
-    image: mysql:8.0
-    restart: always
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root_password_here
-      MYSQL_DATABASE: cms
-      MYSQL_USER: devuser
-      MYSQL_PASSWORD: NewPassword123!
-    ports:
-      - "3307:3306"
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+      MARIADB_DATABASE: ${DB_NAME:?set DB_NAME in .env}
+      MARIADB_USER: ${DB_USER:?set DB_USER in .env}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  # Python FastAPI Backend Service
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "5000:5000"
-    env_file:
-      - ./backend/.env
+  # Creates or upgrades the schema, then exits; the API starts only after it succeeded.
+  migrate:
+    <<: *api-image
+    command: ["python", "manage.py", "migrate"]
+    healthcheck:
+      disable: true  # the image's check probes the HTTP server, which only the api service runs
     depends_on:
-      - mysql_db
+      db:
+        condition: service_healthy
+    restart: "no"
 
-  # Next.js Frontend Service (Admin Panel)
+  api:
+    <<: *api-image
+    restart: unless-stopped
+    environment:
+      DATABASE_URI: *database-uri
+      UPLOAD_DIR: /app/uploads
+      # The worker service does the background work; the API process doesn't.
+      WORKER_INTERVAL_SECONDS: "0"
+    ports:
+      - "${API_PORT:?set API_PORT in .env}:5000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *api-image
+    restart: unless-stopped
+    command: ["python", "worker.py"]
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   admin-panel:
     build:
       context: ./admin-panel
-      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in .env}
+    restart: unless-stopped
     ports:
-      - "3001:3000"
-    environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:5000 
-    volumes:
-      - ./admin-panel:/app
-      - /app/node_modules
+      - "${ADMIN_PORT:?set ADMIN_PORT in .env}:3000"
     depends_on:
-      - backend
+      api:
+        condition: service_healthy
 
-  # Next.js Frontend Service (End User Portal)
   end-user:
     build:
       context: ./end-user
-      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in .env}
+    restart: unless-stopped
     ports:
-      - "3002:3000"
-    environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:5000 
-    volumes:
-      # Sync local files into the container so 'npm run dev' hot-reloads
-      - ./end-user:/app
-      # Keep the container's node_modules separate from the host machine
-      - /app/node_modules
+      - "${PORTAL_PORT:?set PORTAL_PORT in .env}:3000"
     depends_on:
-      - backend
+      api:
+        condition: service_healthy
 
 volumes:
-  mysql_data:
+  db-data:
+  uploads:

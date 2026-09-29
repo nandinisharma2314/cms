@@ -1,31 +1,36 @@
 import secrets
+from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+import config
 from database import get_db
-from models import EndUser, PasswordResetTicket, RefreshToken, User
-from services import audit_service
+from models import RESET_APPROVED, RESET_PENDING, RESET_REJECTED, PasswordResetTicket, User, max_length
+from services import audit_service, rate_limit_service, token_service
 from services.access_service import AccessContext
-from services.token_service import consume_refresh_token, issue_token_pair, revoke_all_for
-from services.user_service import find_staff_by_identifier, serialize_users, visible_reset_tickets
-from utils.auth_middleware import get_access_context, require_permission
-from utils.security import (
-    PRINCIPAL_STAFF, hash_password, sha256_hex, utcnow, validate_password_strength, verify_password,
+from services.user_service import can_handle_reset_ticket, find_staff_by_identifier, login_identifier_key, \
+    serialize_users, visible_reset_tickets
+from utils.auth_middleware import (
+    client_ip, get_access_context, get_access_context_allowing_password_change, require_client_header,
+    require_permission,
 )
+from utils.cookies import clear_refresh_cookie, read_refresh_cookie, set_refresh_cookie
+from utils.security import (
+    PRINCIPALS, PRINCIPAL_STAFF, generate_password, hash_password, utcnow, validate_password_strength, verify_password,
+)
+from utils.text import multi_line
 
 router = APIRouter()
+HOUR = timedelta(hours=1)
 
 
 class LoginRequest(BaseModel):
-    email: str | None = None
-    mobile: str | None = None
+    identifier: str  # email or mobile number
     password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
 
 
 class ChangePasswordRequest(BaseModel):
@@ -38,13 +43,12 @@ class AvailabilityRequest(BaseModel):
 
 
 class ResetQueryRequest(BaseModel):
-    email_or_id: str
-    department: str
+    identifier: str
     reason: str
 
 
-class ApproveResetRequest(BaseModel):
-    temporary_key: str | None = None
+class RejectResetRequest(BaseModel):
+    note: str
 
 
 def staff_profile(db: Session, ctx: AccessContext) -> dict:
@@ -54,49 +58,68 @@ def staff_profile(db: Session, ctx: AccessContext) -> dict:
     return profile
 
 
-# Email / mobile + password login for staff (Super Admin down to Agent)
+def _session_response(response: Response, db: Session, user: User) -> dict:
+    access, refresh = token_service.issue(db, user)
+    set_refresh_cookie(response, PRINCIPAL_STAFF, refresh)
+    return {"access_token": access, "token_type": "bearer", "user": staff_profile(db, AccessContext(db, user))}
+
+
 @router.post("/login")
-def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    identifier = payload.email or payload.mobile
-    user = find_staff_by_identifier(db, identifier) if identifier else None
-    if user is None or not verify_password(payload.password, user.password_hash):
+def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Email or mobile + password, for staff (Super Admin down to Agent)."""
+    ip = client_ip(request)
+    rate_limit_service.enforce(db, "login_ip", ip, config.LOGIN_ATTEMPTS_PER_IP_PER_HOUR, HOUR,
+                               "Too many sign-in attempts from this network. Please try again later.")
+    user = find_staff_by_identifier(db, payload.identifier)
+    # Failures count per account, however the email/mobile was typed (unknown identifiers per normalized value).
+    failure_key = f"user:{user.id}" if user else login_identifier_key(db, payload.identifier)
+    lockout = timedelta(minutes=config.LOGIN_LOCKOUT_MINUTES)
+    if rate_limit_service.count(db, "login_failures", failure_key, lockout) >= config.LOGIN_MAX_FAILURES:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
+                            f"Too many failed attempts. Try again in {config.LOGIN_LOCKOUT_MINUTES} minutes "
+                            "or ask for a password reset.")
+    if not verify_password(payload.password, user.password_hash if user else None):
+        rate_limit_service.hit(db, "login_failures", failure_key, lockout)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been deactivated")
 
+    rate_limit_service.reset(db, "login_failures", failure_key)
     user.last_login_at = utcnow()
     audit_service.record(
         db, actor=user, action="auth.login", entity_type="user", entity_id=user.id,
         summary=f"{user.name} signed in", request=request,
     )
-    tokens = issue_token_pair(db, PRINCIPAL_STAFF, user.id)
-    ctx = AccessContext(db, user)
-    return {"success": True, **tokens, "user": staff_profile(db, ctx)}
+    return _session_response(response, db, user)
 
 
-# Works for both staff and end user refresh tokens; the old token is revoked (rotation)
-@router.post("/refresh")
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
-    token = consume_refresh_token(db, payload.refresh_token)
-    model = User if token.principal_type == PRINCIPAL_STAFF else EndUser
-    principal = db.get(model, token.principal_id)
-    if principal is None or not principal.is_active:
-        db.commit()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account not found or deactivated")
-    return {"success": True, **issue_token_pair(db, token.principal_type, principal.id)}
+@router.post("/refresh", dependencies=[Depends(require_client_header)])
+def refresh(principal: str, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Exchanges the refresh cookie (staff or end user) for a new access token; rotates the cookie."""
+    if principal not in PRINCIPALS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown principal")
+    try:
+        _, access, raw = token_service.rotate(db, read_refresh_cookie(request, principal), principal)
+    except HTTPException as exc:
+        # Returned rather than raised: a raised error gets a fresh response, which would drop the cookie removal.
+        failed = JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        clear_refresh_cookie(failed, principal)
+        return failed
+    set_refresh_cookie(response, principal, raw)
+    return {"access_token": access, "token_type": "bearer"}
 
 
-@router.post("/logout")
-def logout(payload: RefreshRequest, db: Session = Depends(get_db)):
-    token = db.query(RefreshToken).filter(RefreshToken.token_hash == sha256_hex(payload.refresh_token)).first()
-    if token is not None and token.revoked_at is None:
-        token.revoked_at = utcnow()
-        db.commit()
+@router.post("/logout", dependencies=[Depends(require_client_header)])
+def logout(principal: str, request: Request, response: Response, db: Session = Depends(get_db)):
+    if principal not in PRINCIPALS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown principal")
+    token_service.revoke(db, read_refresh_cookie(request, principal))
+    clear_refresh_cookie(response, principal)
     return {"success": True}
 
 
 @router.get("/me")
-def me(ctx: AccessContext = Depends(get_access_context)):
+def me(ctx: AccessContext = Depends(get_access_context_allowing_password_change)):
     return staff_profile(ctx.db, ctx)
 
 
@@ -118,104 +141,130 @@ def set_my_availability(
 
 @router.post("/change-password")
 def change_password(
-    payload: ChangePasswordRequest,
-    request: Request,
-    ctx: AccessContext = Depends(get_access_context),
+    payload: ChangePasswordRequest, request: Request, response: Response,
+    ctx: AccessContext = Depends(get_access_context_allowing_password_change),
 ):
+    """Also required right after signing in with a password someone else set.
+    Ends every other session and returns a fresh one for this browser."""
     db = ctx.db
     if not verify_password(payload.current_password, ctx.user.password_hash):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose a password different from the current one")
     error = validate_password_strength(payload.new_password)
     if error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
     ctx.user.password_hash = hash_password(payload.new_password)
-    revoke_all_for(db, PRINCIPAL_STAFF, ctx.user.id)
+    ctx.user.must_change_password = False
+    token_service.end_all_sessions(db, ctx.user)
     audit_service.record(
         db, actor=ctx.user, action="user.password_change", entity_type="user", entity_id=ctx.user.id,
         summary=f"{ctx.user.name} changed their password", request=request,
     )
     db.commit()
-    return {"success": True}
+    return _session_response(response, db, ctx.user)
 
 
 # ---------------------------------------------------------------------------
-# Password reset queries: a locked-out officer raises a ticket, someone above
-# them approves it and hands over a temporary password.
+# Password reset queries: a locked-out staff member raises a ticket, someone
+# above them verifies who they are and approves it (or rejects it).
 # ---------------------------------------------------------------------------
+
+def _new_ticket_id() -> str:
+    return f"RST-{secrets.token_hex(5).upper()}"
+
 
 @router.post("/reset-query")
-def raise_reset_query(payload: ResetQueryRequest, db: Session = Depends(get_db)):
-    ticket = PasswordResetTicket(
-        ticket_id=f"RST-{secrets.token_hex(3).upper()}",
-        email_or_id=payload.email_or_id.strip()[:120],
-        department=payload.department.strip()[:100],
-        reason=payload.reason.strip()[:500],
-        status="Pending Approval",
-    )
-    db.add(ticket)
-    db.commit()
+def raise_reset_query(payload: ResetQueryRequest, request: Request, db: Session = Depends(get_db)):
+    rate_limit_service.enforce(db, "reset_request_ip", client_ip(request), config.RESET_REQUESTS_PER_IP_PER_HOUR,
+                               HOUR, "Too many reset requests from this network. Please try again later.")
+    identifier = payload.identifier.strip()
+    if not identifier or len(identifier) > max_length(PasswordResetTicket.identifier):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Enter the email address or mobile number of your account")
+    reason = multi_line(payload.reason, "The reason for the reset", max_length(PasswordResetTicket.reason))
+    user = find_staff_by_identifier(db, identifier)
+    for _ in range(5):
+        ticket = PasswordResetTicket(ticket_id=_new_ticket_id(), identifier=identifier, user=user, reason=reason,
+                                     status=RESET_PENDING, created_at=utcnow())
+        db.add(ticket)
+        try:
+            db.commit()
+            break
+        except IntegrityError:  # ticket id collision; try another
+            db.rollback()
+    else:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Could not create the request; please try again")
+    # The same answer whether or not an account matched, so this cannot be used to probe accounts.
+    return {"ticket_id": ticket.ticket_id, "status": ticket.status}
+
+
+def _serialize_ticket(ticket: PasswordResetTicket) -> dict:
     return {
-        "success": True,
         "ticket_id": ticket.ticket_id,
-        "message": "Reset query submitted for review",
+        "identifier": ticket.identifier,
+        "reason": ticket.reason,
         "status": ticket.status,
+        "created_at": ticket.created_at.isoformat(),
+        "matched_user": ({"id": ticket.user.id, "name": ticket.user.name, "role": ticket.user.role.name,
+                          "email": ticket.user.email} if ticket.user else None),
+        "decided_by": ticket.decided_by.name if ticket.decided_by else None,
+        "decided_at": ticket.decided_at.isoformat() if ticket.decided_at else None,
+        "decision_note": ticket.decision_note,
     }
 
 
 @router.get("/reset-queries")
-def list_reset_queries(ctx: AccessContext = Depends(require_permission("user.reset_password"))):
-    return [
-        {
-            "ticket_id": t.ticket_id,
-            "email_or_id": t.email_or_id,
-            "department": t.department,
-            "reason": t.reason,
-            "status": t.status,
-            "created_at": t.created_at.isoformat(),
-            "matched_user": {"id": u.id, "name": u.name, "role": u.role.name} if u else None,
-        }
-        for t, u in visible_reset_tickets(ctx)
-    ]
+def list_reset_queries(pending_only: bool = False, page: int = 1, page_size: int = config.DEFAULT_PAGE_SIZE,
+                       ctx: AccessContext = Depends(require_permission("user.reset_password"))):
+    page, page_size = max(page, 1), min(max(page_size, 1), config.MAX_PAGE_SIZE)
+    tickets = visible_reset_tickets(ctx, pending_only)
+    return {"items": [_serialize_ticket(t) for t in tickets[(page - 1) * page_size: page * page_size]],
+            "total": len(tickets), "page": page, "page_size": page_size}
+
+
+def _pending_ticket(ctx: AccessContext, ticket_id: str) -> PasswordResetTicket:
+    ticket = ctx.db.query(PasswordResetTicket).filter(PasswordResetTicket.ticket_id == ticket_id).with_for_update().first()
+    if ticket is None or not can_handle_reset_ticket(ctx, ticket):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reset ticket not found")
+    if ticket.status != RESET_PENDING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Ticket has already been processed")
+    return ticket
 
 
 @router.post("/reset-queries/{ticket_id}/approve")
-def approve_reset_query(
-    ticket_id: str,
-    request: Request,
-    payload: ApproveResetRequest | None = None,
-    ctx: AccessContext = Depends(require_permission("user.reset_password")),
-):
+def approve_reset_query(ticket_id: str, request: Request,
+                        ctx: AccessContext = Depends(require_permission("user.reset_password"))):
     db = ctx.db
-    ticket = db.query(PasswordResetTicket).filter(PasswordResetTicket.ticket_id == ticket_id).first()
-    if ticket is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reset ticket not found")
-    if ticket.status != "Pending Approval":
-        raise HTTPException(status.HTTP_409_CONFLICT, "Ticket has already been processed")
-    user = find_staff_by_identifier(db, ticket.email_or_id)
+    ticket = _pending_ticket(ctx, ticket_id)
+    user = ticket.user
     if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No staff account matches this ticket")
+        raise HTTPException(status.HTTP_409_CONFLICT, "No staff account matches this ticket; reject it instead")
     if not ctx.can_manage_user(user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot reset this user's password")
-
-    temp_key = (payload.temporary_key if payload and payload.temporary_key else secrets.token_urlsafe(9))
-    error = validate_password_strength(temp_key)
-    if error:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
-
-    user.password_hash = hash_password(temp_key)
-    revoke_all_for(db, PRINCIPAL_STAFF, user.id)
-    ticket.status = "Approved"
-    ticket.approved_by_id = ctx.user.id
+    temporary = generate_password()
+    user.password_hash = hash_password(temporary)
+    user.must_change_password = True
+    token_service.end_all_sessions(db, user)
+    ticket.status, ticket.decided_by, ticket.decided_at = RESET_APPROVED, ctx.user, utcnow()
     audit_service.record(
         db, actor=ctx.user, action="user.password_reset", entity_type="user", entity_id=user.id,
         summary=f"Approved password reset {ticket.ticket_id} for {user.name}", request=request,
     )
     db.commit()
-    # The key is returned once so the approver can pass it on; it is not stored in plain text.
-    return {
-        "success": True,
-        "ticket_id": ticket_id,
-        "status": "Approved",
-        "temporary_key": temp_key,
-        "message": f"Reset approved for {user.name}. Share the temporary password securely.",
-    }
+    # Shown once so the approver can pass it on; the user must replace it when they sign in.
+    return {"ticket_id": ticket.ticket_id, "status": ticket.status, "temporary_password": temporary,
+            "user": {"id": user.id, "name": user.name}}
+
+
+@router.post("/reset-queries/{ticket_id}/reject")
+def reject_reset_query(ticket_id: str, payload: RejectResetRequest, request: Request,
+                       ctx: AccessContext = Depends(require_permission("user.reset_password"))):
+    note = multi_line(payload.note, "The reason for rejecting it", max_length(PasswordResetTicket.decision_note))
+    ticket = _pending_ticket(ctx, ticket_id)
+    ticket.status, ticket.decided_by, ticket.decided_at, ticket.decision_note = RESET_REJECTED, ctx.user, utcnow(), note
+    audit_service.record(
+        ctx.db, actor=ctx.user, action="user.password_reset_reject", entity_type="user",
+        entity_id=ticket.user_id, summary=f"Rejected password reset {ticket.ticket_id}: {note}", request=request,
+    )
+    ctx.db.commit()
+    return _serialize_ticket(ticket)

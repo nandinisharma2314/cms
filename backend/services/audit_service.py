@@ -3,7 +3,7 @@ import json
 from fastapi import Request
 from sqlalchemy.orm import Session
 
-from models import AuditLog, EndUser, User
+from models import AuditLog, EndUser, User, max_length
 
 
 def diff(before: dict, after: dict) -> dict:
@@ -41,7 +41,7 @@ def record(
         action=action,
         entity_type=entity_type,
         entity_id=str(entity_id) if entity_id is not None else None,
-        summary=summary[:500],
+        summary=summary[:max_length(AuditLog.summary)],
         changes=json.dumps(changes, default=str) if changes else None,
         ip_address=request.client.host if request is not None and request.client else None,
     ))

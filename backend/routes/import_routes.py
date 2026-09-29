@@ -3,7 +3,8 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from models import ImportBatch
+from config import DEFAULT_PAGE_SIZE, IMPORT_RESULT_ISSUE_LIMIT, MAX_PAGE_SIZE
+from models import ImportBatch, ImportIssue
 from services.access_service import AccessContext
 from utils.auth_middleware import get_access_context
 from utils.csv_export import csv_response
@@ -56,21 +57,29 @@ def _get(ctx: AccessContext, batch_id: int) -> ImportBatch:
 
 
 @router.get("/")
-def list_imports(kind: str | None = None, limit: int = 100, ctx: AccessContext = Depends(get_access_context)):
+def list_imports(kind: str | None = None, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
+                 ctx: AccessContext = Depends(get_access_context)):
+    page, page_size = max(page, 1), min(max(page_size, 1), MAX_PAGE_SIZE)
     query = _query(ctx)
     if kind:
+        if kind not in KIND_PERMISSIONS:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown import kind")
         query = query.filter(ImportBatch.kind == kind)
-    batches = query.order_by(ImportBatch.started_at.desc(), ImportBatch.id.desc()).limit(min(max(limit, 1), 500)).all()
-    return [_serialize(b) for b in batches]
+    total = query.count()
+    batches = (query.order_by(ImportBatch.started_at.desc(), ImportBatch.id.desc())
+               .offset((page - 1) * page_size).limit(page_size).all())
+    return {"items": [_serialize(b) for b in batches], "total": total, "page": page, "page_size": page_size}
 
 
 @router.get("/{batch_id}")
 def get_import(batch_id: int, ctx: AccessContext = Depends(get_access_context)):
     batch = _get(ctx, batch_id)
     data = _serialize(batch)
-    data["issues"] = [
-        {"row": i.row_number, "severity": i.severity, "message": i.message} for i in batch.issues[:2000]
-    ]
+    issues = (ctx.db.query(ImportIssue).filter(ImportIssue.batch_id == batch.id)
+              .order_by(ImportIssue.row_number, ImportIssue.id).limit(IMPORT_RESULT_ISSUE_LIMIT + 1).all())
+    data["issues"] = [{"row": i.row_number, "severity": i.severity, "message": i.message}
+                      for i in issues[:IMPORT_RESULT_ISSUE_LIMIT]]
+    data["issues_truncated"] = len(issues) > IMPORT_RESULT_ISSUE_LIMIT
     return data
 
 
@@ -78,9 +87,15 @@ def get_import(batch_id: int, ctx: AccessContext = Depends(get_access_context)):
 def issue_report(batch_id: int, severity: str = "error", ctx: AccessContext = Depends(get_access_context)):
     """CSV of the rows with problems, in the original columns plus row and issue.
     severity=error gives the rows that were not imported (fix and re-upload them)."""
+    if severity not in ("error", "warning", "all"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "severity must be error, warning or all")
     batch = _get(ctx, batch_id)
     headers = json.loads(batch.headers) if batch.headers else []
     issues = [i for i in batch.issues if severity == "all" or i.severity == severity]
+    if any(i.data is None for i in issues if i.row_number > 1):
+        raise HTTPException(status.HTTP_410_GONE,
+                            "The original rows of this import have been deleted (retention period); "
+                            "only the messages are kept")
     rows = []
     for issue in issues:
         data = json.loads(issue.data) if issue.data else {}

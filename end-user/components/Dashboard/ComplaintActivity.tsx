@@ -1,75 +1,79 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { CheckCircle2, MessageSquare, Paperclip, RotateCcw, Send, Star, History } from "lucide-react";
-import { apis, BACKEND_URL, ComplaintDetail } from "@/lib/apis";
-import { useEndUser } from "@/lib/endUserSession";
-import { formatWhen } from "@/lib/utils";
+import React, { useRef, useState } from "react";
+import { CheckCircle2, History, MessageSquare, Paperclip, RotateCcw, Send, Star } from "lucide-react";
+import { api, attachmentUrl, ComplaintDetail, EndUserAction } from "@/lib/api";
+import { attachmentProblem } from "@/lib/attachments";
+import { useConfig } from "@/lib/config";
+import { formatWhen } from "@/lib/format";
+import { useEndUser } from "@/lib/session";
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-white p-3 text-[14px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
 
 function Stars({ value, onChange }: { value: number; onChange?: (n: number) => void }) {
   return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          disabled={!onChange}
-          onClick={() => onChange?.(n)}
-          aria-label={`${n} star${n > 1 ? "s" : ""}`}
-          className={onChange ? "cursor-pointer" : "cursor-default"}
-        >
-          <Star className={`w-5 h-5 ${n <= value ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
-        </button>
-      ))}
+    <div
+      className="flex items-center gap-1"
+      role={onChange ? "radiogroup" : undefined}
+      aria-label={onChange ? "Rating" : `${value} out of 5`}
+    >
+      {[1, 2, 3, 4, 5].map((n) =>
+        onChange ? (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={n === value}
+            onClick={() => onChange(n)}
+            aria-label={`${n} star${n > 1 ? "s" : ""}`}
+            className="rounded p-0.5"
+          >
+            <Star className={`h-7 w-7 ${n <= value ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+          </button>
+        ) : (
+          <Star
+            key={n}
+            className={`h-5 w-5 ${n <= value ? "fill-amber-400 text-amber-400" : "text-slate-300"}`}
+            aria-hidden="true"
+          />
+        ),
+      )}
     </div>
   );
 }
 
 /**
- * Live part of a complaint's details: resolution, end user actions (confirm,
- * reopen, rate), the conversation with the department and the timeline.
+ * What the end user can do on a complaint (confirm, reopen, rate, reply),
+ * the conversation with the department and the public timeline.
  */
 export default function ComplaintActivity({
-  complaintId,
-  initialDetail,
+  detail,
   onUpdate,
 }: {
-  complaintId: string;
-  /** Already-loaded details; skips the first fetch. */
-  initialDetail?: ComplaintDetail;
-  onUpdate?: (detail: ComplaintDetail) => void;
+  detail: ComplaintDetail;
+  onUpdate: (detail: ComplaintDetail) => void;
 }) {
-  const [detail, setDetail] = useState<ComplaintDetail | null>(initialDetail ?? null);
-  const [error, setError] = useState("");
+  const { limits, attachments } = useConfig();
+  const canAttach = useEndUser().can("portal.complaint.attach");
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [rating, setRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState("");
+  const [feedback, setFeedback] = useState("");
   const [reopening, setReopening] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
-  const canAttach = useEndUser().can("portal.complaint.attach");
 
-  useEffect(() => {
-    if (initialDetail) return;
-    apis.complaints
-      .getComplaint(complaintId)
-      .then((d) => {
-        setDetail(d);
-        onUpdate?.(d);
-      })
-      .catch((err: Error) => setError(err.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [complaintId]);
+  const can = (action: EndUserAction) => detail.actions.includes(action);
+  const room = attachments.max_per_complaint === null ? 0 : attachments.max_per_complaint - detail.attachments.length;
 
-  const run = async (call: () => Promise<ComplaintDetail>) => {
+  const run = async (call: () => Promise<ComplaintDetail>): Promise<boolean> => {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
-      const updated = await call();
-      setDetail(updated);
-      onUpdate?.(updated);
+      onUpdate(await call());
       return true;
     } catch (err) {
       setError((err as Error).message);
@@ -79,52 +83,55 @@ export default function ComplaintActivity({
     }
   };
 
-  if (!detail) {
-    return (
-      <div className="p-6 md:p-8 text-sm text-slate-400">{error || "Loading updates..."}</div>
-    );
-  }
-
-  const can = (action: string) => detail.actions.includes(action as never);
-
   return (
-    <div className="p-6 md:p-8 border-t border-slate-100 space-y-6">
-      {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
+    <div className="space-y-6 p-5 md:p-7">
+      {error && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-[14px] text-red-700">
+          {error}
+        </p>
+      )}
 
       {(detail.response_due_at || detail.resolution_due_at) && (
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
-          {detail.response_due_at && <span>Expected response by <b>{formatWhen(detail.response_due_at)}</b></span>}
-          {detail.resolution_due_at && <span>Target resolution by <b>{formatWhen(detail.resolution_due_at)}</b></span>}
-          {detail.is_escalated && <span className="text-orange-700 font-semibold">Escalated to a senior officer</span>}
+        <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-xl bg-slate-50 px-4 py-3 text-[13px] text-slate-600">
+          {detail.response_due_at && (
+            <span>
+              Expected first response by <b>{formatWhen(detail.response_due_at)}</b>
+            </span>
+          )}
+          {detail.resolution_due_at && (
+            <span>
+              Target resolution by <b>{formatWhen(detail.resolution_due_at)}</b>
+            </span>
+          )}
         </div>
       )}
 
       {detail.resolution_note && (
-        <div className="p-4 bg-green-50 border border-green-200">
-          <div className="flex items-center gap-2 text-sm font-bold text-green-800">
-            <CheckCircle2 className="w-4 h-4" /> Resolution from the {detail.department} department
-          </div>
-          <p className="text-sm text-green-900 mt-1">{detail.resolution_note}</p>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="flex items-center gap-2 text-[14px] font-bold text-emerald-800">
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Resolution from the {detail.department} department
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-[14px] text-emerald-900">{detail.resolution_note}</p>
         </div>
       )}
 
-      {/* Confirm or reopen a resolved complaint, and rate the service */}
       {(can("confirm") || can("reopen") || can("feedback")) && (
-        <div className="p-4 border border-blue-100 bg-blue-50/40 space-y-3">
+        <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
           {(can("confirm") || can("feedback")) && (
             <>
-              <p className="text-sm font-semibold text-slate-800">
-                {can("confirm") ? "Is your issue resolved?" : "How was the resolution?"}
+              <p className="text-[15px] font-semibold text-slate-800">
+                {can("confirm") ? "Is your issue fixed?" : "How did it go?"}
               </p>
               {can("feedback") && (
                 <>
                   <Stars value={rating} onChange={setRating} />
                   <textarea
                     rows={2}
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    placeholder="Anything you'd like to tell us? (optional)"
-                    className="w-full p-2 text-sm border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    maxLength={limits.feedback}
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    placeholder="Anything you'd like to add? (optional)"
+                    className={inputClass}
                   />
                 </>
               )}
@@ -133,29 +140,39 @@ export default function ComplaintActivity({
           <div className="flex flex-wrap gap-2">
             {can("confirm") && (
               <button
+                type="button"
                 disabled={busy}
-                onClick={() => run(() => apis.complaints.confirm(complaintId, rating || null, feedbackText))}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-60"
+                onClick={() => {
+                  // A comment is kept together with a rating, so don't let one be dropped quietly.
+                  if (feedback.trim() && !rating) {
+                    setError("Choose a star rating to send your comment with it, or clear the comment.");
+                    return;
+                  }
+                  run(() => api.complaints.confirm(detail.id, can("feedback") && rating ? rating : null, feedback.trim() || null));
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
-                <CheckCircle2 className="w-4 h-4" /> Yes, it&apos;s resolved
+                <CheckCircle2 className="h-4 w-4" /> Yes, it&apos;s fixed
               </button>
             )}
             {!can("confirm") && can("feedback") && (
               <button
+                type="button"
                 disabled={busy || rating === 0}
-                onClick={() => run(() => apis.complaints.feedback(complaintId, rating, feedbackText))}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-60"
+                onClick={() => run(() => api.complaints.feedback(detail.id, rating, feedback.trim() || null))}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
               >
-                <Star className="w-4 h-4" /> Submit rating
+                <Star className="h-4 w-4" /> Send rating
               </button>
             )}
             {can("reopen") && !reopening && (
               <button
+                type="button"
                 disabled={busy}
                 onClick={() => setReopening(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50"
               >
-                <RotateCcw className="w-4 h-4" /> Not resolved, reopen
+                <RotateCcw className="h-4 w-4" /> Not fixed, reopen it
               </button>
             )}
           </div>
@@ -164,71 +181,79 @@ export default function ComplaintActivity({
               className="space-y-2"
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (await run(() => apis.complaints.reopen(complaintId, reopenReason))) {
+                if (await run(() => api.complaints.reopen(detail.id, reopenReason))) {
                   setReopening(false);
                   setReopenReason("");
                 }
               }}
             >
-              <textarea
-                rows={2}
-                required
-                value={reopenReason}
-                onChange={(e) => setReopenReason(e.target.value)}
-                placeholder="What is still wrong?"
-                className="w-full p-2 text-sm border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
+              <label className="block text-[13px] font-semibold text-slate-700">
+                What is still wrong?
+                <textarea
+                  rows={2}
+                  required
+                  maxLength={limits.note}
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                  className={`${inputClass} mt-1`}
+                />
+              </label>
               <div className="flex gap-2">
-                <button type="submit" disabled={busy} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-xl bg-orange-600 px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                >
                   Reopen complaint
                 </button>
-                <button type="button" onClick={() => setReopening(false)} className="px-4 py-2 border border-slate-300 bg-white text-sm">
+                <button
+                  type="button"
+                  onClick={() => setReopening(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-[14px]"
+                >
                   Cancel
                 </button>
               </div>
             </form>
           )}
           {detail.reopen_until && (
-            <p className="text-xs text-slate-500">You can reopen this complaint until {formatWhen(detail.reopen_until)}.</p>
+            <p className="text-[12px] text-slate-500">You can reopen it until {formatWhen(detail.reopen_until)}.</p>
           )}
         </div>
       )}
 
       {detail.feedback_rating !== null && (
-        <div className="flex items-center gap-3 text-sm text-slate-600">
+        <div className="flex items-center gap-3 text-[14px] text-slate-600">
           <span>Your rating:</span>
           <Stars value={detail.feedback_rating} />
         </div>
       )}
 
-      {/* Conversation with the department */}
       <div>
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2 mb-3">
-          <MessageSquare className="w-4 h-4 text-blue-600" /> Messages
+        <h3 className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-slate-500">
+          <MessageSquare className="h-4 w-4 text-blue-600" aria-hidden="true" /> Messages
         </h3>
         <div className="space-y-2">
-          {detail.comments.length === 0 && <p className="text-sm text-slate-400">No messages yet.</p>}
+          {detail.comments.length === 0 && <p className="text-[14px] text-slate-400">No messages yet.</p>}
           {detail.comments.map((c) => (
             <div
               key={c.id}
-              className={`p-3 border text-sm ${
-                c.author_type === "end_user" ? "bg-blue-50/60 border-blue-100 ml-8" : "bg-slate-50 border-slate-100 mr-8"
-              }`}
+              className={`rounded-2xl border p-3 text-[14px] ${c.author_type === "end_user" ? "ml-8 border-blue-100 bg-blue-50/60" : "mr-8 border-slate-100 bg-slate-50"}`}
             >
-              <div className="flex justify-between gap-2 text-xs text-slate-500 mb-1">
+              <div className="mb-1 flex justify-between gap-2 text-[12px] text-slate-500">
                 <span className="font-semibold text-slate-700">{c.author_type === "end_user" ? "You" : c.author_name}</span>
                 <span>{formatWhen(c.created_at)}</span>
               </div>
-              <p className="text-slate-700 whitespace-pre-wrap">{c.body}</p>
+              <p className="whitespace-pre-wrap text-slate-700 wrap-break-word">{c.body}</p>
               {c.attachments.map((a) => (
                 <a
                   key={a.id}
-                  href={`${BACKEND_URL}${a.file_path}`}
+                  href={attachmentUrl(a)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 mt-1 mr-2 text-xs text-blue-600 hover:underline"
+                  className="mr-2 mt-1 inline-flex items-center gap-1 text-[12px] text-blue-600 hover:underline"
                 >
-                  <Paperclip className="w-3 h-3" /> {a.file_name}
+                  <Paperclip className="h-3 w-3" aria-hidden="true" /> {a.file_name}
                 </a>
               ))}
             </div>
@@ -239,68 +264,92 @@ export default function ComplaintActivity({
             className="mt-3 space-y-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (await run(() => apis.complaints.comment(complaintId, message, files))) {
+              if (await run(() => api.complaints.comment(detail.id, message, files))) {
                 setMessage("");
                 setFiles([]);
+                if (fileInput.current) fileInput.current.value = "";
               }
             }}
           >
+            <label className="sr-only" htmlFor="reply">
+              Message to the department
+            </label>
             <textarea
-              rows={2}
+              id="reply"
+              rows={3}
               required
+              maxLength={limits.comment}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={
                 detail.status === "WAITING_FOR_INFORMATION"
-                  ? "The department needs more information. Reply here..."
-                  : "Write a message to the department..."
+                  ? "The department needs more information. Reply here…"
+                  : "Write a message to the department…"
               }
-              className="w-full p-2 text-sm border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className={inputClass}
             />
-            <div className="flex items-center justify-between">
-              {canAttach ? (
-                <>
+            <div className="flex items-center justify-between gap-3">
+              {canAttach && room > 0 && attachments.allowed_types.length > 0 ? (
+                <div className="min-w-0">
                   <input
                     ref={fileInput}
                     type="file"
                     multiple
                     className="hidden"
-                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-                    onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                    accept={attachments.allowed_types.map((t) => `.${t}`).join(",")}
+                    onChange={(e) => {
+                      const picked = Array.from(e.target.files ?? []);
+                      const problem = attachmentProblem(picked, room, attachments);
+                      setError(problem);
+                      setFiles(problem ? [] : picked);
+                      if (problem) e.target.value = "";
+                    }}
                   />
-                  <button type="button" onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600">
-                    <Paperclip className="w-3.5 h-3.5" />
-                    {files.length ? `${files.length} file${files.length > 1 ? "s" : ""} attached` : "Attach photo or PDF"}
+                  <button
+                    type="button"
+                    onClick={() => fileInput.current?.click()}
+                    className="inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-blue-600"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    {files.length ? `${files.length} file${files.length > 1 ? "s" : ""} attached` : "Attach a file"}
                   </button>
-                </>
+                  <span className="block text-[11px] text-slate-400">
+                    Up to {room} more{attachments.max_mb ? `, ${attachments.max_mb} MB each` : ""}
+                  </span>
+                </div>
               ) : (
                 <span />
               )}
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-60"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
               >
-                <Send className="w-4 h-4" /> Send
+                <Send className="h-4 w-4" /> Send
               </button>
             </div>
           </form>
         )}
       </div>
 
-      {/* Timeline */}
       <div>
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2 mb-3">
-          <History className="w-4 h-4 text-blue-600" /> Timeline
+        <h3 className="mb-3 flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-slate-500">
+          <History className="h-4 w-4 text-blue-600" aria-hidden="true" /> Timeline
         </h3>
-        <ol className="border-l-2 border-slate-200 ml-2 space-y-3">
+        <ol className="ml-2 space-y-3 border-l-2 border-slate-200">
           {[...detail.timeline].reverse().map((e) => (
             <li key={e.id} className="relative pl-4">
-              <span className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
-              <p className="text-sm text-slate-800">{e.message}</p>
-              {e.note && <p className="text-xs text-slate-600 bg-slate-50 px-2 py-1 mt-1">&ldquo;{e.note}&rdquo;</p>}
-              <p className="text-xs text-slate-400 mt-0.5">
-                {e.actor_name} · {formatWhen(e.created_at)}
+              <span
+                className="absolute -left-1.75 top-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500"
+                aria-hidden="true"
+              />
+              <p className="text-[14px] text-slate-800">{e.message}</p>
+              {e.note && (
+                <p className="mt-1 rounded-lg bg-slate-50 px-2 py-1 text-[12px] text-slate-600">&ldquo;{e.note}&rdquo;</p>
+              )}
+              <p className="mt-0.5 text-[12px] text-slate-400">
+                {e.actor_name ? `${e.actor_name} · ` : ""}
+                {formatWhen(e.created_at)}
               </p>
             </li>
           ))}

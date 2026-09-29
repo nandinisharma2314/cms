@@ -12,7 +12,7 @@ Access = role permissions + (department, location) scopes + role hierarchy:
 The Super Admin role bypasses all three.
 """
 from dataclasses import dataclass
-from typing import Iterable
+from collections.abc import Iterable
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, false, or_

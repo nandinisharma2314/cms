@@ -1,11 +1,25 @@
-export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+/**
+ * Typed client for the CMS API.
+ *
+ * Sessions: the API keeps the refresh token in an httpOnly cookie (never
+ * visible here) and returns a short-lived access token, which lives only in
+ * memory. On a 401 the client refreshes once (serialized across tabs with the
+ * Web Locks API) and retries; when that fails the UNAUTHORIZED_EVENT fires.
+ */
 
-const ACCESS_TOKEN_KEY = "cms_access_token";
-const REFRESH_TOKEN_KEY = "cms_refresh_token";
+const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
+if (!configuredUrl) {
+  throw new Error("NEXT_PUBLIC_API_URL is not set. Copy .env.example to .env.local and set it to the API's URL.");
+}
+export const API_URL = configuredUrl.replace(/\/+$/, "");
 
-/** Fired on window when the session can no longer be refreshed. */
+/** Fired on window when the session has ended and cannot be refreshed. */
 export const UNAUTHORIZED_EVENT = "cms:unauthorized";
+/** Fired after notifications were read or cleared, so every list of them refreshes. */
+export const NOTIFICATIONS_CHANGED_EVENT = "cms:notifications-changed";
+
+const CLIENT_HEADER = { "X-Requested-With": "cms" };
+const PRINCIPAL = "staff";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +35,7 @@ export interface LocationRef {
   id: number;
   name: string;
   type: string;
+  type_name: string;
   path_ids: number[];
   path_names: string[];
   label: string;
@@ -42,6 +57,7 @@ export interface StaffUser {
   is_active: boolean;
   /** Off = skipped by automatic complaint routing (e.g. on leave). */
   is_available: boolean;
+  must_change_password: boolean;
   created_at: string;
   last_login_at: string | null;
   can_manage?: boolean;
@@ -75,10 +91,24 @@ export interface PermissionDef {
   audience: RoleAudience;
 }
 
+export type PriorityTone = "neutral" | "info" | "success" | "warning" | "danger" | "critical";
+
+export interface Priority {
+  id: number;
+  key: string;
+  name: string;
+  rank: number;
+  tone: PriorityTone;
+  is_active: boolean;
+}
+
+export type PriorityRef = Pick<Priority, "id" | "name" | "tone">;
+
 export interface Category {
   id: number;
   name: string;
   is_active: boolean;
+  default_priority: PriorityRef;
 }
 
 export interface Department {
@@ -88,6 +118,7 @@ export interface Department {
   description: string | null;
   is_active: boolean;
   categories: Category[];
+  open_complaints?: number;
 }
 
 export interface LocationNode {
@@ -100,11 +131,12 @@ export interface LocationNode {
   children: LocationNode[];
 }
 
-export interface LocationType {
+export interface LocationLevel {
   id: number;
   key: string;
   name: string;
   depth: number;
+  locations: number;
 }
 
 export interface EndUserRow {
@@ -127,7 +159,7 @@ export interface Paged<T> {
 }
 
 export interface ImportResult {
-  batch_id: number | null;
+  batch_id: number;
   dry_run: boolean;
   total_rows: number;
   created: number;
@@ -137,6 +169,7 @@ export interface ImportResult {
   warnings: number;
   errors: { row: number; message: string }[];
   warning_list: { row: number; message: string }[];
+  truncated: boolean;
 }
 
 export type ImportKind = "locations" | "end_users";
@@ -157,7 +190,11 @@ export interface ImportBatch {
   warnings: number;
   started_at: string;
   finished_at: string | null;
-  issues?: { row: number; severity: "error" | "warning"; message: string }[];
+}
+
+export interface ImportBatchDetail extends ImportBatch {
+  issues: { row: number; severity: "error" | "warning"; message: string }[];
+  issues_truncated: boolean;
 }
 
 export interface AuditEntry {
@@ -190,12 +227,14 @@ export type StatusGroup = "open" | "in_progress" | "resolved" | "rejected";
 
 export interface Attachment {
   id: number;
-  file_path: string;
+  /** Signed, short-lived link relative to the API. */
+  url: string;
   file_name: string;
-  file_type: string;
+  content_type: string;
+  file_size: number | null;
   comment_id: number | null;
   uploaded_by_type: "staff" | "end_user" | null;
-  created_at: string | null;
+  created_at: string;
 }
 
 export type SlaState = "on_track" | "at_risk" | "breached" | "paused" | "met" | "met_late" | null;
@@ -208,25 +247,26 @@ export interface Escalation {
 }
 
 export interface ComplaintData {
-  num?: number;
   id: string;
   title: string;
-  description?: string;
+  description: string;
   additional_details: string | null;
   department: string;
   department_id: number;
+  /** Null only for complaints filed before categories were required. */
   category: string | null;
-  priority: string;
+  category_id: number | null;
+  priority: Priority;
   location: string;
-  location_detail: LocationRef | null;
-  end_user_name?: string | null;
-  end_user_phone?: string | null;
+  location_detail: LocationRef;
+  end_user_name: string | null;
+  end_user_phone: string | null;
   status: ComplaintStatus;
   status_label: string;
   status_group: StatusGroup;
   assignee: { id: number; name: string; role: string } | null;
-  date: string;
   created_at: string;
+  updated_at: string;
   assigned_at: string | null;
   acknowledged_at: string | null;
   resolved_at: string | null;
@@ -238,7 +278,6 @@ export interface ComplaintData {
   attachments: Attachment[];
   response_due_at: string | null;
   resolution_due_at: string | null;
-  is_escalated: boolean;
   sla: { response: SlaState; resolution: SlaState };
   sla_paused: boolean;
   escalation: Escalation | null;
@@ -253,7 +292,7 @@ export interface TimelineEvent {
   from_status: ComplaintStatus | null;
   to_status: ComplaintStatus | null;
   actor_type: "staff" | "end_user" | "system";
-  actor_name: string;
+  actor_name: string | null;
   created_at: string;
 }
 
@@ -274,6 +313,13 @@ export interface WorkflowAction {
   note_label: string;
 }
 
+export interface RejectionReason {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
 export interface ComplaintDetail extends ComplaintData {
   end_user: { id: number; name: string; mobile: string; email: string } | null;
   timeline: TimelineEvent[];
@@ -282,24 +328,25 @@ export interface ComplaintDetail extends ComplaintData {
     assignee: { id: number; name: string; role: string };
     method: "auto" | "manual";
     reason: string | null;
-    assigned_by: string;
+    assigned_by: string | null;
     assigned_at: string;
     ended_at: string | null;
   }[];
   actions: WorkflowAction[];
   can_assign: boolean;
   can_comment: boolean;
+  can_reclassify: boolean;
   escalations: {
     type: "response" | "resolution";
     level: number;
-    from: string;
+    from: string | null;
     to: string | null;
     created_at: string;
     resolved_at: string | null;
   }[];
   rejection: {
     can_request: boolean;
-    categories: string[];
+    reasons: RejectionReason[];
     requests: RejectionRequestItem[];
   };
   sla_due: {
@@ -312,7 +359,14 @@ export interface ComplaintDetail extends ComplaintData {
 
 export interface RejectionRequestItem {
   id: number;
-  complaint: { id: string; title: string; department: string; location: string; priority: string; status: ComplaintStatus };
+  complaint: {
+    id: string;
+    title: string;
+    department: string;
+    location: string;
+    priority: Pick<Priority, "name" | "tone">;
+    status: ComplaintStatus;
+  };
   requested_by: { id: number; name: string; role: string };
   approver: string | null;
   category: string;
@@ -339,7 +393,7 @@ export interface NotificationItem {
 
 export interface SlaRule {
   id: number;
-  priority: string;
+  priority: Priority;
   department: { id: number; name: string } | null;
   response_hours: number;
   resolution_hours: number;
@@ -364,21 +418,25 @@ export interface AssigneeOption {
   is_current: boolean;
 }
 
-export interface DashboardStatsResponse {
+/** Change vs the previous comparison window; null when there is no baseline. */
+export interface Change {
+  percent: number;
+  direction: "up" | "down" | "flat";
+  sentiment: "good" | "bad" | "neutral";
+}
+
+export interface DashboardStats {
   metrics: {
     total: number;
-    total_trend: string | null;
-    total_trend_type?: "positive" | "negative";
+    total_change: Change | null;
     open: number;
-    open_trend: string | null;
-    open_trend_type?: "positive" | "negative";
-    resolved: number;
-    resolved_trend: string | null;
-    resolved_trend_type?: "positive" | "negative";
+    open_change: Change | null;
     in_progress: number;
-    in_progress_trend: string | null;
-    in_progress_trend_type?: "positive" | "negative";
+    in_progress_change: Change | null;
+    resolved: number;
+    resolved_change: Change | null;
     rejected: number;
+    rejected_change: Change | null;
     unassigned: number;
     sla_breached: number;
     sla_at_risk: number;
@@ -388,26 +446,39 @@ export interface DashboardStatsResponse {
   by_status: { status: ComplaintStatus; label: string; count: number }[];
   departments: { name: string; count: number }[];
   trend: { date: string; received: number; resolved: number }[];
-  pending_summary?: {
-    pending_resets: number;
-    /** Open complaints nobody is assigned to. */
-    pending_assignments: number;
+  pending_summary: {
+    /** null: the user can't act on these. */
+    pending_resets: number | null;
+    unassigned: number;
     assigned_to_me: number;
     escalated_to_me: number;
     rejection_requests: number;
-    escalations: number;
     total_users: number | null;
   };
 }
 
+export interface ClassificationOptions {
+  departments: { id: number; name: string; categories: { id: number; name: string; default_priority: PriorityRef }[] }[];
+  locations: LocationNode[];
+  priorities: Priority[];
+}
+
+export interface ComplaintFacets {
+  departments: { id: number; name: string }[];
+  priorities: Priority[];
+  statuses: { key: ComplaintStatus; label: string }[];
+}
+
 export interface PasswordResetTicket {
   ticket_id: string;
-  email_or_id: string;
-  department: string;
+  identifier: string;
   reason: string;
-  status: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
   created_at: string;
-  matched_user: { id: number; name: string; role: string } | null;
+  matched_user: { id: number; name: string; role: string; email: string } | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
 }
 
 export interface DurationStats {
@@ -434,20 +505,25 @@ export interface ReportMetrics {
   avg_rating: number | null;
   rated: number;
   reopened: number;
+  resolved_at_least_once: number;
   reopen_pct: number | null;
   rejection_pct: number | null;
 }
 
-export interface ReportSummary {
-  period: { date_from: string; date_to: string };
-  previous_period: { date_from: string; date_to: string };
-  metrics: ReportMetrics;
-  previous: ReportMetrics;
+export interface ReportPeriod {
+  date_from: string;
+  date_to: string;
 }
 
-export interface ReportTrend {
-  interval: "day" | "week";
-  points: { date: string; label: string; received: number; resolved: number; breached: number }[];
+export interface ReportOverview {
+  period: ReportPeriod;
+  previous_period: ReportPeriod;
+  metrics: ReportMetrics;
+  previous: ReportMetrics;
+  trend: {
+    interval: "day" | "week";
+    points: { date: string; received: number; resolved: number; breached: number }[];
+  };
 }
 
 export interface PerformanceRow {
@@ -474,7 +550,8 @@ export type ReportQuery = {
   date_from?: string;
   date_to?: string;
   department_id?: number;
-  priority?: string;
+  location_id?: number;
+  priority_id?: number;
 };
 
 export type AuditQuery = {
@@ -492,6 +569,118 @@ export interface ScopeInput {
   location_id: number | null;
 }
 
+export interface SystemSettings {
+  organisation_name: string | null;
+  product_name: string | null;
+  support_email: string | null;
+  support_phone: string | null;
+  support_hours: string | null;
+  timezone: string | null;
+  complaint_id_prefix: string | null;
+  complaint_next_number: number | null;
+  reopen_window_days: number | null;
+  max_reopens: number | null;
+  max_attachments_per_complaint: number | null;
+  max_attachment_mb: number | null;
+  allowed_attachment_types: string[];
+  phone_country_code: string | null;
+  phone_number_length: number | null;
+  phone_expected_prefixes: string | null;
+  sms_notifications_enabled: boolean;
+  email_notifications_enabled: boolean;
+  updated_at: string | null;
+}
+
+export type SettingsForm = Omit<SystemSettings, "updated_at">;
+// complaint_next_number: null keeps the current number (see the Settings page).
+
+export interface SettingsResponse extends SystemSettings {
+  supported_attachment_types: string[];
+  timezones: string[];
+  /** Notifications can only be enabled on these (the server may switch SMS or email off). */
+  available_channels: ("sms" | "email")[];
+}
+
+export interface ConfigurationProblem {
+  area: "settings" | "locations" | "priorities" | "sla";
+  field: string;
+  message: string;
+}
+
+/** What the app needs before sign-in (GET /public/config). */
+export interface PublicConfig {
+  organisation_name: string | null;
+  product_name: string | null;
+  support: { email: string | null; phone: string | null; hours: string | null };
+  timezone: string | null;
+  phone: { country_code: string | null; number_length: number | null };
+  attachments: { max_per_complaint: number | null; max_mb: number | null; allowed_types: string[] };
+  notifications: { sms: boolean; email: boolean };
+  /** `channels`: what end users can sign in with (the server may switch SMS or email off). */
+  otp: { length: number; resend_after_seconds: number; expires_in_seconds: number; channels: ("sms" | "email")[] };
+  password: { min_length: number; max_bytes: number; character_classes: number };
+  /** Text limits the API enforces; most are the size of the column the text is stored in. */
+  limits: {
+    description: number;
+    comment: number;
+    note: number;
+    rejection_reason_min: number;
+    title: number;
+    additional_details: number;
+    feedback: number;
+    assignment_reason: number;
+    person_name: number;
+    external_id: number;
+    address: number;
+    email: number;
+    staff_name: number;
+    role_key: number;
+    role_name: number;
+    role_description: number;
+    department_name: number;
+    department_code: number;
+    department_description: number;
+    category_name: number;
+    location_name: number;
+    location_level_key: number;
+    location_level_name: number;
+    priority_key: number;
+    priority_name: number;
+    rejection_reason_name: number;
+    reset_identifier: number;
+    reset_reason: number;
+    reset_note: number;
+    organisation_name: number;
+    product_name: number;
+    support_email: number;
+    support_phone: number;
+    support_hours: number;
+    complaint_id_prefix: number;
+    phone_country_code: number;
+    phone_expected_prefixes: number;
+  };
+  ui: {
+    default_page_size: number;
+    max_page_size: number;
+    report_default_days: number;
+    report_preset_days: number[];
+    report_max_days: number;
+    dashboard_recent_items: number;
+    notification_menu_items: number;
+    search_debounce_ms: number;
+    lookup_min_chars: number;
+    lookup_results: number;
+    toast_seconds: number;
+    csv_preview_rows: number;
+    dashboard_trend_days: number;
+    dashboard_comparison_days: number;
+    notification_poll_seconds: number;
+    complaint_refresh_seconds: number;
+    sla_good_pct: number;
+    sla_watch_pct: number;
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Transport
 // ---------------------------------------------------------------------------
@@ -504,22 +693,12 @@ export class ApiError extends Error {
   }
 }
 
-function storage(): Storage | null {
-  return typeof window === "undefined" ? null : window.localStorage;
-}
+const UNREACHABLE = "The server can't be reached. Check your connection and try again.";
 
-export function hasAccessToken(): boolean {
-  return !!storage()?.getItem(ACCESS_TOKEN_KEY);
-}
+let accessToken: string | null = null;
 
-function setTokens(access: string, refresh: string) {
-  storage()?.setItem(ACCESS_TOKEN_KEY, access);
-  storage()?.setItem(REFRESH_TOKEN_KEY, refresh);
-}
-
-export function clearTokens() {
-  storage()?.removeItem(ACCESS_TOKEN_KEY);
-  storage()?.removeItem(REFRESH_TOKEN_KEY);
+export function setAccessToken(token: string | null) {
+  accessToken = token;
 }
 
 async function errorMessage(res: Response): Promise<string> {
@@ -527,7 +706,10 @@ async function errorMessage(res: Response): Promise<string> {
     const data = await res.json();
     if (typeof data.detail === "string") return data.detail;
     if (Array.isArray(data.detail)) {
-      return data.detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join("; ");
+      return data.detail
+        .map((d: { msg?: string }) => d.msg)
+        .filter(Boolean)
+        .join("; ");
     }
   } catch {
     // not JSON
@@ -535,111 +717,100 @@ async function errorMessage(res: Response): Promise<string> {
   return `Request failed (${res.status})`;
 }
 
+type Query = Record<string, string | number | boolean | null | undefined>;
+
+function buildUrl(path: string, query: Query = {}): URL {
+  const url = new URL(`${API_URL}${path}`);
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+  }
+  return url;
+}
+
 let refreshInFlight: Promise<boolean> | null = null;
 
-function refreshTokens(): Promise<boolean> {
-  const refreshToken = storage()?.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) return Promise.resolve(false);
-  refreshInFlight ??= fetch(`${BACKEND_URL}/auth/refresh`, {
+async function doRefresh(): Promise<boolean> {
+  const res = await fetch(buildUrl("/auth/refresh", { principal: PRINCIPAL }), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  })
-    .then(async (res) => {
-      if (!res.ok) return false;
-      const data = await res.json();
-      setTokens(data.access_token, data.refresh_token);
-      return true;
-    })
-    .catch(() => false)
-    .finally(() => {
-      refreshInFlight = null;
-    });
+    credentials: "include",
+    headers: CLIENT_HEADER,
+  });
+  if (!res.ok) {
+    accessToken = null;
+    return false;
+  }
+  accessToken = (await res.json()).access_token;
+  return true;
+}
+
+/** Exchanges the refresh cookie for a new access token. One refresh at a time, across tabs. */
+export function refreshSession(): Promise<boolean> {
+  if (!refreshInFlight) {
+    const attempt: Promise<boolean> =
+      typeof navigator !== "undefined" && navigator.locks
+        ? navigator.locks.request("cms-staff-session-refresh", doRefresh).then((refreshed) => refreshed)
+        : doRefresh();
+    refreshInFlight = attempt
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
   return refreshInFlight;
 }
 
-type Query = Record<string, string | number | boolean | null | undefined>;
-
-async function request<T>(
-  path: string,
-  options: { method?: string; body?: unknown; query?: Query } = {},
-): Promise<T> {
-  const url = new URL(`${BACKEND_URL}${path}`);
-  for (const [key, value] of Object.entries(options.query ?? {})) {
-    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
-  }
-  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
-
-  const send = () => {
-    const token = storage()?.getItem(ACCESS_TOKEN_KEY);
-    return fetch(url, {
-      method: options.method ?? "GET",
-      headers: {
-        ...(isForm || options.body === undefined ? {} : { "Content-Type": "application/json" }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: isForm ? (options.body as FormData) : options.body === undefined ? undefined : JSON.stringify(options.body),
+async function send(path: string, init: RequestInit, query?: Query): Promise<Response> {
+  const attempt = () =>
+    fetch(buildUrl(path, query), {
+      ...init,
+      credentials: "include",
       cache: "no-store",
+      headers: { ...(init.headers ?? {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
     });
-  };
-
   let res: Response;
   try {
-    res = await send();
-    if (res.status === 401 && (await refreshTokens())) res = await send();
+    // After a page load there is no access token yet: get one from the refresh cookie first.
+    if (!accessToken) await refreshSession();
+    res = await attempt();
+    if (res.status === 401 && (await refreshSession())) res = await attempt();
   } catch {
-    throw new ApiError("Unable to reach the backend server. Please check that it is running.", 0);
+    throw new ApiError(UNREACHABLE, 0);
   }
-
-  if (res.status === 401) {
-    clearTokens();
-    if (typeof window !== "undefined") window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
-  }
+  if (res.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   if (!res.ok) throw new ApiError(await errorMessage(res), res.status);
+  return res;
+}
+
+async function request<T>(path: string, options: { method?: string; body?: unknown; query?: Query } = {}): Promise<T> {
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const res = await send(
+    path,
+    {
+      method: options.method ?? "GET",
+      headers: isForm || options.body === undefined ? {} : { "Content-Type": "application/json" },
+      body: isForm ? (options.body as FormData) : options.body === undefined ? undefined : JSON.stringify(options.body),
+    },
+    options.query,
+  );
   return res.json() as Promise<T>;
 }
 
-// ---------------------------------------------------------------------------
-// Endpoints
-// ---------------------------------------------------------------------------
-
-export async function loginApi(payload: {
-  email?: string;
-  mobile?: string;
-  password: string;
-}): Promise<{ success: boolean; user?: Me; error?: string }> {
+/** Calls that must not trigger a refresh (sign-in, public data). */
+async function publicRequest<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+  let res: Response;
   try {
-    const res = await fetch(`${BACKEND_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    res = await fetch(buildUrl(path), {
+      method: options.method ?? "GET",
+      credentials: "include",
+      cache: "no-store",
+      headers: options.body === undefined ? {} : { "Content-Type": "application/json" },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
-    if (!res.ok) return { success: false, error: await errorMessage(res) };
-    const data = await res.json();
-    setTokens(data.access_token, data.refresh_token);
-    return { success: true, user: data.user };
   } catch {
-    return { success: false, error: "Unable to reach the backend server. Please check that it is running." };
+    throw new ApiError(UNREACHABLE, 0);
   }
-}
-
-export async function raiseResetQueryApi(payload: {
-  email_or_id: string;
-  department: string;
-  reason: string;
-}): Promise<{ success: boolean; ticket_id?: string; error?: string }> {
-  try {
-    const res = await fetch(`${BACKEND_URL}/auth/reset-query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) return { success: false, error: await errorMessage(res) };
-    const data = await res.json();
-    return { success: true, ticket_id: data.ticket_id };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
-  }
+  if (!res.ok) throw new ApiError(await errorMessage(res), res.status);
+  return res.json() as Promise<T>;
 }
 
 function uploadCsv(path: string, file: File, dryRun: boolean): Promise<ImportResult> {
@@ -651,206 +822,307 @@ function uploadCsv(path: string, file: File, dryRun: boolean): Promise<ImportRes
 
 /** Saves a file from an authenticated endpoint (a plain link can't send the auth header). */
 async function downloadFile(path: string, query: Query = {}): Promise<void> {
-  const url = new URL(`${BACKEND_URL}${path}`);
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
-  }
-  const send = () => fetch(url, { headers: { Authorization: `Bearer ${storage()?.getItem(ACCESS_TOKEN_KEY) ?? ""}` } });
-  let res = await send();
-  if (res.status === 401 && (await refreshTokens())) res = await send();
-  if (!res.ok) throw new ApiError(await errorMessage(res), res.status);
+  const res = await send(path, { method: "GET" }, query);
+  const disposition = res.headers.get("content-disposition") ?? "";
+  const name = disposition.match(/filename="?([^";]+)"?/)?.[1];
+  if (!name) throw new ApiError("The server did not name the file.", res.status);
   const blobUrl = URL.createObjectURL(await res.blob());
   const link = document.createElement("a");
   link.href = blobUrl;
-  link.download = res.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "download.csv";
+  link.download = name;
   link.click();
   URL.revokeObjectURL(blobUrl);
 }
 
+/** A signed attachment link as an absolute URL. */
+export function attachmentUrl(attachment: Attachment): string {
+  return `${API_URL}${attachment.url}`;
+}
+
+const id = (value: string) => encodeURIComponent(value);
+
+// ---------------------------------------------------------------------------
+// Endpoints
+// ---------------------------------------------------------------------------
+
 export const api = {
+  config: () => publicRequest<PublicConfig>("/public/config"),
   auth: {
+    login: async (identifier: string, password: string): Promise<Me> => {
+      const data = await publicRequest<{ access_token: string; user: Me }>("/auth/login", {
+        method: "POST",
+        body: { identifier, password },
+      });
+      accessToken = data.access_token;
+      return data.user;
+    },
+    /** Picks up an existing session (after a reload) from the refresh cookie. */
+    restore: () => refreshSession(),
     me: () => request<Me>("/auth/me"),
     logout: async () => {
-      const refreshToken = storage()?.getItem(REFRESH_TOKEN_KEY);
-      if (refreshToken) {
-        await request("/auth/logout", { method: "POST", body: { refresh_token: refreshToken } }).catch(() => undefined);
-      }
-      clearTokens();
+      await fetch(buildUrl("/auth/logout", { principal: PRINCIPAL }), {
+        method: "POST",
+        credentials: "include",
+        headers: CLIENT_HEADER,
+      }).catch(() => undefined);
+      accessToken = null;
     },
-    setAvailability: (is_available: boolean) =>
-      request<Me>("/auth/availability", { method: "POST", body: { is_available } }),
-    changePassword: (current_password: string, new_password: string) =>
-      request("/auth/change-password", { method: "POST", body: { current_password, new_password } }),
-    resetQueries: () => request<PasswordResetTicket[]>("/auth/reset-queries"),
+    setAvailability: (is_available: boolean) => request<Me>("/auth/availability", { method: "POST", body: { is_available } }),
+    changePassword: async (current_password: string, new_password: string): Promise<Me> => {
+      const data = await request<{ access_token: string; user: Me }>("/auth/change-password", {
+        method: "POST",
+        body: { current_password, new_password },
+      });
+      accessToken = data.access_token;
+      return data.user;
+    },
+    raiseResetQuery: (identifier: string, reason: string) =>
+      publicRequest<{ ticket_id: string; status: string }>("/auth/reset-query", {
+        method: "POST",
+        body: { identifier, reason },
+      }),
+    resetQueries: (query: { pending_only?: boolean; page?: number; page_size?: number } = {}) =>
+      request<Paged<PasswordResetTicket>>("/auth/reset-queries", { query }),
     approveResetQuery: (ticketId: string) =>
-      request<{ temporary_key: string; message: string }>(`/auth/reset-queries/${ticketId}/approve`, { method: "POST" }),
+      request<{ ticket_id: string; status: string; temporary_password: string; user: { id: number; name: string } }>(
+        `/auth/reset-queries/${id(ticketId)}/approve`,
+        { method: "POST" },
+      ),
+    rejectResetQuery: (ticketId: string, note: string) =>
+      request<PasswordResetTicket>(`/auth/reset-queries/${id(ticketId)}/reject`, { method: "POST", body: { note } }),
+  },
+  settings: {
+    get: () => request<SettingsResponse>("/settings/"),
+    save: (form: SettingsForm) => request<SystemSettings>("/settings/", { method: "PUT", body: form }),
+    status: () => request<{ problems: ConfigurationProblem[] }>("/settings/status"),
+    reasons: () => request<RejectionReason[]>("/settings/rejection-reasons"),
+    addReason: (name: string) => request<RejectionReason>("/settings/rejection-reasons", { method: "POST", body: { name } }),
+    updateReason: (reasonId: number, data: { name?: string; is_active?: boolean }) =>
+      request<RejectionReason>(`/settings/rejection-reasons/${reasonId}`, { method: "PATCH", body: data }),
+    orderReasons: (ids: number[]) =>
+      request<RejectionReason[]>("/settings/rejection-reasons/order", { method: "PUT", body: { ids } }),
+  },
+  priorities: {
+    list: (includeInactive = false) => request<Priority[]>("/priorities/", { query: { include_inactive: includeInactive } }),
+    create: (data: {
+      key: string;
+      name: string;
+      tone: PriorityTone;
+      response_hours: number;
+      resolution_hours: number;
+      warning_minutes: number;
+    }) => request<Priority>("/priorities/", { method: "POST", body: data }),
+    update: (priorityId: number, data: { name?: string; tone?: PriorityTone; is_active?: boolean }) =>
+      request<Priority>(`/priorities/${priorityId}`, { method: "PATCH", body: data }),
+    order: (ids: number[]) => request<Priority[]>("/priorities/order", { method: "PUT", body: { ids } }),
   },
   complaints: {
-    stats: () => request<DashboardStatsResponse>("/complaints/admin/stats"),
+    stats: () => request<DashboardStats>("/complaints/admin/stats"),
+    facets: () => request<ComplaintFacets>("/complaints/facets"),
+    classificationOptions: () => request<ClassificationOptions>("/complaints/classification-options"),
     list: (
       filters: {
-        status?: string;
+        status_filter?: string;
         group?: StatusGroup | "";
         assigned?: "me" | "unassigned" | "";
-        priority?: string;
+        priority_ids?: string;
         department_id?: number;
         search?: string;
         sla?: "breached" | "at_risk" | "";
         escalated?: "me" | "any" | "";
+        page?: number;
+        page_size?: number;
       } = {},
-    ) => request<ComplaintData[]>("/complaints/", { query: filters }),
-    get: (id: string) => request<ComplaintDetail>(`/complaints/${encodeURIComponent(id)}`),
-    act: (id: string, action: string, note?: string) =>
-      request<ComplaintDetail>(`/complaints/${encodeURIComponent(id)}/actions`, {
+    ) => request<Paged<ComplaintData>>("/complaints/", { query: filters }),
+    get: (complaintId: string) => request<ComplaintDetail>(`/complaints/${id(complaintId)}`),
+    act: (complaintId: string, action: string, note: string | null, reasonId: number | null) =>
+      request<ComplaintDetail>(`/complaints/${id(complaintId)}/actions`, {
         method: "POST",
-        body: { action, note: note || null },
+        body: { action, note, reason_id: reasonId },
       }),
-    assigneeOptions: (id: string) =>
-      request<AssigneeOption[]>(`/complaints/${encodeURIComponent(id)}/assignee-options`),
-    assign: (id: string, assignee_id: number, reason?: string) =>
-      request<ComplaintDetail>(`/complaints/${encodeURIComponent(id)}/assign`, {
+    reclassify: (
+      complaintId: string,
+      data: { department_id: number; category_id: number; location_id: number; priority_id: number; reason: string },
+    ) => request<ComplaintDetail>(`/complaints/${id(complaintId)}/reclassify`, { method: "POST", body: data }),
+    assigneeOptions: (complaintId: string) => request<AssigneeOption[]>(`/complaints/${id(complaintId)}/assignee-options`),
+    assign: (complaintId: string, assignee_id: number, reason: string | null) =>
+      request<ComplaintDetail>(`/complaints/${id(complaintId)}/assign`, {
         method: "POST",
-        body: { assignee_id, reason: reason || null },
+        body: { assignee_id, reason },
       }),
-    autoAssign: (id: string) =>
-      request<ComplaintDetail>(`/complaints/${encodeURIComponent(id)}/auto-assign`, { method: "POST" }),
-    requestRejection: (id: string, category: string, reason: string) =>
-      request<ComplaintDetail>(`/complaints/${encodeURIComponent(id)}/rejection-requests`, {
+    autoAssign: (complaintId: string) =>
+      request<ComplaintDetail>(`/complaints/${id(complaintId)}/auto-assign`, { method: "POST" }),
+    requestRejection: (complaintId: string, reason_id: number, reason: string) =>
+      request<ComplaintDetail>(`/complaints/${id(complaintId)}/rejection-requests`, {
         method: "POST",
-        body: { category, reason },
+        body: { reason_id, reason },
       }),
-    comment: (id: string, body: string, isInternal: boolean, files: File[]) => {
+    comment: (complaintId: string, body: string, isInternal: boolean, files: File[]) => {
       const form = new FormData();
       form.append("body", body);
       form.append("is_internal", String(isInternal));
       files.forEach((f) => form.append("files", f));
-      return request<ComplaintDetail>(`/complaints/${encodeURIComponent(id)}/comments`, { method: "POST", body: form });
+      return request<ComplaintDetail>(`/complaints/${id(complaintId)}/comments`, { method: "POST", body: form });
     },
     quickCreate: (data: {
       title: string;
+      description: string;
+      additional_details: string | null;
       department_id: number;
-      category_id?: number | null;
+      category_id: number;
       location_id: number;
-      priority?: string;
-      description?: string;
-      end_user_name?: string;
-      end_user_phone?: string;
+      priority_id: number | null;
+      priority_reason: string | null;
+      end_user_id: number | null;
+      end_user_name: string | null;
+      end_user_phone: string | null;
     }) => request<{ id: string; assignee: string | null }>("/complaints/quick-create", { method: "POST", body: data }),
   },
   users: {
-    list: (query: { search?: string; role_id?: number } = {}) => request<StaffUser[]>("/users/", { query }),
+    list: (query: { search?: string; role_id?: number; page?: number; page_size?: number } = {}) =>
+      request<Paged<StaffUser>>("/users/", { query }),
+    assignableRoles: () => request<RoleRef[]>("/users/assignable-roles"),
     create: (data: {
       name: string;
       email: string;
-      mobile?: string;
+      mobile: string | null;
       role_id: number;
       password: string;
-      reports_to_id?: number | null;
+      reports_to_id: number | null;
       scopes: ScopeInput[];
     }) => request<StaffUser>("/users/", { method: "POST", body: data }),
+    /** Only the fields that are sent change. */
     update: (
-      id: number,
+      userId: number,
       data: Partial<{
         name: string;
         email: string;
         mobile: string;
+        clear_mobile: boolean;
         role_id: number;
-        reports_to_id: number | null;
+        reports_to_id: number;
         clear_reports_to: boolean;
         scopes: ScopeInput[];
         is_available: boolean;
       }>,
-    ) => request<StaffUser>(`/users/${id}`, { method: "PATCH", body: data }),
-    setActive: (id: number, active: boolean) =>
-      request<StaffUser>(`/users/${id}/${active ? "activate" : "deactivate"}`, { method: "POST" }),
+    ) => request<StaffUser>(`/users/${userId}`, { method: "PATCH", body: data }),
+    setActive: (userId: number, active: boolean) =>
+      request<StaffUser>(`/users/${userId}/${active ? "activate" : "deactivate"}`, { method: "POST" }),
     reportsToOptions: (roleId: number) =>
       request<{ id: number; name: string; role: string }[]>("/users/reports-to-options", { query: { role_id: roleId } }),
   },
   roles: {
     list: () => request<RoleDetail[]>("/roles/"),
     permissions: () => request<PermissionDef[]>("/roles/permissions"),
-    create: (data: { key: string; name: string; description?: string; parent_id: number; permissions: string[] }) =>
+    create: (data: { key: string; name: string; description: string | null; parent_id: number; permissions: string[] }) =>
       request<RoleDetail>("/roles/", { method: "POST", body: data }),
-    update: (id: number, data: Partial<{ name: string; description: string; parent_id: number; permissions: string[] }>) =>
-      request<RoleDetail>(`/roles/${id}`, { method: "PATCH", body: data }),
-    remove: (id: number) => request(`/roles/${id}`, { method: "DELETE" }),
+    update: (roleId: number, data: Partial<{ name: string; description: string; parent_id: number; permissions: string[] }>) =>
+      request<RoleDetail>(`/roles/${roleId}`, { method: "PATCH", body: data }),
+    remove: (roleId: number) => request(`/roles/${roleId}`, { method: "DELETE" }),
   },
   departments: {
     list: () => request<Department[]>("/departments/"),
-    create: (data: { name: string; code: string; description?: string; categories: string[] }) =>
-      request<Department>("/departments/", { method: "POST", body: data }),
-    update: (id: number, data: Partial<{ name: string; code: string; description: string; is_active: boolean }>) =>
-      request<Department>(`/departments/${id}`, { method: "PATCH", body: data }),
-    addCategory: (id: number, name: string) =>
-      request<Department>(`/departments/${id}/categories`, { method: "POST", body: { name } }),
-    updateCategory: (id: number, categoryId: number, data: { name?: string; is_active?: boolean }) =>
-      request<Department>(`/departments/${id}/categories/${categoryId}`, { method: "PATCH", body: data }),
+    create: (data: {
+      name: string;
+      code: string;
+      description: string | null;
+      categories: { name: string; default_priority_id: number }[];
+    }) => request<Department>("/departments/", { method: "POST", body: data }),
+    update: (departmentId: number, data: Partial<{ name: string; code: string; description: string; is_active: boolean }>) =>
+      request<Department>(`/departments/${departmentId}`, { method: "PATCH", body: data }),
+    addCategory: (departmentId: number, name: string, default_priority_id: number) =>
+      request<Department>(`/departments/${departmentId}/categories`, {
+        method: "POST",
+        body: { name, default_priority_id },
+      }),
+    updateCategory: (
+      departmentId: number,
+      categoryId: number,
+      data: { name?: string; default_priority_id?: number; is_active?: boolean },
+    ) => request<Department>(`/departments/${departmentId}/categories/${categoryId}`, { method: "PATCH", body: data }),
   },
   locations: {
-    types: () => request<LocationType[]>("/locations/types"),
+    levels: () => request<LocationLevel[]>("/locations/types"),
+    addLevel: (key: string, name: string) => request<LocationLevel>("/locations/types", { method: "POST", body: { key, name } }),
+    renameLevel: (levelId: number, name: string) =>
+      request<LocationLevel>(`/locations/types/${levelId}`, { method: "PATCH", body: { name } }),
+    removeLevel: (levelId: number) => request(`/locations/types/${levelId}`, { method: "DELETE" }),
     tree: (includeInactive = false) =>
       request<LocationNode[]>("/locations/tree", { query: { include_inactive: includeInactive } }),
     create: (name: string, parent_id: number | null) =>
       request<LocationRef>("/locations/", { method: "POST", body: { name, parent_id } }),
-    update: (id: number, data: { name?: string; is_active?: boolean }) =>
-      request<LocationRef>(`/locations/${id}`, { method: "PATCH", body: data }),
-    importCsv: (file: File, dryRun = false) => uploadCsv("/locations/import", file, dryRun),
-    exportCsv: () => downloadFile("/locations/export"),
+    update: (locationId: number, data: { name?: string; is_active?: boolean }) =>
+      request<LocationRef>(`/locations/${locationId}`, { method: "PATCH", body: data }),
+    remove: (locationId: number) => request(`/locations/${locationId}`, { method: "DELETE" }),
+    importCsv: (file: File, dryRun: boolean) => uploadCsv("/locations/import", file, dryRun),
+    exportCsv: (includeInactive = false) => downloadFile("/locations/export", { include_inactive: includeInactive }),
   },
   endUsers: {
     list: (query: { search?: string; page?: number; page_size?: number } = {}) =>
       request<Paged<EndUserRow>>("/end-users/", { query }),
-    update: (id: number, data: Partial<{ name: string; mobile: string; email: string; location_id: number; is_active: boolean }>) =>
-      request<EndUserRow>(`/end-users/${id}`, { method: "PATCH", body: data }),
-    importCsv: (file: File, dryRun = false) => uploadCsv("/end-users/import", file, dryRun),
+    create: (data: { external_id: string | null; name: string; mobile: string; email: string; location_id: number | null }) =>
+      request<EndUserRow>("/end-users/", { method: "POST", body: data }),
+    update: (
+      endUserId: number,
+      data: Partial<{
+        external_id: string;
+        name: string;
+        mobile: string;
+        email: string;
+        location_id: number;
+        clear_location: boolean;
+        is_active: boolean;
+      }>,
+    ) => request<EndUserRow>(`/end-users/${endUserId}`, { method: "PATCH", body: data }),
+    importCsv: (file: File, dryRun: boolean) => uploadCsv("/end-users/import", file, dryRun),
     exportCsv: (search?: string) => downloadFile("/end-users/export", { search }),
   },
   imports: {
-    list: (kind?: ImportKind) => request<ImportBatch[]>("/imports/", { query: { kind } }),
-    get: (id: number) => request<ImportBatch>(`/imports/${id}`),
-    downloadReport: (id: number, severity: "error" | "warning" | "all" = "error") =>
-      downloadFile(`/imports/${id}/report`, { severity }),
+    list: (query: { kind?: ImportKind; page?: number; page_size?: number } = {}) =>
+      request<Paged<ImportBatch>>("/imports/", { query }),
+    get: (batchId: number) => request<ImportBatchDetail>(`/imports/${batchId}`),
+    downloadReport: (batchId: number, severity: "error" | "warning" | "all") =>
+      downloadFile(`/imports/${batchId}/report`, { severity }),
   },
   rejections: {
-    list: (view: "to_decide" | "mine" | "all") =>
-      request<RejectionRequestItem[]>("/rejection-requests/", { query: { view } }),
-    approve: (id: number, note?: string) =>
-      request<ComplaintDetail>(`/rejection-requests/${id}/approve`, { method: "POST", body: { note: note || null } }),
-    deny: (id: number, note: string) =>
-      request<ComplaintDetail>(`/rejection-requests/${id}/deny`, { method: "POST", body: { note } }),
-    withdraw: (id: number) => request<ComplaintDetail>(`/rejection-requests/${id}/withdraw`, { method: "POST" }),
+    reasons: () => request<RejectionReason[]>("/rejection-requests/reasons"),
+    list: (query: { view: "to_decide" | "mine" | "all"; page?: number; page_size?: number }) =>
+      request<Paged<RejectionRequestItem>>("/rejection-requests/", { query }),
+    approve: (requestId: number, note: string | null) =>
+      request<ComplaintDetail>(`/rejection-requests/${requestId}/approve`, { method: "POST", body: { note } }),
+    deny: (requestId: number, note: string) =>
+      request<ComplaintDetail>(`/rejection-requests/${requestId}/deny`, { method: "POST", body: { note } }),
+    withdraw: (requestId: number) => request<ComplaintDetail>(`/rejection-requests/${requestId}/withdraw`, { method: "POST" }),
   },
   notifications: {
-    list: (unreadOnly = false) =>
-      request<{ items: NotificationItem[]; unread_count: number }>("/notifications/", {
-        query: { unread_only: unreadOnly, limit: 30 },
-      }),
-    markRead: (id: number) => request(`/notifications/${id}/read`, { method: "POST" }),
+    list: (query: { unread_only?: boolean; page?: number; page_size?: number } = {}) =>
+      request<Paged<NotificationItem> & { unread_count: number }>("/notifications/", { query }),
+    markRead: (notificationId: number) => request(`/notifications/${notificationId}/read`, { method: "POST" }),
     markAllRead: () => request("/notifications/read-all", { method: "POST" }),
   },
   sla: {
-    config: () =>
-      request<{ priorities: string[]; sla_rules: SlaRule[]; escalation_rules: EscalationRule[] }>("/sla/config"),
+    config: () => request<{ priorities: Priority[]; sla_rules: SlaRule[]; escalation_rules: EscalationRule[] }>("/sla/config"),
     saveRule: (data: {
-      priority: string;
+      priority_id: number;
       department_id: number | null;
       response_hours: number;
       resolution_hours: number;
       warning_minutes: number;
     }) => request<SlaRule>("/sla/rules", { method: "PUT", body: data }),
-    deleteRule: (id: number) => request(`/sla/rules/${id}`, { method: "DELETE" }),
+    deleteRule: (ruleId: number) => request(`/sla/rules/${ruleId}`, { method: "DELETE" }),
     saveEscalationRule: (data: {
-      breach_type: string;
+      breach_type: "response" | "resolution";
       department_id: number | null;
       level_hours: number;
       max_level: number;
       is_active: boolean;
     }) => request<EscalationRule>("/sla/escalation-rules", { method: "PUT", body: data }),
+    deleteEscalationRule: (ruleId: number) => request(`/sla/escalation-rules/${ruleId}`, { method: "DELETE" }),
     runNow: () => request<Record<string, number>>("/sla/run", { method: "POST" }),
   },
   reports: {
-    summary: (query: ReportQuery) => request<ReportSummary>("/reports/summary", { query }),
-    trend: (query: ReportQuery) => request<ReportTrend>("/reports/trend", { query }),
+    overview: (query: ReportQuery) => request<ReportOverview>("/reports/overview", { query }),
+    levels: () => request<{ key: string; name: string; depth: number }[]>("/reports/levels"),
     table: (kind: "agents" | "departments" | "locations", query: ReportQuery & { level?: string }) =>
       request<PerformanceRow[]>(`/reports/${kind}`, { query }),
     exportTable: (kind: "agents" | "departments" | "locations", query: ReportQuery & { level?: string }) =>
@@ -859,6 +1131,7 @@ export const api = {
   audit: {
     list: (query: AuditQuery & { page?: number; page_size?: number } = {}) =>
       request<Paged<AuditEntry>>("/audit-logs/", { query }),
+    entityTypes: () => request<string[]>("/audit-logs/entity-types"),
     exportCsv: (query: AuditQuery = {}) => downloadFile("/audit-logs/export", query),
   },
 };

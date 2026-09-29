@@ -1,150 +1,90 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import { DashboardStats, StatusGroup } from "@/lib/api";
+import { GROUP_COLORS, GROUP_LABELS } from "@/lib/status";
 
-interface StatusSlice {
-  label: string;
-  count: number;
-  percentage: number;
-  color: string;
-  dotColor: string;
-}
+const GROUPS: StatusGroup[] = ["open", "in_progress", "resolved", "rejected"];
 
-interface ComplaintsByStatusChartProps {
-  stats?: {
-    metrics: {
-      total: number;
-    };
-    status_breakdown: {
-      open: { count: number; percentage: number };
-      in_progress: { count: number; percentage: number };
-      resolved: { count: number; percentage: number };
-    };
-  } | null;
-  isLoading?: boolean;
-}
-
-export function ComplaintsByStatusChart({ stats, isLoading = false }: ComplaintsByStatusChartProps) {
-  const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
-
+/** Donut of every status group (they always add up to the total). */
+export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardStats | undefined; loading: boolean }) {
+  const [hovered, setHovered] = useState<StatusGroup | null>(null);
   const total = stats?.metrics.total ?? 0;
-  const breakdown = stats?.status_breakdown;
-
-  const slices: StatusSlice[] = [
-    {
-      label: "Open",
-      count: breakdown?.open.count ?? 0,
-      percentage: breakdown?.open.percentage ?? 0,
-      color: "#f87171", // Coral red
-      dotColor: "bg-rose-400",
-    },
-    {
-      label: "In Progress",
-      count: breakdown?.in_progress.count ?? 0,
-      percentage: breakdown?.in_progress.percentage ?? 0,
-      color: "#a855f7", // Soft purple
-      dotColor: "bg-purple-500",
-    },
-    {
-      label: "Resolved",
-      count: breakdown?.resolved.count ?? 0,
-      percentage: breakdown?.resolved.percentage ?? 0,
-      color: "#2dd4bf", // Vibrant teal / green
-      dotColor: "bg-teal-400",
-    },
-  ];
-
   const radius = 68;
   const strokeWidth = 26;
   const circumference = 2 * Math.PI * radius;
 
-  let accumulatedPercent = 0;
+  const counts = GROUPS.map((group) => stats?.status_breakdown[group].count ?? 0);
+  const slices = GROUPS.map((group, i) => ({
+    group,
+    count: counts[i],
+    fraction: total ? counts[i] / total : 0,
+    // where this slice starts: the share of the slices before it
+    offset: total ? counts.slice(0, i).reduce((sum, n) => sum + n, 0) / total : 0,
+  }));
 
   return (
-    <div className="flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
-      <h3 className="text-base font-bold text-slate-800 mb-4">Complaints by Status</h3>
-
-      {isLoading ? (
+    <div className="flex flex-col p-5 sm:p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+      <h2 className="text-base font-bold text-slate-800 mb-4">Complaints by status</h2>
+      {loading ? (
         <div className="flex items-center justify-center flex-1 py-10">
-          <div className="w-40 h-40 rounded-full border-4 border-slate-100 border-t-blue-500 animate-spin"></div>
+          <div className="w-36 h-36 rounded-full border-4 border-slate-100 border-t-blue-500 animate-spin" />
         </div>
       ) : (
-        <div className="flex items-center justify-between flex-1 gap-4">
-          {/* Donut Chart SVG */}
-          <div className="relative w-44 h-44 flex items-center justify-center shrink-0">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 180 180">
-              {/* Background ring */}
-              <circle
-                cx="90"
-                cy="90"
-                r={radius}
-                stroke="#f1f5f9"
-                strokeWidth={strokeWidth}
-                fill="transparent"
-              />
-
-              {total > 0 &&
-                slices.map((slice) => {
-                  const strokeDasharray = `${(slice.percentage / 100) * circumference} ${circumference}`;
-                  const strokeDashoffset = -((accumulatedPercent / 100) * circumference);
-                  accumulatedPercent += slice.percentage;
-
-                  const isHovered = hoveredSlice === slice.label;
-
-                  return (
-                    <circle
-                      key={slice.label}
-                      cx="90"
-                      cy="90"
-                      r={radius}
-                      stroke={slice.color}
-                      strokeWidth={isHovered ? strokeWidth + 4 : strokeWidth}
-                      strokeDasharray={strokeDasharray}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="butt"
-                      fill="transparent"
-                      className="transition-all duration-200 cursor-pointer"
-                      onMouseEnter={() => setHoveredSlice(slice.label)}
-                      onMouseLeave={() => setHoveredSlice(null)}
-                    />
-                  );
-                })}
+        <div className="flex flex-col items-center justify-center flex-1 gap-5">
+          <div className="relative w-40 h-40 shrink-0">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 180 180" role="img" aria-label="Complaints by status">
+              <circle cx="90" cy="90" r={radius} stroke="#f1f5f9" strokeWidth={strokeWidth} fill="transparent" />
+              {slices
+                .filter((s) => s.fraction > 0)
+                .map((s) => (
+                  <circle
+                    key={s.group}
+                    cx="90"
+                    cy="90"
+                    r={radius}
+                    stroke={GROUP_COLORS[s.group]}
+                    strokeWidth={hovered === s.group ? strokeWidth + 4 : strokeWidth}
+                    strokeDasharray={`${s.fraction * circumference} ${circumference}`}
+                    strokeDashoffset={-s.offset * circumference}
+                    fill="transparent"
+                    className="transition-all duration-200"
+                    onMouseEnter={() => setHovered(s.group)}
+                    onMouseLeave={() => setHovered(null)}
+                  />
+                ))}
             </svg>
-
-            {/* Centered Total Count */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-              <span className="text-2xl font-extrabold text-slate-800 leading-tight">
-                {total.toLocaleString()}
-              </span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-2xl font-extrabold text-slate-800 leading-tight">{total.toLocaleString()}</span>
               <span className="text-xs font-semibold text-slate-400">Total</span>
             </div>
           </div>
-
-          {/* Legend on the right */}
-          <div className="flex flex-col gap-3.5 pr-2">
-            {slices.map((slice) => (
-              <div
-                key={slice.label}
-                onMouseEnter={() => setHoveredSlice(slice.label)}
-                onMouseLeave={() => setHoveredSlice(null)}
-                className={`flex items-center gap-2.5 text-xs transition-opacity cursor-pointer ${
-                  hoveredSlice && hoveredSlice !== slice.label ? "opacity-45" : "opacity-100"
-                }`}
-              >
-                <span
-                  className={`w-3 h-3 rounded-full shrink-0 ${slice.dotColor}`}
-                  style={{ backgroundColor: slice.color }}
-                ></span>
-                <span className="font-semibold text-slate-700 min-w-[70px]">
-                  {slice.label}
-                </span>
-                <span className="font-semibold text-slate-600">
-                  {slice.count.toLocaleString()}{" "}
-                  <span className="text-slate-400 font-normal">({slice.percentage}%)</span>
-                </span>
-              </div>
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 w-full">
+            {slices.map((s) => (
+              <li key={s.group}>
+                <Link
+                  href={`/complaints?group=${s.group}`}
+                  onMouseEnter={() => setHovered(s.group)}
+                  onMouseLeave={() => setHovered(null)}
+                  className={`flex items-start gap-2 text-xs transition-opacity ${hovered && hovered !== s.group ? "opacity-45" : ""}`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 mt-1 rounded-full shrink-0"
+                    style={{ backgroundColor: GROUP_COLORS[s.group] }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-slate-700 truncate">{GROUP_LABELS[s.group]}</span>
+                    <span className="block text-slate-600">
+                      {s.count.toLocaleString()}{" "}
+                      <span className="text-slate-400">({stats?.status_breakdown[s.group].percentage ?? 0}%)</span>
+                    </span>
+                  </span>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
     </div>

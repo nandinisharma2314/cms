@@ -45,8 +45,8 @@ AWAITING_RESPONSE = [SUBMITTED, ASSIGNED, REOPENED]
 
 
 def status_label(value: str) -> str:
-    return STATUS_LABELS.get(value, value)
+    return STATUS_LABELS[value]
 
 
 def end_user_status_label(value: str) -> str:
-    return END_USER_STATUS_LABELS.get(value, value)
+    return END_USER_STATUS_LABELS[value]

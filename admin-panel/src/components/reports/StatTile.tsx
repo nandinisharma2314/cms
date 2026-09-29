@@ -35,7 +35,7 @@ export function StatTile({
   if (current != null && previous != null) {
     const change = current - previous;
     const Icon = change > 0 ? ArrowUpRight : change < 0 ? ArrowDownRight : Minus;
-    const good = better === "neutral" || change === 0 ? null : (change > 0) === (better === "up");
+    const good = better === "neutral" || change === 0 ? null : change > 0 === (better === "up");
     const color = good === null ? SECONDARY : good ? GOOD : BAD;
     const text = formatDelta ? formatDelta(change) : `${change > 0 ? "+" : ""}${change.toLocaleString()}`;
     delta = (

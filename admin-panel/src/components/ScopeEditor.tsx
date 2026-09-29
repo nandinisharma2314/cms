@@ -12,7 +12,8 @@ export function scopeLabel(scope: UserScope): string {
   return `${department} · ${location}`;
 }
 
-/** Edits a user's list of (department, location) scopes. */
+/** Edits a user's list of (department, location) scopes. `departments` may include inactive
+ * ones: they are offered only where a scope already names them. */
 export function ScopeEditor({
   scopes,
   onChange,
@@ -29,6 +30,7 @@ export function ScopeEditor({
 
   return (
     <div className="space-y-2">
+      {scopes.length === 0 && <p className="text-[11px] text-slate-400">No scope yet. Add at least one.</p>}
       {scopes.map((scope, index) => (
         <div key={index} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
           <div className="flex items-center gap-2">
@@ -39,17 +41,21 @@ export function ScopeEditor({
               aria-label="Department"
             >
               <option value="">All departments</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
+              {departments
+                .filter((d) => d.is_active || d.id === scope.department_id)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                    {d.is_active ? "" : " (inactive)"}
+                  </option>
+                ))}
             </select>
             <button
               type="button"
               onClick={() => onChange(scopes.filter((_, i) => i !== index))}
               className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
               title="Remove scope"
+              aria-label="Remove scope"
             >
               <Trash2 className="w-4 h-4" />
             </button>

@@ -1,6 +1,6 @@
 """Controlled rejection: an agent may not reject a complaint on their own.
 
-    handler requests rejection (category + reason required)
+    handler requests rejection (reason category + explanation required)
         -> complaint goes to REJECTION_REQUESTED ("Under Review" for the end user)
         -> someone above them with complaint.reject.approve decides:
              approve  -> REJECTED, end user told why
@@ -9,14 +9,15 @@
 
 Approvers who reject directly (the "reject" workflow action) get the same
 record with direct=True, so every rejection has requester, reason, approver
-and time on file.
+and time on file. Reason categories are managed by admins (rejection_reasons).
 """
 from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models import Complaint, RejectionRequest, User
+from config import NOTE_MAX_LENGTH, REJECTION_REASON_MIN_LENGTH
+from models import Complaint, RejectionReason, RejectionRequest, User
 from services import notification_service, sla_service
 from services.access_service import AccessContext
 from services.events import record_event
@@ -29,18 +30,35 @@ from utils.security import utcnow
 REQUEST_PERMISSION = "complaint.reject.request"
 APPROVE_PERMISSION = "complaint.reject.approve"
 
-REASON_CATEGORIES = [
-    "Outside department jurisdiction",
-    "Outside municipal jurisdiction",
-    "Duplicate complaint",
-    "Insufficient or false information",
-    "Private property matter",
-    "Other",
-]
-
 PENDING, APPROVED, DENIED, WITHDRAWN = "PENDING", "APPROVED", "DENIED", "WITHDRAWN"
 REQUESTABLE_STATUSES = {SUBMITTED, ASSIGNED, ACKNOWLEDGED, IN_PROGRESS, WAITING, REOPENED}
 
+
+# ---------------------------------------------------------------------------
+# Reason categories
+# ---------------------------------------------------------------------------
+
+def list_reasons(db: Session, include_inactive: bool = False) -> list[RejectionReason]:
+    query = db.query(RejectionReason)
+    if not include_inactive:
+        query = query.filter(RejectionReason.is_active.is_(True))
+    return query.order_by(RejectionReason.sort_order, RejectionReason.id).all()
+
+
+def serialize_reason(reason: RejectionReason) -> dict:
+    return {"id": reason.id, "name": reason.name, "sort_order": reason.sort_order, "is_active": reason.is_active}
+
+
+def active_reason(db: Session, reason_id: int | None) -> RejectionReason:
+    reason = db.get(RejectionReason, reason_id) if reason_id is not None else None
+    if reason is None or not reason.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose a rejection reason")
+    return reason
+
+
+# ---------------------------------------------------------------------------
+# Requests
+# ---------------------------------------------------------------------------
 
 def pending_request(complaint: Complaint) -> RejectionRequest | None:
     return next((r for r in complaint.rejection_requests if r.status == PENDING), None)
@@ -70,30 +88,30 @@ def can_decide(ctx: AccessContext, request: RejectionRequest) -> bool:
     )
 
 
-def _validate(category: str, reason: str) -> tuple[str, str]:
-    if category not in REASON_CATEGORIES:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Category must be one of: {', '.join(REASON_CATEGORIES)}")
+def _clean_reason(reason: str) -> str:
     reason = (reason or "").strip()
-    if len(reason) < 10:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Please explain the reason (at least 10 characters)")
-    if len(reason) > 2000:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Reason is too long")
-    return category, reason
+    if len(reason) < REJECTION_REASON_MIN_LENGTH:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            f"Please explain the reason (at least {REJECTION_REASON_MIN_LENGTH} characters)")
+    if len(reason) > NOTE_MAX_LENGTH:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"The reason is too long (max {NOTE_MAX_LENGTH} characters)")
+    return reason
 
 
 def request_rejection(
-    ctx: AccessContext, complaint: Complaint, category: str, reason: str, at: datetime | None = None,
+    ctx: AccessContext, complaint: Complaint, reason_id: int | None, reason: str, at: datetime | None = None,
 ) -> RejectionRequest:
     from services.workflow_service import change_status
 
     if not can_request(ctx, complaint):
         raise HTTPException(status.HTTP_409_CONFLICT, "You cannot request rejection of this complaint")
-    category, reason = _validate(category, reason)
+    category = active_reason(ctx.db, reason_id)
+    reason = _clean_reason(reason)
     db, now = ctx.db, at or utcnow()
     approver = sla_service.next_up(db, complaint, ctx.user, permission=APPROVE_PERMISSION)
     request = RejectionRequest(
-        complaint=complaint, requested_by=ctx.user, approver=approver, category=category, reason=reason,
-        previous_status=complaint.status, created_at=now,
+        complaint=complaint, requested_by=ctx.user, approver=approver, reason_category=category, reason=reason,
+        previous_status=complaint.status, status=PENDING, created_at=now,
     )
     db.add(request)
     if complaint.acknowledged_at is None:
@@ -101,9 +119,9 @@ def request_rejection(
 
     change_status(
         db, complaint, REJECTION_REQUESTED, ctx.user,
-        message=f"{ctx.user.name} requested rejection ({category})"
+        message=f"{ctx.user.name} requested rejection ({category.name})"
                 + (f"; awaiting {approver.name}" if approver else ""),
-        public_message="Your complaint is under review by a senior officer",
+        public_message="Your complaint is being reviewed",
         at=now,
     )
     # The reason is internal until an approver decides what to tell the end user.
@@ -112,7 +130,7 @@ def request_rejection(
     notification_service.notify(
         db, [approver], "rejection.requested",
         f"Rejection requested for {complaint.generated_id}",
-        f"{ctx.user.name}: {category}. {reason[:200]}", complaint, at=now,
+        f"{ctx.user.name}: {category.name}. {reason[:200]}", complaint, at=now,
     )
     return request
 
@@ -130,7 +148,11 @@ def approve(
     if not can_decide(ctx, request):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot decide this rejection request")
     db, now, complaint = ctx.db, at or utcnow(), request.complaint
-    public_reason = (message_to_end_user or "").strip() or f"{request.category}. {request.reason}"
+    message = (message_to_end_user or "").strip()
+    if len(message) > NOTE_MAX_LENGTH:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"The message is too long (max {NOTE_MAX_LENGTH} characters)")
+    # The requester's explanation is internal; without a message the end user is given the reason category.
+    public_reason = message or request.reason_category.name
     request.status = APPROVED
     request.decided_by = ctx.user
     request.decided_at = now
@@ -155,7 +177,9 @@ def deny(ctx: AccessContext, request: RejectionRequest, note: str, at: datetime 
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot decide this rejection request")
     note = (note or "").strip()
     if not note:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tell the officer why the rejection is denied")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Explain why the rejection is denied")
+    if len(note) > NOTE_MAX_LENGTH:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"The note is too long (max {NOTE_MAX_LENGTH} characters)")
     db, now, complaint = ctx.db, at or utcnow(), request.complaint
     request.status = DENIED
     request.decided_by = ctx.user
@@ -194,10 +218,10 @@ def withdraw(ctx: AccessContext, request: RejectionRequest) -> None:
 
 
 def record_direct_rejection(db: Session, approver: User, complaint: Complaint, previous_status: str,
-                            reason: str, at: datetime) -> None:
+                            category: RejectionReason, reason: str, at: datetime) -> None:
     """Called by the workflow when an approver uses the direct "reject" action."""
     db.add(RejectionRequest(
-        complaint=complaint, requested_by=approver, approver=approver, category="Other", reason=reason,
+        complaint=complaint, requested_by=approver, approver=approver, reason_category=category, reason=reason,
         previous_status=previous_status, status=APPROVED, direct=True,
         decided_by=approver, decided_at=at, decision_note=reason, created_at=at,
     ))
@@ -205,6 +229,29 @@ def record_direct_rejection(db: Session, approver: User, complaint: Complaint, p
         db, [complaint.assigned_to], "rejection.approved", f"{complaint.generated_id} was rejected",
         f"Rejected by {approver.name}: {reason[:200]}", complaint, exclude=approver, at=at,
     )
+
+
+def reroute_pending_for(db: Session, user: User, at: datetime) -> int:
+    """Pending requests routed to `user` (who is leaving) go to the next
+    approver above each requester. Returns how many were moved."""
+    moved = 0
+    for request in db.query(RejectionRequest).filter(
+        RejectionRequest.approver_id == user.id, RejectionRequest.status == PENDING,
+    ).all():
+        request.approver = sla_service.next_up(db, request.complaint, request.requested_by,
+                                               permission=APPROVE_PERMISSION)
+        record_event(db, request.complaint, "rejection_rerouted", None,
+                     f"Rejection request moved from {user.name} to "
+                     f"{request.approver.name if request.approver else 'nobody (no approver above the requester)'}",
+                     at=at)
+        notification_service.notify(
+            db, [request.approver], "rejection.requested",
+            f"Rejection requested for {request.complaint.generated_id}",
+            f"{request.requested_by.name}: {request.reason_category.name}. {request.reason[:200]}",
+            request.complaint, at=at,
+        )
+        moved += 1
+    return moved
 
 
 def serialize(request: RejectionRequest, ctx: AccessContext | None = None) -> dict:
@@ -216,13 +263,13 @@ def serialize(request: RejectionRequest, ctx: AccessContext | None = None) -> di
             "title": complaint.title,
             "department": complaint.department.name,
             "location": complaint.location.name,
-            "priority": complaint.priority,
+            "priority": {"name": complaint.priority.name, "tone": complaint.priority.tone},
             "status": complaint.status,
         },
         "requested_by": {"id": request.requested_by.id, "name": request.requested_by.name,
                          "role": request.requested_by.role.name},
         "approver": request.approver.name if request.approver else None,
-        "category": request.category,
+        "category": request.reason_category.name,
         "reason": request.reason,
         "status": request.status,
         "direct": request.direct,
@@ -235,3 +282,4 @@ def serialize(request: RejectionRequest, ctx: AccessContext | None = None) -> di
         data["can_decide"] = can_decide(ctx, request)
         data["can_withdraw"] = request.status == PENDING and request.requested_by_id == ctx.user.id
     return data
+

@@ -3,25 +3,28 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CivicLogo } from "./CivicLogo";
 import {
-  Home,
-  FileText,
-  Users,
-  Contact,
-  Building2,
-  MapPin,
-  ShieldCheck,
-  ScrollText,
-  Timer,
   ArrowUpCircle,
   Ban,
-  History,
   BarChart3,
-  Headphones,
+  Building2,
   ChevronLeft,
+  Contact,
+  FileText,
+  Headphones,
+  History,
+  Home,
+  MapPin,
+  ScrollText,
+  Settings,
+  ShieldCheck,
+  Timer,
+  Users,
+  X,
 } from "lucide-react";
+import { useConfig } from "@/lib/config";
 import { useSession } from "@/lib/session";
+import { BrandMark } from "./BrandMark";
 
 interface NavItem {
   href: string;
@@ -31,125 +34,137 @@ interface NavItem {
   anyOf?: string[];
 }
 
-// What a user sees is driven by permissions, not role names, so custom roles
-// get the right menu automatically.
+// Driven by permissions, not role names, so custom roles get the right menu automatically.
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/complaints", label: "Complaints", icon: FileText, anyOf: ["complaint.view"] },
-  { href: "/complaints?escalated=me", label: "Escalated to Me", icon: ArrowUpCircle, anyOf: ["complaint.assign"] },
+  { href: "/complaints?escalated=me", label: "Escalated to me", icon: ArrowUpCircle, anyOf: ["complaint.assign"] },
   {
     href: "/rejection-requests",
-    label: "Rejection Requests",
+    label: "Rejection requests",
     icon: Ban,
     anyOf: ["complaint.reject.approve", "complaint.reject.request"],
   },
   { href: "/reports", label: "Reports", icon: BarChart3, anyOf: ["reports.view"] },
-  { href: "/users", label: "Staff Users", icon: Users, anyOf: ["user.view"] },
-  { href: "/end-users", label: "End Users", icon: Contact, anyOf: ["end_user.view"] },
+  { href: "/users", label: "Staff users", icon: Users, anyOf: ["user.view"] },
+  { href: "/end-users", label: "End users", icon: Contact, anyOf: ["end_user.view"] },
   { href: "/departments", label: "Departments", icon: Building2, anyOf: ["department.view"] },
   { href: "/locations", label: "Locations", icon: MapPin, anyOf: ["location.view"] },
-  { href: "/roles", label: "Roles & Permissions", icon: ShieldCheck, anyOf: ["role.manage"] },
-  { href: "/sla", label: "SLA & Escalation", icon: Timer, anyOf: ["sla.manage"] },
-  { href: "/imports", label: "Import History", icon: History, anyOf: ["location.import", "end_user.import"] },
-  { href: "/audit-logs", label: "Audit Logs", icon: ScrollText, anyOf: ["audit.view"] },
+  { href: "/roles", label: "Roles & permissions", icon: ShieldCheck, anyOf: ["role.view"] },
+  { href: "/sla", label: "Priorities & SLA", icon: Timer, anyOf: ["sla.manage"] },
+  { href: "/imports", label: "Import history", icon: History, anyOf: ["location.import", "end_user.import"] },
+  { href: "/audit-logs", label: "Audit log", icon: ScrollText, anyOf: ["audit.view"] },
+  { href: "/settings", label: "Settings", icon: Settings, anyOf: ["settings.manage"] },
 ];
 
-interface SidebarProps {
-  isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
+function SupportCard({ collapsed }: { collapsed: boolean }) {
+  const { support } = useConfig();
+  const lines = [support.phone, support.email].filter((v): v is string => Boolean(v));
+  if (lines.length === 0) return null;
+  if (collapsed) {
+    return (
+      <div className="p-3 mx-auto mb-4" title={[...lines, support.hours].filter(Boolean).join("\n")}>
+        <div className="w-10 h-10 rounded-full bg-[#162244] border border-[#233566] flex items-center justify-center text-sky-400">
+          <Headphones className="w-5 h-5" />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="p-4 m-3.5 rounded-xl bg-[#162244] border border-[#233566] text-[11px]">
+      <div className="flex items-center gap-2.5 mb-2">
+        <div className="w-8 h-8 rounded-full bg-[#203260] flex items-center justify-center text-sky-400 shrink-0">
+          <Headphones className="w-4 h-4" />
+        </div>
+        <span className="text-xs font-semibold text-white">Support</span>
+      </div>
+      {support.phone && (
+        <a href={`tel:${support.phone.replace(/[^\d+]/g, "")}`} className="block text-slate-300 hover:text-white truncate">
+          {support.phone}
+        </a>
+      )}
+      {support.email && (
+        <a href={`mailto:${support.email}`} className="block text-slate-300 hover:text-white truncate">
+          {support.email}
+        </a>
+      )}
+      {support.hours && <p className="text-slate-500 mt-1">{support.hours}</p>}
+    </div>
+  );
 }
 
-export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps) {
+export function Sidebar({
+  collapsed,
+  onToggleCollapse,
+  mobileOpen,
+  onCloseMobile,
+}: {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
+}) {
   const pathname = usePathname();
   const { canAny } = useSession();
   const items = NAV_ITEMS.filter((item) => !item.anyOf || canAny(...item.anyOf));
+  // On phones the drawer always shows labels.
+  const narrow = collapsed && !mobileOpen;
 
   return (
-    <aside
-      className={`sticky top-0 flex flex-col bg-[#111c38] text-slate-300 transition-all duration-300 ease-in-out z-30 shrink-0 ${
-        isCollapsed ? "w-20" : "w-64"
-      } h-screen border-r border-[#1e2d54]`}
-    >
-      {/* Brand Header */}
-      <div className="flex items-center justify-between px-5 py-5 border-b border-[#1b284e]">
-        {!isCollapsed && <CivicLogo size={36} theme="dark" />}
-        {isCollapsed && (
-          <div className="mx-auto">
-            <CivicLogo size={32} showText={false} theme="dark" />
-          </div>
-        )}
-
-        <button
-          onClick={onToggleCollapse}
-          className="flex items-center justify-center w-7 h-7 rounded-full bg-[#1e2d54] text-slate-300 hover:text-white hover:bg-[#2563eb] transition-colors cursor-pointer"
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+    <>
+      {mobileOpen && <div className="fixed inset-0 z-40 bg-slate-900/60 lg:hidden" onClick={onCloseMobile} aria-hidden="true" />}
+      <aside
+        className={`fixed lg:sticky inset-y-0 left-0 top-0 z-50 lg:z-30 flex flex-col bg-[#111c38] text-slate-300 transition-all duration-300 shrink-0 h-screen border-r border-[#1e2d54] ${
+          narrow ? "lg:w-20" : "lg:w-64"
+        } w-72 ${mobileOpen ? "translate-x-0" : "-translate-x-full invisible lg:visible lg:translate-x-0"}`}
+        aria-label="Main navigation"
+      >
+        <div
+          className={`flex items-center gap-2 px-5 py-5 border-b border-[#1b284e] ${narrow ? "justify-center" : "justify-between"}`}
         >
-          <ChevronLeft
-            className={`w-4 h-4 transition-transform duration-300 ${
-              isCollapsed ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-      </div>
-
-      {/* Navigation Links */}
-      <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-1.5">
-        {items.map((item) => {
-          const Icon = item.icon;
-          // Links with a query (filtered views) are not highlighted; their base page is.
-          const active =
-            !item.href.includes("?") && (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={isCollapsed ? item.label : undefined}
-              className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                active
-                  ? "bg-[#2563eb] text-white shadow-md shadow-blue-900/30"
-                  : "text-slate-300 hover:bg-[#1a274c] hover:text-white"
-              }`}
-            >
-              <Icon className={`w-[18px] h-[18px] mr-3 shrink-0 ${active ? "" : "text-slate-400"}`} />
-              {!isCollapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Bottom Need Help Card */}
-      {!isCollapsed && (
-        <div className="p-4 m-3.5 rounded-xl bg-[#162244] border border-[#233566]">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-full bg-[#203260] flex items-center justify-center text-sky-400">
-              <Headphones className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-white">Need Help?</h4>
-              <p className="text-[11px] text-slate-400">Contact support team</p>
-            </div>
-          </div>
+          {!narrow && <BrandMark theme="dark" />}
           <button
-            onClick={() => alert("Support helpline: +91 1800-CIVIC-CARE\nEmail: support@civiccare.gov.in")}
-            className="w-full mt-2 py-2 px-3 text-xs font-medium text-white bg-[#101b38] hover:bg-[#1f2f5e] rounded-lg border border-[#2b3e75] transition-all text-center cursor-pointer shadow-sm"
+            onClick={onToggleCollapse}
+            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-full bg-[#1e2d54] text-slate-300 hover:text-white hover:bg-blue-600 transition-colors cursor-pointer shrink-0"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            Contact Support
+            <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
+          </button>
+          <button
+            onClick={onCloseMobile}
+            className="lg:hidden flex items-center justify-center w-8 h-8 rounded-full bg-[#1e2d54] text-slate-300 hover:text-white cursor-pointer shrink-0"
+            aria-label="Close menu"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
-      )}
 
-      {/* Collapsed small support icon */}
-      {isCollapsed && (
-        <div className="p-3 mx-auto mb-4">
-          <button
-            onClick={() => alert("Support helpline: +91 1800-CIVIC-CARE")}
-            className="w-10 h-10 rounded-full bg-[#162244] border border-[#233566] flex items-center justify-center text-sky-400 hover:bg-[#203260]"
-            title="Need Help?"
-          >
-            <Headphones className="w-5 h-5" />
-          </button>
-        </div>
-      )}
-    </aside>
+        <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-1">
+          {items.map((item) => {
+            const Icon = item.icon;
+            // Filtered views (links with a query) are not highlighted; their base page is.
+            const active = !item.href.includes("?") && (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={narrow ? item.label : undefined}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  active
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
+                    : "text-slate-300 hover:bg-[#1a274c] hover:text-white"
+                } ${narrow ? "justify-center" : ""}`}
+              >
+                <Icon className={`w-4.5 h-4.5 shrink-0 ${narrow ? "" : "mr-3"} ${active ? "" : "text-slate-400"}`} />
+                {!narrow && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <SupportCard collapsed={narrow} />
+      </aside>
+    </>
   );
 }

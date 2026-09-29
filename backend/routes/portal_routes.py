@@ -1,34 +1,46 @@
-"""End-user portal. End users are imported by CSV; they sign in with
-their mobile or email + OTP and only ever see their own complaints."""
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+"""End-user portal. End users are imported by CSV or added by staff; they sign
+in with their mobile number or email + a one-time code and only ever see their
+own complaints."""
+from datetime import date, datetime
 
-from config import EXPOSE_DEV_OTP, OTP_RESEND_COOLDOWN_SECONDS, OTP_TTL_MINUTES
+import jwt
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session, selectinload
+
+from config import (
+    ACCOUNT_SELECTION_MINUTES, DEFAULT_PAGE_SIZE, EXPOSE_DEV_OTP, MAX_PAGE_SIZE, OTP_RESEND_COOLDOWN_SECONDS,
+    OTP_TTL_MINUTES,
+)
 from database import get_db
-from models import Complaint, ComplaintEvent, Department, EndUser, Notification
-from services import audit_service, notification_service, otp_service, routing_service, workflow_service
+from models import GENDERS, Complaint, ComplaintEvent, Department, EndUser, Notification, max_length
+from services import (
+    attachment_service, audit_service, notification_service, otp_service, routing_service, settings_service,
+    token_service, workflow_service,
+)
 from services.complaint_service import (
-    end_user_detail, group_counts, register_complaint, resolve_classification, save_attachments,
-    serialize_complaints, validate_priority,
+    DETAIL_OPTIONS, LIST_OPTIONS, clean_complaint_text, end_user_detail, group_counts, register_complaint,
+    resolve_classification, serialize_complaints,
 )
 from services.location_service import build_tree, path_names, serialize_location
-from services.permission_catalog import END_USER_ROLE_KEY
-from services.token_service import issue_token_pair
+from services.statuses import CLOSED, RESOLVED, STATUS_GROUPS
 from utils.auth_middleware import (
-    end_user_permissions, end_user_role, get_current_end_user, require_portal_permission,
+    client_ip, end_user_permissions, end_user_role, get_current_end_user, require_portal_permission,
 )
-from utils.security import PRINCIPAL_END_USER, looks_like_email, normalize_email, normalize_mobile
+from utils.cookies import set_refresh_cookie
+from utils.search import text_match
+from utils.security import (
+    PRINCIPAL_END_USER, TOKEN_ACCOUNT_SELECTION, create_purpose_token, decode_purpose_token, utcnow,
+)
+from utils.text import multi_line, single_line
 
 router = APIRouter()
 
 
+
 class RequestOtp(BaseModel):
-    """The channel's own identifier is required (mobile for sms, email for
-    email). The other one is only needed when that identifier is shared."""
-    mobile: str | None = None
-    email: str | None = None
-    channel: str = "sms"
+    channel: str  # "sms" | "email"
+    identifier: str
 
 
 class VerifyOtp(BaseModel):
@@ -36,17 +48,25 @@ class VerifyOtp(BaseModel):
     otp: str
 
 
+class SelectAccount(BaseModel):
+    selection_token: str
+    end_user_id: int
+
+
 class UpdateProfileRequest(BaseModel):
     name: str | None = None
-    email: str | None = None
-    mobile: str | None = None
-    dob: str | None = None
+    dob: date | None = None
+    clear_dob: bool = False
     gender: str | None = None
+    clear_gender: bool = False
     address: str | None = None
-    language: str | None = None
     notify_sms: bool | None = None
     notify_email: bool | None = None
-    notify_alerts: bool | None = None
+
+
+class ContactChangeRequest(BaseModel):
+    channel: str
+    value: str
 
 
 class ConfirmRequest(BaseModel):
@@ -65,87 +85,94 @@ class FeedbackRequest(BaseModel):
 
 def _profile(db: Session, end_user: EndUser) -> dict:
     role = end_user_role(db)
+    names = path_names(db, [end_user.location])
     return {
         "id": end_user.id,
         "external_id": end_user.external_id,
         "name": end_user.name,
         "mobile": end_user.mobile,
         "email": end_user.email,
-        "location": serialize_location(end_user.location, path_names(db, [end_user.location])),
-        "dob": end_user.dob or "",
-        "gender": end_user.gender or "",
-        "address": end_user.address or "",
-        "language": end_user.language,
+        "location": serialize_location(end_user.location, names),
+        "dob": end_user.dob.isoformat() if end_user.dob else None,
+        "gender": end_user.gender,
+        "address": end_user.address,
         "notify_sms": end_user.notify_sms,
         "notify_email": end_user.notify_email,
-        "notify_alerts": end_user.notify_alerts,
-        "role": {"key": END_USER_ROLE_KEY, "name": role.name if role else "End User"},
-        "permissions": sorted(p.key for p in role.permissions) if role else [],
+        "role": {"key": role.key, "name": role.name},
+        "permissions": sorted(p.key for p in role.permissions),
     }
 
 
-@router.post("/auth/request-otp")
-def request_otp(payload: RequestOtp, db: Session = Depends(get_db)):
-    if payload.channel not in otp_service.CHANNELS:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Channel must be 'sms' or 'email'")
-    mobile = normalize_mobile(payload.mobile)
-    email = normalize_email(payload.email)
-    by_sms = payload.channel == "sms"
-    if not (mobile if by_sms else email):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Mobile number is required" if by_sms else "Email address is required",
-        )
-
-    query = db.query(EndUser).filter(EndUser.is_active.is_(True))
-    if mobile:
-        query = query.filter(EndUser.mobile == mobile)
-    if email:
-        query = query.filter(EndUser.email == email)
-    matches = query.limit(2).all()
-    entered = " and ".join(label for label, value in (("mobile number", mobile), ("email address", email)) if value)
-    if not matches:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            f"No registered end user matches this {entered}. "
-            "Please contact your municipal office to be registered.",
-        )
-    # Only the mobile + email pair is unique (e.g. a family sharing one phone),
-    # so an identifier shared by several end users needs the other one too.
-    if len(matches) > 1:
-        other = "email address" if by_sms else "mobile number"
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            f"This {entered} is registered to more than one end user. Please also enter your registered {other}.",
-        )
-    end_user = matches[0]
-
-    challenge, code = otp_service.issue_challenge(db, end_user, payload.channel)
-    otp_service.deliver(end_user, payload.channel, code)
-    response = {
-        "success": True,
-        "challenge_id": challenge.challenge_id,
-        "channel": payload.channel,
-        "sent_to": otp_service.mask_target(end_user, payload.channel),
-        "expires_in_seconds": OTP_TTL_MINUTES * 60,
-        "resend_after_seconds": OTP_RESEND_COOLDOWN_SECONDS,
-    }
-    if EXPOSE_DEV_OTP:
-        response["dev_otp"] = code
-    return response
-
-
-@router.post("/auth/verify-otp")
-def verify_otp(payload: VerifyOtp, request: Request, db: Session = Depends(get_db)):
-    end_user = otp_service.verify_challenge(db, payload.challenge_id, payload.otp)
-    if not end_user.is_active:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been deactivated")
+def _session(response: Response, db: Session, end_user: EndUser, request: Request) -> dict:
+    end_user.last_login_at = utcnow()
     audit_service.record(
         db, actor=end_user, action="auth.login", entity_type="end_user", entity_id=end_user.id,
         summary=f"End user {end_user.name} signed in", request=request,
     )
-    tokens = issue_token_pair(db, PRINCIPAL_END_USER, end_user.id)
-    return {"success": True, **tokens, "user": _profile(db, end_user)}
+    access, refresh = token_service.issue(db, end_user)
+    set_refresh_cookie(response, PRINCIPAL_END_USER, refresh)
+    return {"access_token": access, "token_type": "bearer", "user": _profile(db, end_user)}
 
+
+def _challenge_response(db: Session, challenge, code: str | None) -> dict:
+    response = {
+        "challenge_id": challenge.challenge_id,
+        "channel": challenge.channel,
+        "sent_to": otp_service.mask_target(db, challenge.channel, challenge.target),
+        "expires_in_seconds": OTP_TTL_MINUTES * 60,
+        "resend_after_seconds": OTP_RESEND_COOLDOWN_SECONDS,
+    }
+    if EXPOSE_DEV_OTP and code is not None:
+        response["dev_otp"] = code
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Sign-in
+# ---------------------------------------------------------------------------
+
+@router.post("/auth/request-otp")
+def request_otp(payload: RequestOtp, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """Always answers the same way, and as fast, for registered and unregistered identifiers."""
+    challenge, code = otp_service.request_login_code(db, payload.channel, payload.identifier, client_ip(request))
+    if code is not None:
+        background.add_task(otp_service.send_login_code, challenge.challenge_id, code)
+    return _challenge_response(db, challenge, code)
+
+
+@router.post("/auth/verify-otp")
+def verify_otp(payload: VerifyOtp, request: Request, response: Response, db: Session = Depends(get_db)):
+    channel, target, end_users = otp_service.verify_login_code(db, payload.challenge_id, payload.otp,
+                                                               client_ip(request))
+    if len(end_users) == 1:
+        return _session(response, db, end_users[0], request)
+    # Several people share this phone/email: they choose who is signing in.
+    names = path_names(db, [e.location for e in end_users])
+    token = create_purpose_token(TOKEN_ACCOUNT_SELECTION, {"ids": [e.id for e in end_users]}, ACCOUNT_SELECTION_MINUTES)
+    return {
+        "selection_token": token,
+        "accounts": [{"id": e.id, "name": e.name, "location": names[e.location_id][-1] if e.location_id else None}
+                     for e in end_users],
+    }
+
+
+@router.post("/auth/select-account")
+def select_account(payload: SelectAccount, request: Request, response: Response, db: Session = Depends(get_db)):
+    try:
+        claims = decode_purpose_token(payload.selection_token, TOKEN_ACCOUNT_SELECTION)
+    except jwt.InvalidTokenError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The sign-in has expired; request a new code") from None
+    if payload.end_user_id not in claims.get("ids", []):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose one of the listed accounts")
+    end_user = db.get(EndUser, payload.end_user_id)
+    if end_user is None or not end_user.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This account is no longer active")
+    return _session(response, db, end_user, request)
+
+
+# ---------------------------------------------------------------------------
+# Profile
+# ---------------------------------------------------------------------------
 
 @router.get("/me")
 def me(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
@@ -157,39 +184,29 @@ def update_profile(
     payload: UpdateProfileRequest, request: Request,
     end_user: EndUser = Depends(require_portal_permission("portal.profile.update")), db: Session = Depends(get_db),
 ):
-    """End users keep their own details up to date. Mobile + email are also the
-    login identity, so they stay valid and unique as a pair."""
+    """Personal details and notification preferences. Mobile number and email
+    are the sign-in identity; they change through /profile/contact (verified)."""
     before = _profile(db, end_user)
     if payload.name is not None:
-        name = " ".join(payload.name.split())
-        if not name or len(name) > 150:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Name is required (max 150 characters)")
-        end_user.name = name
-    if payload.mobile is not None:
-        mobile = normalize_mobile(payload.mobile)
-        if not mobile or len(mobile) != 10:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Mobile must be a 10-digit number")
-        end_user.mobile = mobile
-    if payload.email is not None:
-        email = normalize_email(payload.email)
-        if not email or not looks_like_email(email):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email is not valid")
-        end_user.email = email
-    clash = db.query(EndUser).filter(
-        EndUser.mobile == end_user.mobile, EndUser.email == end_user.email, EndUser.id != end_user.id,
-    ).first()
-    if clash is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Another account already uses this mobile number and email")
-    for field, limit in (("dob", 20), ("gender", 20), ("address", 500)):
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(end_user, field, value.strip()[:limit] or None)
-    if payload.language is not None and payload.language.strip():
-        end_user.language = payload.language.strip()[:50]
-    for field in ("notify_sms", "notify_email", "notify_alerts"):
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(end_user, field, value)
+        end_user.name = single_line(payload.name, "Name", max_length(EndUser.name))
+    if payload.clear_dob:
+        end_user.dob = None
+    elif payload.dob is not None:
+        if payload.dob > datetime.now(settings_service.timezone(db)).date():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Date of birth cannot be in the future")
+        end_user.dob = payload.dob
+    if payload.clear_gender:
+        end_user.gender = None
+    elif payload.gender is not None:
+        if payload.gender not in GENDERS:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Gender must be one of: {', '.join(GENDERS)}")
+        end_user.gender = payload.gender
+    if payload.address is not None:
+        end_user.address = multi_line(payload.address, "Address", max_length(EndUser.address), required=False)
+    if payload.notify_sms is not None:
+        end_user.notify_sms = payload.notify_sms
+    if payload.notify_email is not None:
+        end_user.notify_email = payload.notify_email
 
     after = _profile(db, end_user)
     changes = audit_service.diff(before, after)
@@ -200,58 +217,64 @@ def update_profile(
             changes=changes, request=request,
         )
     db.commit()
-    return {"success": True, "message": "Profile updated successfully", "user": _profile(db, end_user)}
+    return after
 
 
-# Timeline entries -> the activity kinds the portal's feed shows
-ACTIVITY_TYPES = {"submitted": "forwarded", "routed": "forwarded", "assigned": "assigned", "escalated": "in_progress"}
+@router.post("/profile/contact/request")
+def request_contact_change(
+    payload: ContactChangeRequest, request: Request,
+    end_user: EndUser = Depends(require_portal_permission("portal.profile.update")), db: Session = Depends(get_db),
+):
+    """Sends a code to the new mobile number / email; the change applies once it is confirmed."""
+    challenge, code = otp_service.request_contact_change(db, end_user, payload.channel, payload.value,
+                                                         client_ip(request))
+    return _challenge_response(db, challenge, code)
 
 
-@router.get("/activities")
-def my_activities(limit: int = 30, end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
-    """Recent public updates across the end user's complaints."""
-    events = (
-        db.query(ComplaintEvent)
-        .join(Complaint, ComplaintEvent.complaint_id == Complaint.id)
-        .filter(Complaint.end_user_id == end_user.id, ComplaintEvent.public_message.isnot(None))
-        .order_by(ComplaintEvent.created_at.desc(), ComplaintEvent.id.desc())
-        .limit(min(max(limit, 1), 100))
-        .all()
+@router.post("/profile/contact/verify")
+def verify_contact_change(
+    payload: VerifyOtp, request: Request, response: Response,
+    end_user: EndUser = Depends(require_portal_permission("portal.profile.update")), db: Session = Depends(get_db),
+):
+    """Applies the verified contact and signs out every other session."""
+    channel, old, new = otp_service.verify_contact_change(db, end_user, payload.challenge_id, payload.otp,
+                                                          client_ip(request))
+    label = "mobile" if channel == "sms" else "email"
+    token_service.end_all_sessions(db, end_user)
+    audit_service.record(
+        db, actor=end_user, action="end_user.contact_change", entity_type="end_user", entity_id=end_user.id,
+        summary=f"End user {end_user.name} changed their {label}", changes={label: [old, new]}, request=request,
     )
-    activities = []
-    for event in events:
-        if event.event_type == "status_changed":
-            kind = "resolved" if event.to_status in (workflow_service.RESOLVED, workflow_service.CLOSED) else "in_progress"
-        else:
-            kind = ACTIVITY_TYPES.get(event.event_type, "in_progress")
-        activities.append({
-            "id": event.id,
-            "title": event.complaint.title,
-            "desc": f"{event.complaint.generated_id}: {event.public_message}",
-            "type": kind,
-            "complaint_id": event.complaint.generated_id,
-            "created_at": event.created_at.isoformat(),
-        })
-    return {"success": True, "activities": activities}
+    db.commit()
+    access, refresh = token_service.issue(db, end_user)
+    set_refresh_cookie(response, PRINCIPAL_END_USER, refresh)
+    return {"access_token": access, "token_type": "bearer", "user": _profile(db, end_user)}
 
+
+# ---------------------------------------------------------------------------
+# Reference data
+# ---------------------------------------------------------------------------
 
 @router.get("/departments")
 def departments(_: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
-    return [
-        {
-            "id": d.id,
-            "name": d.name,
-            "code": d.code,
-            "categories": [{"id": c.id, "name": c.name} for c in d.categories if c.is_active],
-        }
-        for d in db.query(Department).filter(Department.is_active.is_(True)).order_by(Department.name).all()
-    ]
+    """Active departments that have at least one active category (complaints need one)."""
+    result = []
+    for d in db.query(Department).filter(Department.is_active.is_(True)).order_by(Department.name).all():
+        categories = [{"id": c.id, "name": c.name, "priority": c.default_priority.name}
+                      for c in d.categories if c.is_active and c.default_priority.is_active]
+        if categories:
+            result.append({"id": d.id, "name": d.name, "code": d.code, "categories": categories})
+    return result
 
 
 @router.get("/locations/tree")
 def locations_tree(_: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
     return build_tree(db)
 
+
+# ---------------------------------------------------------------------------
+# Complaints
+# ---------------------------------------------------------------------------
 
 def _own(db: Session, end_user: EndUser):
     return db.query(Complaint).filter(Complaint.end_user_id == end_user.id)
@@ -263,23 +286,38 @@ def _require_attach(db: Session, files: list[UploadFile]) -> None:
 
 
 def _get_own(db: Session, end_user: EndUser, complaint_id: str) -> Complaint:
-    complaint = _own(db, end_user).filter(Complaint.generated_id == complaint_id).first()
+    complaint = (_own(db, end_user).filter(Complaint.generated_id == complaint_id)
+                 .options(*DETAIL_OPTIONS).first())
     if complaint is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found")
     return complaint
 
 
 @router.get("/complaints")
-def my_complaints(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
-    complaints = _own(db, end_user).order_by(Complaint.created_at.desc()).all()
-    return serialize_complaints(db, complaints, for_end_user=True)
+def my_complaints(
+    group: str | None = None, search: str | None = None, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
+    end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db),
+):
+    page, page_size = max(page, 1), min(max(page_size, 1), MAX_PAGE_SIZE)
+    query = _own(db, end_user)
+    if group:
+        if group not in STATUS_GROUPS:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"group must be one of: {', '.join(STATUS_GROUPS)}")
+        query = query.filter(Complaint.status.in_(STATUS_GROUPS[group]))
+    if search and search.strip():
+        term = search.strip()
+        query = query.filter(text_match(term, Complaint.title, Complaint.generated_id))
+    total = query.count()
+    complaints = (query.options(*LIST_OPTIONS).order_by(Complaint.created_at.desc(), Complaint.id.desc())
+                  .offset((page - 1) * page_size).limit(page_size).all())
+    return {"items": serialize_complaints(db, complaints, for_end_user=True), "total": total, "page": page,
+            "page_size": page_size}
 
 
 @router.get("/complaints/stats")
 def my_complaint_stats(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
-    own = _own(db, end_user)
-    counts = group_counts(own)
-    return {"total": own.count(), **counts}
+    counts = group_counts(_own(db, end_user))
+    return {"total": sum(counts.values()), **counts}
 
 
 @router.get("/complaints/{complaint_id}")
@@ -287,59 +325,44 @@ def my_complaint(complaint_id: str, end_user: EndUser = Depends(get_current_end_
     return end_user_detail(db, end_user, _get_own(db, end_user, complaint_id), end_user_permissions(db))
 
 
-@router.post("/complaints", status_code=201)
+@router.post("/complaints", status_code=status.HTTP_201_CREATED)
 def create_complaint(
     request: Request,
     department_id: int = Form(...),
-    category_id: int | None = Form(None),
-    priority: str = Form("Medium"),
+    category_id: int = Form(...),
+    location_id: int = Form(...),
     title: str = Form(...),
     description: str = Form(...),
-    location_id: int | None = Form(None),
     additional_details: str | None = Form(None),
     files: list[UploadFile] = File(default=[]),
     end_user: EndUser = Depends(require_portal_permission("portal.complaint.create")),
     db: Session = Depends(get_db),
 ):
+    """The category decides the starting priority; staff may change it later."""
     _require_attach(db, files)
-    title = title.strip()
-    description = description.strip()
-    if not title or len(title) > 200:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Title is required (max 200 characters)")
-    if not description:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Description is required")
-    location_id = location_id or end_user.location_id
-    if location_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Please choose the location of the issue")
+    title, description, additional_details = clean_complaint_text(title, description, additional_details)
     department, category, location = resolve_classification(db, department_id, category_id, location_id)
-
-    complaint = register_complaint(
-        db,
-        department=department,
-        category=category,
-        location=location,
-        priority=validate_priority(priority),
-        title=title,
-        description=description,
-        additional_details=(additional_details or "").strip()[:500] or None,
-        end_user=end_user,
-    )
-    saved = save_attachments(db, complaint, files, end_user)
-    audit_service.record(
-        db, actor=end_user, action="complaint.create", entity_type="complaint", entity_id=complaint.generated_id,
-        summary=f"End user {end_user.name} registered {complaint.generated_id} ({department.name}, {location.name})",
-        request=request,
-    )
-    db.commit()
-    return {
-        "success": True,
-        "complaint_id": complaint.generated_id,
-        "message": "Complaint registered successfully",
-        "attachments": saved,
-    }
+    stored = attachment_service.StoredFiles()
+    try:
+        complaint = register_complaint(
+            db, department=department, category=category, location=location, priority=category.default_priority,
+            title=title, description=description, additional_details=additional_details, end_user=end_user,
+        )
+        attachment_service.save_attachments(db, complaint, files, end_user, stored)
+        audit_service.record(
+            db, actor=end_user, action="complaint.create", entity_type="complaint", entity_id=complaint.generated_id,
+            summary=f"End user {end_user.name} registered {complaint.generated_id} ({department.name}, {location.name})",
+            request=request,
+        )
+        db.commit()
+    except BaseException:
+        db.rollback()
+        stored.discard()
+        raise
+    return end_user_detail(db, end_user, _get_own(db, end_user, complaint.generated_id), end_user_permissions(db))
 
 
-@router.post("/complaints/{complaint_id}/comments", status_code=201)
+@router.post("/complaints/{complaint_id}/comments", status_code=status.HTTP_201_CREATED)
 def comment_on_complaint(
     complaint_id: str,
     body: str = Form(...),
@@ -348,13 +371,19 @@ def comment_on_complaint(
     db: Session = Depends(get_db),
 ):
     complaint = _get_own(db, end_user, complaint_id)
-    if "comment" not in workflow_service.end_user_actions_for(complaint):
+    if "comment" not in workflow_service.end_user_actions_for(db, complaint):
         raise HTTPException(status.HTTP_409_CONFLICT, "This complaint is closed. Reopen it to add a comment.")
     _require_attach(db, files)
-    comment = workflow_service.add_comment(db, complaint, end_user, body)
-    save_attachments(db, complaint, files, end_user, comment=comment)
-    db.commit()
-    return end_user_detail(db, end_user, complaint, end_user_permissions(db))
+    stored = attachment_service.StoredFiles()
+    try:
+        comment = workflow_service.add_comment(db, complaint, end_user, body)
+        attachment_service.save_attachments(db, complaint, files, end_user, stored, comment=comment)
+        db.commit()
+    except BaseException:
+        db.rollback()
+        stored.discard()
+        raise
+    return end_user_detail(db, end_user, _get_own(db, end_user, complaint_id), end_user_permissions(db))
 
 
 @router.post("/complaints/{complaint_id}/confirm")
@@ -364,9 +393,9 @@ def confirm_resolution(
     db: Session = Depends(get_db),
 ):
     complaint = _get_own(db, end_user, complaint_id)
-    # A rating given while confirming is feedback, which the role may not allow.
-    rating = payload.rating if "portal.complaint.feedback" in end_user_permissions(db) else None
-    workflow_service.end_user_confirm(db, end_user, complaint, rating, payload.comment)
+    if payload.rating is not None and "portal.complaint.feedback" not in end_user_permissions(db):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Missing permission: portal.complaint.feedback")
+    workflow_service.end_user_confirm(db, end_user, complaint, payload.rating, payload.comment)
     audit_service.record(
         db, actor=end_user, action="complaint.confirm", entity_type="complaint", entity_id=complaint.generated_id,
         summary=f"End user {end_user.name} confirmed the resolution of {complaint.generated_id}", request=request,
@@ -387,10 +416,14 @@ def reopen_complaint(
         db, actor=end_user, action="complaint.reopen", entity_type="complaint", entity_id=complaint.generated_id,
         summary=f"End user {end_user.name} reopened {complaint.generated_id}", request=request,
     )
-    # The original officer keeps it, unless they have since left or gone unavailable.
+    # The same handler keeps it if they still can; otherwise it goes to someone else or the queue.
     handler = complaint.assigned_to
-    if handler is None or not handler.is_active or not handler.is_available:
-        routing_service.auto_route(db, complaint)
+    now = utcnow()
+    if handler is not None and not (routing_service.still_handles(handler, complaint) and handler.is_available):
+        routing_service.unassign(db, complaint, None, f"{handler.name} is no longer available", now)
+        handler = None
+    if handler is None:
+        routing_service.auto_route(db, complaint, at=now)
     db.commit()
     return end_user_detail(db, end_user, complaint, end_user_permissions(db))
 
@@ -411,12 +444,50 @@ def give_feedback(
     return end_user_detail(db, end_user, complaint, end_user_permissions(db))
 
 
+# ---------------------------------------------------------------------------
+# Activity and notifications
+# ---------------------------------------------------------------------------
+
+@router.get("/activities")
+def my_activities(page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
+                  end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
+    """Recent public updates across the end user's complaints."""
+    page, page_size = max(page, 1), min(max(page_size, 1), MAX_PAGE_SIZE)
+    query = (
+        db.query(ComplaintEvent)
+        .join(Complaint, ComplaintEvent.complaint_id == Complaint.id)
+        .filter(Complaint.end_user_id == end_user.id, ComplaintEvent.public_message.isnot(None))
+    )
+    total = query.count()
+    events = (
+        query.options(selectinload(ComplaintEvent.complaint))
+        .order_by(ComplaintEvent.created_at.desc(), ComplaintEvent.id.desc())
+        .offset((page - 1) * page_size).limit(page_size).all()
+    )
+    items = []
+    for event in events:
+        if event.event_type == "status_changed" and event.to_status in (RESOLVED, CLOSED):
+            kind = "resolved"
+        else:
+            kind = event.event_type
+        items.append({
+            "id": event.id,
+            "kind": kind,
+            "title": event.complaint.title,
+            "message": event.public_message,
+            "complaint_id": event.complaint.generated_id,
+            "created_at": event.created_at.isoformat(),
+        })
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
 @router.get("/notifications")
 def my_notifications(
-    unread_only: bool = False, limit: int = 30,
+    unread_only: bool = False, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
     end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db),
 ):
-    return notification_service.list_for(db, "end_user", end_user.id, unread_only, limit)
+    return notification_service.list_for(db, "end_user", end_user.id, unread_only, max(page, 1),
+                                         min(max(page_size, 1), MAX_PAGE_SIZE))
 
 
 @router.post("/notifications/{notification_id}/read")
@@ -427,16 +498,16 @@ def mark_notification_read(
     return {"success": True}
 
 
+@router.post("/notifications/read-all")
+def mark_all_notifications_read(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
+    notification_service.mark_read(db, "end_user", end_user.id)
+    return {"success": True}
+
+
 @router.delete("/notifications")
 def clear_notifications(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
     db.query(Notification).filter(
         Notification.recipient_type == "end_user", Notification.recipient_id == end_user.id,
     ).delete(synchronize_session=False)
     db.commit()
-    return {"success": True}
-
-
-@router.post("/notifications/read-all")
-def mark_all_notifications_read(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
-    notification_service.mark_read(db, "end_user", end_user.id)
     return {"success": True}

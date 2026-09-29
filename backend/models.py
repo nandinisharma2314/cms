@@ -1,10 +1,51 @@
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey, Table, Text, UniqueConstraint, Index,
+    Boolean, Column, Computed, Date, DateTime, ForeignKey, Index, Integer, String, Table, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
 from database import Base
 from utils.security import utcnow
+
+
+def max_length(attribute) -> int:
+    """The declared size of a String column, e.g. max_length(EndUser.name): the
+    single source of text limits, for validation and for the apps' forms."""
+    return attribute.property.columns[0].type.length
+
+# ---------------------------------------------------------------------------
+# System settings (managed by the Super Admin; see services/settings_service.py)
+# ---------------------------------------------------------------------------
+
+
+class SystemSettings(Base):
+    """A single row (id = 1) of business settings. A NULL value means "not
+    configured yet": features that need it refuse to work and the admin panel
+    lists it under configuration problems."""
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True)
+    organisation_name = Column(String(150), nullable=True)
+    product_name = Column(String(100), nullable=True)
+    support_email = Column(String(120), nullable=True)
+    support_phone = Column(String(40), nullable=True)
+    support_hours = Column(String(120), nullable=True)
+    timezone = Column(String(64), nullable=True)  # IANA name, e.g. "Asia/Kolkata"
+    complaint_id_prefix = Column(String(10), nullable=True)
+    # Number the next complaint gets (complaint IDs are "<prefix>-<number>"); incremented on use.
+    complaint_next_number = Column(Integer, nullable=True)
+    reopen_window_days = Column(Integer, nullable=True)
+    max_reopens = Column(Integer, nullable=True)
+    max_attachments_per_complaint = Column(Integer, nullable=True)
+    max_attachment_mb = Column(Integer, nullable=True)
+    allowed_attachment_types = Column(String(255), nullable=True)  # comma-separated extensions
+    phone_country_code = Column(String(6), nullable=True)  # e.g. "+91"
+    phone_number_length = Column(Integer, nullable=True)  # digits after the country code
+    # Optional: leading digits a mobile number normally starts with; imports warn about others.
+    phone_expected_prefixes = Column(String(20), nullable=True)
+    sms_notifications_enabled = Column(Boolean, nullable=False)
+    email_notifications_enabled = Column(Boolean, nullable=False)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
 # ---------------------------------------------------------------------------
@@ -46,8 +87,26 @@ class Role(Base):
 
 
 # ---------------------------------------------------------------------------
-# Departments & locations
+# Priorities, departments, categories, locations
 # ---------------------------------------------------------------------------
+
+class Priority(Base):
+    """A complaint priority. Every priority has a default SLA rule (created
+    with it), so an active priority always has response/resolution targets."""
+    __tablename__ = "priorities"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(30), unique=True, nullable=False)
+    name = Column(String(50), unique=True, nullable=False)
+    # 1 = most urgent; drives sort order in lists and filters.
+    rank = Column(Integer, unique=True, nullable=False)
+    tone = Column(String(20), nullable=False)  # badge colour: see PRIORITY_TONES
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+PRIORITY_TONES = ("neutral", "info", "success", "warning", "danger", "critical")
+
 
 class Department(Base):
     __tablename__ = "departments"
@@ -72,32 +131,38 @@ class ComplaintCategory(Base):
     id = Column(Integer, primary_key=True)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)
+    # Priority a complaint in this category starts with; staff can change it later.
+    default_priority_id = Column(Integer, ForeignKey("priorities.id"), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 
     department = relationship("Department", back_populates="categories")
+    default_priority = relationship("Priority", lazy="joined")
 
 
 class LocationType(Base):
-    """A level of the location hierarchy (country, state, district, city, area)."""
+    """A level of the location hierarchy (e.g. region, site, zone). Levels are
+    defined by the admins; depth 0 is the top."""
     __tablename__ = "location_types"
 
     id = Column(Integer, primary_key=True)
     key = Column(String(30), unique=True, nullable=False)
     name = Column(String(50), nullable=False)
-    depth = Column(Integer, unique=True, nullable=False)  # 0 = top level
+    depth = Column(Integer, unique=True, nullable=False)
 
 
 class Location(Base):
     """A node in the location tree. `path` is the materialized path of ids from
     the root down to this node ("/1/4/9/"), so "is X inside Y" is a prefix check."""
     __tablename__ = "locations"
-    __table_args__ = (UniqueConstraint("parent_id", "name"),)
+    __table_args__ = (UniqueConstraint("parent_scope", "name", name="uq_locations_parent_scope_name"),)
 
     id = Column(Integer, primary_key=True)
     name = Column(String(150), nullable=False)
     type_id = Column(Integer, ForeignKey("location_types.id"), nullable=False)
-    parent_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
-    path = Column(String(255), nullable=False, default="", index=True)
+    parent_id = Column(Integer, ForeignKey("locations.id"), nullable=True, index=True)
+    # parent_id with NULL (top level) mapped to 0, so names are unique at every level.
+    parent_scope = Column(Integer, Computed("coalesce(parent_id, 0)", persisted=True))
+    path = Column(String(255), nullable=False, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
@@ -115,8 +180,12 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     email = Column(String(120), unique=True, index=True, nullable=False)
-    mobile = Column(String(20), index=True, nullable=True)
-    password_hash = Column(String(255), nullable=True)
+    mobile = Column(String(20), unique=True, nullable=True)
+    password_hash = Column(String(255), nullable=False)
+    # Set for passwords someone else chose (new accounts, approved resets).
+    must_change_password = Column(Boolean, default=False, nullable=False)
+    # Bumped to invalidate every token issued so far (password change, deactivation).
+    token_version = Column(Integer, default=0, nullable=False)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     reports_to_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -151,8 +220,11 @@ class UserScope(Base):
 
 
 # ---------------------------------------------------------------------------
-# End users (people who raise complaints; imported via CSV)
+# End users (people who raise complaints; imported via CSV or added by staff)
 # ---------------------------------------------------------------------------
+
+GENDERS = ("female", "male", "other", "prefer_not_to_say")
+
 
 class EndUser(Base):
     __tablename__ = "end_users"
@@ -161,19 +233,19 @@ class EndUser(Base):
     id = Column(Integer, primary_key=True)
     external_id = Column(String(50), unique=True, nullable=True)  # user_id column from the CSV
     name = Column(String(150), nullable=False)
-    mobile = Column(String(20), nullable=False, index=True)  # normalized digits
+    mobile = Column(String(20), nullable=False, index=True)  # normalized national number
     email = Column(String(120), nullable=False, index=True)  # lowercased
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    token_version = Column(Integer, default=0, nullable=False)
 
     # Profile details the end user maintains in the portal
-    dob = Column(String(20), nullable=True)
-    gender = Column(String(20), nullable=True)
+    dob = Column(Date, nullable=True)
+    gender = Column(String(20), nullable=True)  # one of GENDERS
     address = Column(String(500), nullable=True)
-    language = Column(String(50), default="English (India)", nullable=False)
+    # Whether complaint updates are also sent by SMS / email (when the organisation enables those channels).
     notify_sms = Column(Boolean, default=True, nullable=False)
     notify_email = Column(Boolean, default=True, nullable=False)
-    notify_alerts = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
@@ -187,45 +259,83 @@ class EndUser(Base):
 # ---------------------------------------------------------------------------
 
 class RefreshToken(Base):
+    """Refresh tokens rotate on every use. All tokens descending from one login
+    share a family; presenting an already-rotated token (outside the short
+    grace window) revokes the whole family."""
     __tablename__ = "refresh_tokens"
     __table_args__ = (Index("ix_refresh_tokens_principal", "principal_type", "principal_id"),)
 
     id = Column(Integer, primary_key=True)
     token_hash = Column(String(64), unique=True, nullable=False)
+    family_id = Column(String(64), nullable=False, index=True)
     principal_type = Column(String(20), nullable=False)  # "staff" | "end_user"
     principal_id = Column(Integer, nullable=False)
-    expires_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
     revoked_at = Column(DateTime, nullable=True)
+    replaced_at = Column(DateTime, nullable=True)  # set when rotated (as opposed to logged out)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+OTP_PURPOSE_LOGIN = "login"
+OTP_PURPOSE_CONTACT = "contact_change"
 
 
 class OtpChallenge(Base):
+    """A one-time code sent to a mobile number or email address.
+
+    Login challenges are keyed by the identifier, not by an account: the same
+    response is given whether or not the identifier is registered (unknown
+    identifiers get a decoy challenge that is never sent and never verifies)."""
     __tablename__ = "otp_challenges"
+    __table_args__ = (Index("ix_otp_challenges_target", "purpose", "channel", "target"),)
 
     id = Column(Integer, primary_key=True)
     challenge_id = Column(String(64), unique=True, nullable=False)
-    end_user_id = Column(Integer, ForeignKey("end_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose = Column(String(20), nullable=False)  # OTP_PURPOSE_*
     channel = Column(String(10), nullable=False)  # "sms" | "email"
+    target = Column(String(120), nullable=False)  # normalized mobile or email
+    end_user_id = Column(Integer, ForeignKey("end_users.id", ondelete="CASCADE"), nullable=True)  # contact changes
+    is_decoy = Column(Boolean, default=False, nullable=False)
     code_hash = Column(String(64), nullable=False)
     attempts = Column(Integer, default=0, nullable=False)
-    expires_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
     consumed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
-    end_user = relationship("EndUser")
+
+RESET_PENDING, RESET_APPROVED, RESET_REJECTED = "PENDING", "APPROVED", "REJECTED"
 
 
 class PasswordResetTicket(Base):
+    """A locked-out staff user's request for a new password, decided by
+    someone above them. The account is matched when the ticket is raised."""
     __tablename__ = "password_reset_tickets"
 
-    id = Column(Integer, primary_key=True, index=True)
-    ticket_id = Column(String(50), unique=True, index=True, nullable=False)
-    email_or_id = Column(String(120), nullable=False)
-    department = Column(String(100), nullable=False)
+    id = Column(Integer, primary_key=True)
+    ticket_id = Column(String(20), unique=True, index=True, nullable=False)
+    identifier = Column(String(120), nullable=False)  # what the requester typed (email or mobile)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL: no account matched
     reason = Column(String(500), nullable=False)
-    status = Column(String(50), default="Pending Approval")  # Pending Approval, Approved
-    created_at = Column(DateTime, default=utcnow)
-    approved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String(20), nullable=False, index=True)  # RESET_*
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    decided_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    decision_note = Column(String(500), nullable=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+    decided_by = relationship("User", foreign_keys=[decided_by_id])
+
+
+class RateLimitCounter(Base):
+    """Fixed-window counters shared by every API worker."""
+    __tablename__ = "rate_limit_counters"
+    __table_args__ = (UniqueConstraint("bucket", "subject", "window_start", name="uq_rate_limit_window"),)
+
+    id = Column(Integer, primary_key=True)
+    bucket = Column(String(50), nullable=False)
+    subject = Column(String(190), nullable=False)
+    window_start = Column(DateTime, nullable=False, index=True)
+    count = Column(Integer, nullable=False)
 
 
 # ---------------------------------------------------------------------------
@@ -241,19 +351,22 @@ class Complaint(Base):
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # staff who logged it
 
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+    # Required for new complaints (it sets the starting priority); NULL only on complaints
+    # registered before categories became mandatory.
     category_id = Column(Integer, ForeignKey("complaint_categories.id"), nullable=True)
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=False, index=True)
+    priority_id = Column(Integer, ForeignKey("priorities.id"), nullable=False, index=True)
 
-    priority = Column(String(20), nullable=False, default="Medium")
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
     additional_details = Column(String(500), nullable=True)
 
+    # Contact details for complaints registered by staff for someone without a portal account.
     end_user_name = Column(String(150), nullable=True)
     end_user_phone = Column(String(20), nullable=True)
 
     # Workflow state; see services/workflow_service.py for the allowed transitions.
-    status = Column(String(30), default="SUBMITTED", nullable=False, index=True)
+    status = Column(String(30), nullable=False, index=True)
     assigned_to_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     assigned_at = Column(DateTime, nullable=True)
     acknowledged_at = Column(DateTime, nullable=True)  # first staff response (response SLA)
@@ -293,6 +406,7 @@ class Complaint(Base):
     department = relationship("Department", lazy="joined")
     category = relationship("ComplaintCategory", lazy="joined")
     location = relationship("Location", lazy="joined")
+    priority = relationship("Priority", lazy="joined")
     attachments = relationship(
         "ComplaintAttachment", back_populates="complaint", cascade="all, delete-orphan",
         order_by="ComplaintAttachment.id",
@@ -323,15 +437,19 @@ class Complaint(Base):
 
 
 class ComplaintAttachment(Base):
+    """A file stored under UPLOAD_DIR. Never served statically: downloads go
+    through a signed, expiring link checked against the viewer's access."""
     __tablename__ = "complaint_attachments"
 
     id = Column(Integer, primary_key=True, index=True)
-    complaint_id = Column(Integer, ForeignKey("complaints.id"), nullable=False)
-    comment_id = Column(Integer, ForeignKey("complaint_comments.id"), nullable=True)
-    file_path = Column(String(500), nullable=False)
-    file_type = Column(String(100))
-    file_name = Column(String(200))
-    uploaded_by_type = Column(String(20), nullable=True)  # "staff" | "end_user"
+    complaint_id = Column(Integer, ForeignKey("complaints.id", ondelete="CASCADE"), nullable=False, index=True)
+    comment_id = Column(Integer, ForeignKey("complaint_comments.id", ondelete="CASCADE"), nullable=True)
+    storage_name = Column(String(100), unique=True, nullable=False)  # file name inside UPLOAD_DIR
+    content_type = Column(String(100), nullable=False)
+    file_name = Column(String(200), nullable=False)  # original name, for display and download
+    file_size = Column(Integer, nullable=True)  # bytes; NULL only for files uploaded before sizes were recorded
+    # "staff" | "end_user"; NULL only for files uploaded before uploaders were recorded.
+    uploaded_by_type = Column(String(20), nullable=True)
     uploaded_by_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
@@ -363,7 +481,7 @@ class ComplaintEvent(Base):
 
     id = Column(Integer, primary_key=True)
     complaint_id = Column(Integer, ForeignKey("complaints.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_type = Column(String(40), nullable=False)
+    event_type = Column(String(40), nullable=False, index=True)
     actor_type = Column(String(20), nullable=False)  # "staff" | "end_user" | "system"
     actor_id = Column(Integer, nullable=True)
     actor_name = Column(String(150), nullable=True)
@@ -403,27 +521,34 @@ class SlaRule(Base):
     """Response/resolution targets for a priority. department_id NULL = the
     default for every department; a department row overrides it."""
     __tablename__ = "sla_rules"
-    __table_args__ = (UniqueConstraint("priority", "department_id"),)
+    __table_args__ = (UniqueConstraint("priority_id", "department_scope", name="uq_sla_rules_priority_scope"),)
 
     id = Column(Integer, primary_key=True)
-    priority = Column(String(20), nullable=False)
+    priority_id = Column(Integer, ForeignKey("priorities.id", ondelete="CASCADE"), nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=True)
+    # department_id with NULL (the default) mapped to 0, so there is one default per priority. VIRTUAL
+    # because MySQL rejects a STORED column over a base column whose foreign key cascades.
+    department_scope = Column(Integer, Computed("coalesce(department_id, 0)", persisted=False))
     response_hours = Column(Integer, nullable=False)
     resolution_hours = Column(Integer, nullable=False)
-    warning_minutes = Column(Integer, nullable=False, default=120)  # "due soon" lead time
+    warning_minutes = Column(Integer, nullable=False)  # "due soon" lead time
 
+    priority = relationship("Priority", lazy="joined")
     department = relationship("Department")
 
 
 class EscalationRule(Base):
     """How a breached SLA climbs the hierarchy: each escalated level gets
-    `level_hours` to act before it moves one level further, up to `max_level`."""
+    `level_hours` to act before it moves one level further, up to `max_level`.
+    A department row overrides the default (department_id NULL); a disabled
+    department row turns escalation off for that department."""
     __tablename__ = "escalation_rules"
-    __table_args__ = (UniqueConstraint("breach_type", "department_id"),)
+    __table_args__ = (UniqueConstraint("breach_type", "department_scope", name="uq_escalation_rules_type_scope"),)
 
     id = Column(Integer, primary_key=True)
     breach_type = Column(String(20), nullable=False)  # "response" | "resolution"
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=True)
+    department_scope = Column(Integer, Computed("coalesce(department_id, 0)", persisted=False))  # see SlaRule
     level_hours = Column(Integer, nullable=False)
     max_level = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -464,11 +589,44 @@ class Notification(Base):
     read_at = Column(DateTime, nullable=True)
 
     complaint = relationship("Complaint")
+    deliveries = relationship("MessageDelivery", back_populates="notification", cascade="all, delete-orphan")
+
+
+DELIVERY_PENDING, DELIVERY_SENT, DELIVERY_FAILED = "pending", "sent", "failed"
+
+
+class MessageDelivery(Base):
+    """An SMS or email copy of a notification, sent by the background worker."""
+    __tablename__ = "message_deliveries"
+    __table_args__ = (Index("ix_message_deliveries_due", "status", "next_attempt_at"),)
+
+    id = Column(Integer, primary_key=True)
+    notification_id = Column(Integer, ForeignKey("notifications.id", ondelete="CASCADE"), nullable=False, index=True)
+    channel = Column(String(10), nullable=False)  # "sms" | "email"
+    target = Column(String(120), nullable=False)
+    status = Column(String(10), nullable=False)  # DELIVERY_*
+    attempts = Column(Integer, default=0, nullable=False)
+    next_attempt_at = Column(DateTime, nullable=False)
+    last_error = Column(String(500), nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    notification = relationship("Notification", back_populates="deliveries")
 
 
 # ---------------------------------------------------------------------------
-# Audit
+# Governance: rejections, imports, audit
 # ---------------------------------------------------------------------------
+
+class RejectionReason(Base):
+    """A reason category offered when rejecting a complaint (managed by admins)."""
+    __tablename__ = "rejection_reasons"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(80), unique=True, nullable=False)
+    sort_order = Column(Integer, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
 
 class RejectionRequest(Base):
     """An agent's request to reject a complaint, decided by someone above them.
@@ -480,10 +638,10 @@ class RejectionRequest(Base):
     complaint_id = Column(Integer, ForeignKey("complaints.id", ondelete="CASCADE"), nullable=False, index=True)
     requested_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # who it was routed to
-    category = Column(String(80), nullable=False)
+    reason_id = Column(Integer, ForeignKey("rejection_reasons.id"), nullable=False)
     reason = Column(Text, nullable=False)
     previous_status = Column(String(30), nullable=False)  # restored when denied or withdrawn
-    status = Column(String(20), default="PENDING", nullable=False, index=True)  # PENDING/APPROVED/DENIED/WITHDRAWN
+    status = Column(String(20), nullable=False, index=True)  # PENDING/APPROVED/DENIED/WITHDRAWN
     direct = Column(Boolean, default=False, nullable=False)
     decided_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     decision_note = Column(Text, nullable=True)
@@ -491,6 +649,7 @@ class RejectionRequest(Base):
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
     complaint = relationship("Complaint", back_populates="rejection_requests")
+    reason_category = relationship("RejectionReason", lazy="joined")
     requested_by = relationship("User", foreign_keys=[requested_by_id])
     approver = relationship("User", foreign_keys=[approver_id])
     decided_by = relationship("User", foreign_keys=[decided_by_id])
@@ -523,7 +682,9 @@ class ImportBatch(Base):
 
 
 class ImportIssue(Base):
-    """A failed row (severity "error", not imported) or a warning (imported)."""
+    """A failed row (severity "error", not imported) or a warning (imported).
+    `data` keeps the original row for the failed-row report until the
+    retention period (IMPORT_ISSUE_RETENTION_DAYS) clears it."""
     __tablename__ = "import_issues"
 
     id = Column(Integer, primary_key=True)
@@ -538,6 +699,7 @@ class ImportIssue(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+    __table_args__ = (Index("ix_audit_logs_entity", "entity_type", "entity_id"),)
 
     id = Column(Integer, primary_key=True)
     actor_type = Column(String(20), nullable=False)  # "staff" | "end_user" | "system"

@@ -25,7 +25,7 @@ const SURFACE = "#ffffff";
 const MARGIN = { top: 12, bottom: 26, left: 40 };
 const RIGHT_WITH_LABELS = 112;
 const RIGHT_PLAIN = 24;
-const PLOT_HEIGHT = 220;
+const DEFAULT_PLOT_HEIGHT = 220;
 
 /** Top of the y-axis so that four equal steps are clean whole numbers (counts). */
 function niceMax(value: number): number {
@@ -43,11 +43,15 @@ export function TrendLineChart({
   points,
   series,
   ariaLabel,
+  height: plotHeight = DEFAULT_PLOT_HEIGHT,
 }: {
   points: Point[];
   series: TrendSeries[];
   ariaLabel: string;
+  /** Height of the plot area in pixels. */
+  height?: number;
 }) {
+  const PLOT_HEIGHT = plotHeight;
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   const [active, setActive] = useState<number | null>(null);
@@ -115,15 +119,37 @@ export function TrendLineChart({
         >
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={MARGIN.left} x2={MARGIN.left + plotWidth} y1={y(t)} y2={y(t)} stroke={t === 0 ? BASELINE : GRID} strokeWidth={1} />
-              <text x={MARGIN.left - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill={INK.muted} style={{ fontVariantNumeric: "tabular-nums" }}>
+              <line
+                x1={MARGIN.left}
+                x2={MARGIN.left + plotWidth}
+                y1={y(t)}
+                y2={y(t)}
+                stroke={t === 0 ? BASELINE : GRID}
+                strokeWidth={1}
+              />
+              <text
+                x={MARGIN.left - 8}
+                y={y(t)}
+                dy="0.32em"
+                textAnchor="end"
+                fontSize={11}
+                fill={INK.muted}
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
                 {Math.round(t).toLocaleString()}
               </text>
             </g>
           ))}
           {points.map((p, i) =>
             showTick(i) ? (
-              <text key={p.label + i} x={x(i)} y={MARGIN.top + PLOT_HEIGHT + 18} textAnchor="middle" fontSize={11} fill={INK.muted}>
+              <text
+                key={p.label + i}
+                x={x(i)}
+                y={MARGIN.top + PLOT_HEIGHT + 18}
+                textAnchor="middle"
+                fontSize={11}
+                fill={INK.muted}
+              >
                 {p.label}
               </text>
             ) : null,
@@ -149,12 +175,29 @@ export function TrendLineChart({
           {series.map((s) => {
             const i = active ?? last;
             if (i < 0) return null;
-            return <circle key={s.key} cx={x(i)} cy={y(Number(points[i][s.key]) || 0)} r={4} fill={s.color} stroke={SURFACE} strokeWidth={2} />;
+            return (
+              <circle
+                key={s.key}
+                cx={x(i)}
+                cy={y(Number(points[i][s.key]) || 0)}
+                r={4}
+                fill={s.color}
+                stroke={SURFACE}
+                strokeWidth={2}
+              />
+            );
           })}
 
           {endLabelsFit &&
             series.map((s) => (
-              <text key={s.key} x={x(last) + 10} y={y(Number(points[last][s.key]) || 0)} dy="0.32em" fontSize={11} fill={INK.secondary}>
+              <text
+                key={s.key}
+                x={x(last) + 10}
+                y={y(Number(points[last][s.key]) || 0)}
+                dy="0.32em"
+                fontSize={11}
+                fill={INK.secondary}
+              >
                 {s.label} {Number(points[last][s.key]).toLocaleString()}
               </text>
             ))}

@@ -1,11 +1,12 @@
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from models import Department, Location, PasswordResetTicket, Role, User, UserScope
+from models import RESET_PENDING, Department, Location, PasswordResetTicket, Role, User, UserScope
 from services.access_service import AccessContext
-from services.location_service import path_names, serialize_location
+from services.location_service import path_names, require_usable, serialize_location
 from services.permission_catalog import SUPER_ADMIN_ROLE_KEY
-from utils.security import normalize_email, normalize_mobile
+from services.phone_service import phone_format
+from utils.security import normalize_email
 
 
 def serialize_role(role: Role) -> dict:
@@ -32,6 +33,7 @@ def serialize_users(db: Session, users: list[User], ctx: AccessContext | None = 
             ],
             "is_active": u.is_active,
             "is_available": u.is_available,
+            "must_change_password": u.must_change_password,
             "created_at": u.created_at.isoformat(),
             "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
         }
@@ -52,8 +54,8 @@ def build_scopes(db: Session, ctx: AccessContext, role: Role, requested: list[di
     scopes: list[UserScope] = []
     seen: set[tuple[int | None, int | None]] = set()
     for item in requested:
-        department_id = item.get("department_id")
-        location_id = item.get("location_id")
+        department_id = item["department_id"]
+        location_id = item["location_id"]
         if (department_id, location_id) in seen:
             continue
         seen.add((department_id, location_id))
@@ -61,13 +63,11 @@ def build_scopes(db: Session, ctx: AccessContext, role: Role, requested: list[di
         department = None
         if department_id is not None:
             department = db.get(Department, department_id)
-            if department is None:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Department {department_id} not found")
+            if department is None or not department.is_active:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Department {department_id} not found or inactive")
         location = None
         if location_id is not None:
-            location = db.get(Location, location_id)
-            if location is None:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Location {location_id} not found")
+            location = require_usable(db, db.get(Location, location_id))
 
         if not ctx.covers(department_id, location.path if location else None):
             label = f"{department.name if department else 'All departments'} / {location.name if location else 'All locations'}"
@@ -94,23 +94,38 @@ def scope_snapshot(scopes: list[UserScope]) -> list[str]:
     return sorted(f"{s.department_id or '*'}@{s.location_id or '*'}" for s in scopes)
 
 
-def find_staff_by_identifier(db: Session, email_or_mobile: str) -> User | None:
-    email = normalize_email(email_or_mobile)
-    user = db.query(User).filter(User.email == email).first() if email else None
-    if user is None:
-        mobile = normalize_mobile(email_or_mobile)
-        if mobile:
-            user = db.query(User).filter(User.mobile == mobile).first()
-    return user
+def login_identifier_key(db: Session, identifier: str) -> str:
+    """The identifier in one canonical form (normalized email or national mobile number)."""
+    email = normalize_email(identifier)
+    if email is not None:
+        return f"email:{email}"
+    mobile = phone_format(db).normalize(identifier)
+    return f"mobile:{mobile}" if mobile is not None else f"raw:{identifier.strip().lower()[:100]}"
 
 
-def visible_reset_tickets(ctx: AccessContext) -> list[tuple[PasswordResetTicket, User | None]]:
-    """Reset tickets the actor may act on: tickets for users they manage (the
-    Super Admin also sees tickets that match no account)."""
-    tickets = ctx.db.query(PasswordResetTicket).order_by(PasswordResetTicket.created_at.desc()).all()
-    visible = []
-    for ticket in tickets:
-        user = find_staff_by_identifier(ctx.db, ticket.email_or_id)
-        if ctx.is_super_admin or (user is not None and ctx.can_manage_user(user)):
-            visible.append((ticket, user))
-    return visible
+def find_staff_by_identifier(db: Session, identifier: str) -> User | None:
+    """The staff account whose email or mobile matches (both are unique)."""
+    email = normalize_email(identifier)
+    if email is not None:
+        return db.query(User).filter(User.email == email).first()
+    mobile = phone_format(db).normalize(identifier)
+    if mobile is None:
+        return None
+    return db.query(User).filter(User.mobile == mobile).first()
+
+
+def can_handle_reset_ticket(ctx: AccessContext, ticket: PasswordResetTicket) -> bool:
+    """Tickets for users the actor manages; the Super Admin also handles tickets that matched no account."""
+    if ticket.user is None:
+        return ctx.is_super_admin
+    return ctx.can_manage_user(ticket.user)
+
+
+def visible_reset_tickets(ctx: AccessContext, pending_only: bool) -> list[PasswordResetTicket]:
+    """Reset tickets the actor may act on, newest first. Who may handle a ticket
+    depends on the hierarchy, so this is filtered in Python."""
+    query = ctx.db.query(PasswordResetTicket).options(joinedload(PasswordResetTicket.user))
+    if pending_only:
+        query = query.filter(PasswordResetTicket.status == RESET_PENDING)
+    tickets = query.order_by(PasswordResetTicket.created_at.desc(), PasswordResetTicket.id.desc()).all()
+    return [t for t in tickets if can_handle_reset_ticket(ctx, t)]

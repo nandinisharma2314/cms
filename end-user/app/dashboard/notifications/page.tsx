@@ -1,292 +1,250 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bell,
-  Check,
-  CheckCheck,
-  Trash2,
-  Clock,
-  ExternalLink,
-  Megaphone,
-  FileText,
-  AlertTriangle,
-  Send,
-  UserCheck,
-  CheckCircle2,
-  Sparkles,
   ArrowLeft,
+  Bell,
+  CheckCheck,
+  CheckCircle2,
+  Clock,
+  FileText,
+  MessageSquare,
   RefreshCw,
+  Trash2,
+  UserCog,
 } from "lucide-react";
-import { apis } from "@/lib/apis";
+import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/api";
+import { useConfig, useDocumentTitle } from "@/lib/config";
+import { formatWhen } from "@/lib/format";
+
+/** Icon per notification kind (the kinds the API sends to end users). */
+const KIND_STYLE: Record<string, { icon: React.ElementType; className: string }> = {
+  "complaint.status": { icon: CheckCircle2, className: "bg-emerald-50 text-emerald-600" },
+  "complaint.reply": { icon: MessageSquare, className: "bg-sky-50 text-sky-600" },
+  "account.contact_changed": { icon: UserCog, className: "bg-amber-50 text-amber-600" },
+};
+const OTHER_STYLE = { icon: FileText, className: "bg-indigo-50 text-indigo-600" };
 
 export default function NotificationsPage() {
+  useDocumentTitle("Notifications");
   const router = useRouter();
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [filter, setFilter] = useState<"all" | "unread" | "alerts">("all");
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { ui } = useConfig();
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [items, setItems] = useState<NotificationItem[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [unread, setUnread] = useState(0);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchNotifications = async (showRefresh = false) => {
-    try {
-      if (showRefresh) setIsRefreshing(true);
-      const res = await apis.notifications.getNotifications();
-      if (res && res.success) {
-        setNotifications(res.notifications || []);
-      }
-    } catch (err) {
-      console.warn("Could not fetch notifications:", err);
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
+  const load = useCallback(
+    (pageNumber: number) =>
+      api.notifications.list({ unread_only: unreadOnly, page: pageNumber, page_size: ui.default_page_size }).then(
+        (result) => {
+          setItems(result.items);
+          setTotal(result.total);
+          setUnread(result.unread_count);
+          setError(null);
+        },
+        (err: Error) => setError(err.message),
+      ),
+    [unreadOnly, ui.default_page_size],
+  );
+
+  const refresh = () => {
+    setRefreshing(true);
+    load(page).finally(() => setRefreshing(false));
   };
+  const pages = Math.max(1, Math.ceil(total / ui.default_page_size));
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 25000);
-    return () => clearInterval(interval);
-  }, []);
+    load(page);
+    const timer = setInterval(() => load(page), ui.notification_poll_seconds * 1000);
+    return () => clearInterval(timer);
+  }, [load, page, ui.notification_poll_seconds]);
 
-  const handleMarkRead = async (id: number) => {
+  const act = async (call: () => Promise<unknown>) => {
     try {
-      await apis.notifications.markRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-      );
+      await call();
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      await load(page);
     } catch (err) {
-      console.error(err);
+      setError((err as Error).message);
     }
   };
 
-  const handleMarkAllRead = async () => {
-    try {
-      await apis.notifications.markAllRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    } catch (err) {
-      console.error(err);
+  const open = async (item: NotificationItem) => {
+    if (!item.read_at) {
+      await api.notifications.markRead(item.id).catch(() => undefined);
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     }
-  };
-
-  const handleClearAll = async () => {
-    try {
-      await apis.notifications.clearAll();
-      setNotifications([]);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const filtered = notifications.filter((n) => {
-    if (filter === "unread") return !n.is_read;
-    if (filter === "alerts") return n.type === "civic_alert";
-    return true;
-  });
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-
-  const renderIcon = (type: string) => {
-    switch (type) {
-      case "forwarded":
-      case "complaint_update":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Send size={16} />
-          </div>
-        );
-      case "assigned":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <UserCheck size={16} />
-          </div>
-        );
-      case "resolved":
-      case "resolution":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 size={16} />
-          </div>
-        );
-      case "civic_alert":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Megaphone size={16} />
-          </div>
-        );
-      default:
-        return (
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <FileText size={16} />
-          </div>
-        );
-    }
+    if (item.complaint_id) router.push(`/dashboard/complaints/${encodeURIComponent(item.complaint_id)}`);
+    else load(page);
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50 p-2 md:p-4">
-      <div className="max-w-3xl mx-auto flex flex-col gap-2 pb-24">
-        {/* Top Back Link */}
+    <div className="flex-1 overflow-y-auto bg-linear-to-b from-[#e5effd] via-[#f0f5fd] to-slate-50 p-4 md:p-8">
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 pb-24 md:pb-8">
         <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => router.push("/dashboard")}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-[13px] font-bold text-slate-500 hover:text-blue-600"
           >
-            <ArrowLeft size={16} /> Back to Dashboard
+            <ArrowLeft size={16} /> Home
           </button>
           <button
             type="button"
-            onClick={() => fetchNotifications(true)}
-            className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer"
+            onClick={refresh}
+            className="flex items-center gap-1 text-[13px] font-bold text-blue-600 hover:text-blue-700"
           >
-            <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} /> Refresh
+            <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} /> Refresh
           </button>
         </div>
 
-        {/* Card Container */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
-          {/* Header */}
-          <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/20">
-            <div className="flex items-center gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-slate-900">Live Notifications</h1>
-                  {unreadCount > 0 && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 text-xs font-bold">
-                      {unreadCount} unread
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Real-time updates on your registered complaints and municipal alerts
-                </p>
-              </div>
+        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
+            <div>
+              <h1 className="flex items-center gap-2 text-[20px] font-bold text-[#0b1a3f]">
+                Notifications
+                {unread > 0 && (
+                  <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[12px] font-bold text-red-600">
+                    {unread} unread
+                  </span>
+                )}
+              </h1>
+              <p className="mt-0.5 text-[13px] text-slate-500">Updates on the complaints you registered.</p>
             </div>
-
             <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
+              {unread > 0 && (
                 <button
                   type="button"
-                  onClick={handleMarkAllRead}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  onClick={() => act(api.notifications.markAllRead)}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-700 hover:bg-slate-50"
                 >
-                  <CheckCheck size={14} /> Mark All Read
+                  <CheckCheck size={14} /> Mark all read
                 </button>
               )}
-              {notifications.length > 0 && (
+              {total > 0 && (
                 <button
                   type="button"
-                  onClick={handleClearAll}
-                  className="px-3 py-1.5 rounded-xl border border-red-100 text-red-600 bg-red-50/50 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  onClick={() => confirm("Delete all your notifications?") && act(api.notifications.clear)}
+                  className="flex items-center gap-1.5 rounded-xl border border-red-100 bg-red-50/50 px-3 py-1.5 text-[12px] font-bold text-red-600 hover:bg-red-50"
                 >
-                  <Trash2 size={13} /> Clear
+                  <Trash2 size={13} /> Clear all
                 </button>
               )}
             </div>
           </div>
 
-          {/* Filter Tabs */}
-          <div className="flex items-center border-b border-slate-100 px-6 bg-white text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setFilter("all")}
-              className={`py-3 px-4 border-b-2 transition-all cursor-pointer ${
-                filter === "all"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              All Notifications ({notifications.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilter("unread")}
-              className={`py-3 px-4 border-b-2 transition-all cursor-pointer ${
-                filter === "unread"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              Unread ({unreadCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilter("alerts")}
-              className={`py-3 px-4 border-b-2 transition-all cursor-pointer ${
-                filter === "alerts"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              Civic Alerts
-            </button>
+          <div className="flex border-b border-slate-100 px-4 text-[13px] font-bold" role="tablist">
+            {[false, true].map((value) => (
+              <button
+                key={String(value)}
+                type="button"
+                role="tab"
+                aria-selected={unreadOnly === value}
+                onClick={() => {
+                  setUnreadOnly(value);
+                  setPage(1);
+                }}
+                className={`border-b-2 px-4 py-3 transition-all ${unreadOnly === value ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-700"}`}
+              >
+                {value ? `Unread (${unread})` : "All"}
+              </button>
+            ))}
           </div>
 
-          {/* List */}
-          <div className="divide-y divide-slate-100">
-            {loading ? (
-              <div className="p-8 flex flex-col gap-4 animate-pulse">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 shrink-0" />
-                    <div className="flex-1">
-                      <div className="h-4 bg-slate-100 rounded w-1/3 mb-2" />
-                      <div className="h-3 bg-slate-50 rounded w-3/4" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="py-16 px-6 flex flex-col items-center justify-center text-center">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-3">
-                  <Sparkles size={26} />
+          {error && (
+            <p role="alert" className="border-b border-slate-100 bg-red-50 p-3 text-[13px] text-red-700">
+              {error}
+            </p>
+          )}
+
+          <ul className="divide-y divide-slate-100">
+            {items === null ? (
+              !error && (
+              <li className="flex animate-pulse gap-4 p-6" aria-hidden="true">
+                <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-100" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-1/3 rounded bg-slate-100" />
+                  <div className="h-3 w-3/4 rounded bg-slate-50" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-800">No Notifications</h3>
-                <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                  You are completely caught up! New status updates will appear here in real time.
-                </p>
-              </div>
+              </li>
+              )
+            ) : items.length === 0 ? (
+              <li className="flex flex-col items-center px-6 py-16 text-center">
+                <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-500">
+                  <Bell size={26} />
+                </span>
+                <p className="text-[14px] font-bold text-slate-800">You&apos;re all caught up</p>
+                <p className="mt-1 max-w-sm text-[13px] text-slate-400">New updates about your complaints will appear here.</p>
+              </li>
             ) : (
-              filtered.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    if (!item.is_read) handleMarkRead(item.id);
-                    if (item.complaint_id) router.push(`/dashboard/complaints/${encodeURIComponent(item.complaint_id)}`);
-                  }}
-                  className={`p-4 md:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors cursor-pointer relative ${
-                    !item.is_read ? "bg-indigo-50/20" : ""
-                  }`}
-                >
-                  {renderIcon(item.type)}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <h4 className="text-sm font-bold text-slate-800 truncate">{item.title}</h4>
-                      <span className="text-xs text-slate-400 font-medium shrink-0 flex items-center gap-1">
-                        <Clock size={12} /> {item.time}
+              items.map((item) => {
+                const { icon: Icon, className } = KIND_STYLE[item.kind] ?? OTHER_STYLE;
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => open(item)}
+                      className={`flex w-full items-start gap-4 p-4 text-left transition-colors hover:bg-slate-50 md:p-5 ${item.read_at ? "" : "bg-blue-50/30"}`}
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${className}`}>
+                        <Icon size={16} aria-hidden="true" />
                       </span>
-                    </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">{item.message}</p>
-
-                    {item.complaint_id && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-bold">
-                          {item.complaint_id}
+                      <span className="min-w-0 flex-1">
+                        <span className="mb-1 flex items-start justify-between gap-2">
+                          <span className="text-[14px] font-bold text-slate-800">
+                            {item.title}
+                            {!item.read_at && <span className="sr-only"> (unread)</span>}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1 text-[12px] font-medium text-slate-400">
+                            <Clock size={12} aria-hidden="true" /> {formatWhen(item.created_at)}
+                          </span>
                         </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {!item.is_read && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 mt-1 shadow-sm shadow-blue-400" />
-                  )}
-                </div>
-              ))
+                        {item.body && <span className="block text-[13px] leading-relaxed text-slate-600">{item.body}</span>}
+                        {item.complaint_id && (
+                          <span className="mt-2 inline-block rounded-md bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
+                            {item.complaint_id}
+                          </span>
+                        )}
+                      </span>
+                      {!item.read_at && (
+                        <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-hidden="true" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })
             )}
-          </div>
+          </ul>
         </div>
+
+        {pages > 1 && (
+          <nav className="flex items-center justify-center gap-3 text-[13px] text-slate-500" aria-label="Pages">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-40"
+            >
+              Newer
+            </button>
+            <span>
+              Page {page} of {pages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= pages}
+              onClick={() => setPage(page + 1)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-40"
+            >
+              Older
+            </button>
+          </nav>
+        )}
       </div>
     </div>
   );

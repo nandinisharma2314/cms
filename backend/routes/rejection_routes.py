@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from models import Complaint, Location, RejectionRequest
 from services import audit_service, rejection_service
 from services.access_service import AccessContext
@@ -9,6 +10,9 @@ from services.complaint_service import staff_detail
 from utils.auth_middleware import get_access_context, require_permission
 
 router = APIRouter()
+
+VIEWS = ("to_decide", "mine", "all")
+STATUSES = (rejection_service.PENDING, rejection_service.APPROVED, rejection_service.DENIED, rejection_service.WITHDRAWN)
 
 
 class DecisionRequest(BaseModel):
@@ -31,19 +35,25 @@ def _get(ctx: AccessContext, request_id: int) -> RejectionRequest:
     return request
 
 
-@router.get("/categories")
-def categories(_: AccessContext = Depends(get_access_context)):
-    return rejection_service.REASON_CATEGORIES
+@router.get("/reasons")
+def reasons(ctx: AccessContext = Depends(get_access_context)):
+    """Active reason categories, for the request and reject forms."""
+    return [rejection_service.serialize_reason(r) for r in rejection_service.list_reasons(ctx.db)]
 
 
 @router.get("/")
 def list_requests(
-    view: str = "to_decide",  # to_decide | mine | all
+    view: str,
     status_filter: str | None = None,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE,
     ctx: AccessContext = Depends(require_permission("complaint.view")),
 ):
     """to_decide: pending requests you can approve/deny; mine: requests you made;
     all: every request in your scope (approvers only)."""
+    if view not in VIEWS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"view must be one of: {', '.join(VIEWS)}")
+    page, page_size = max(page, 1), min(max(page_size, 1), MAX_PAGE_SIZE)
     query = _scoped_requests(ctx)
     if view == "mine":
         query = query.filter(RejectionRequest.requested_by_id == ctx.user.id)
@@ -52,18 +62,26 @@ def list_requests(
     elif not ctx.has(rejection_service.APPROVE_PERMISSION):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Missing permission: complaint.reject.approve")
     if status_filter:
+        if status_filter.upper() not in STATUSES:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"status_filter must be one of: {', '.join(STATUSES)}")
         query = query.filter(RejectionRequest.status == status_filter.upper())
-    rows = query.order_by(RejectionRequest.created_at.desc()).limit(300).all()
+    query = query.order_by(RejectionRequest.created_at.desc(), RejectionRequest.id.desc())
     if view == "to_decide":
-        rows = [r for r in rows if rejection_service.can_decide(ctx, r)]
-    return [rejection_service.serialize(r, ctx) for r in rows]
+        # Who may decide depends on the hierarchy, so this is filtered in Python before paging.
+        rows = [r for r in query.all() if rejection_service.can_decide(ctx, r)]
+        total, rows = len(rows), rows[(page - 1) * page_size: page * page_size]
+    else:
+        total = query.count()
+        rows = query.offset((page - 1) * page_size).limit(page_size).all()
+    return {"items": [rejection_service.serialize(r, ctx) for r in rows], "total": total, "page": page,
+            "page_size": page_size}
 
 
 def _audit(ctx: AccessContext, request: RejectionRequest, action: str, summary: str, http_request: Request):
     audit_service.record(
         ctx.db, actor=ctx.user, action=action, entity_type="complaint", entity_id=request.complaint.generated_id,
         summary=summary,
-        changes={"rejection_request": [None, request.status], "category": [None, request.category]},
+        changes={"rejection_request": [None, request.status], "category": [None, request.reason_category.name]},
         request=http_request,
     )
 
@@ -75,7 +93,7 @@ def approve(request_id: int, payload: DecisionRequest, http_request: Request,
     rejection_service.approve(ctx, request, payload.note)
     _audit(ctx, request, "complaint.rejection_approve",
            f"{request.complaint.generated_id}: rejection requested by {request.requested_by.name} approved "
-           f"({request.category})", http_request)
+           f"({request.reason_category.name})", http_request)
     ctx.db.commit()
     return staff_detail(ctx, request.complaint)
 

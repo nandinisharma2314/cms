@@ -1,4 +1,5 @@
 -r requirements.txt
-pytest
-# FastAPI's TestClient needs httpx2 on Starlette 1.x (older Starlette uses httpx)
-httpx2
+pytest==9.1.1
+# FastAPI's TestClient needs httpx2 on Starlette 1.x
+httpx2==2.13.1
+ruff==0.16.9

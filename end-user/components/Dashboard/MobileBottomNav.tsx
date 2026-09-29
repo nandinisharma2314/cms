@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, FileText, Home, Plus, User } from "lucide-react";
-import { apis } from "@/lib/apis";
-import { useEndUser } from "@/lib/endUserSession";
+import { api, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/api";
+import { useConfig } from "@/lib/config";
+import { useEndUser } from "@/lib/session";
 
 type NavIcon = React.ComponentType<{ className?: string; strokeWidth?: number }>;
 
@@ -15,12 +16,6 @@ interface NavItem {
   activeIcon?: NavIcon;
   href: string;
   exact?: boolean;
-}
-
-interface MobileBottomNavProps {
-  activeTab?: string;
-  onTabChange?: React.Dispatch<React.SetStateAction<string>>;
-  onCenterAction?: () => void;
 }
 
 // Filled house with the door cut out, for the active Home tab.
@@ -42,18 +37,27 @@ const RIGHT_ITEMS: NavItem[] = [
   { name: "Profile", icon: User, href: "/dashboard/profile" },
 ];
 
-// The tabs follow the URL; the props are only accepted for older callers.
-const MobileBottomNav: React.FC<MobileBottomNavProps> = () => {
+/** Bottom tab bar on phones; the tabs follow the URL. */
+export default function MobileBottomNav() {
   const pathname = usePathname();
   const canCreate = useEndUser().can("portal.complaint.create");
+  const { ui } = useConfig();
   const [hasUnread, setHasUnread] = useState(false);
 
   useEffect(() => {
-    apis.notifications
-      .list()
-      .then((res) => setHasUnread(res.unread_count > 0))
-      .catch(() => undefined);
-  }, [pathname]);
+    const check = () =>
+      api.notifications.list({ unread_only: true, page_size: 1 }).then(
+        (res) => setHasUnread(res.unread_count > 0),
+        () => undefined, // keep the last state; the next check retries
+      );
+    check();
+    const timer = setInterval(check, ui.notification_poll_seconds * 1000);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, check);
+    };
+  }, [pathname, ui.notification_poll_seconds]);
 
   const renderItem = (item: NavItem) => {
     const isActive = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
@@ -98,6 +102,4 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = () => {
       </div>
     </nav>
   );
-};
-
-export default MobileBottomNav;
+}

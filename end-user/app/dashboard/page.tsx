@@ -7,7 +7,7 @@ import RecentActivity from "@/components/Dashboard/RecentActivity";
 
 export default function DashboardPage() {
   return (
-    <div className="flex-1 bg-gradient-to-b from-[#e5effd] via-[#f0f5fd] to-slate-50 md:min-h-0 md:overflow-y-auto">
+    <div className="flex-1 bg-linear-to-b from-[#e5effd] via-[#f0f5fd] to-slate-50 md:min-h-0 md:overflow-y-auto">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 pb-6 pt-6 md:gap-5 md:px-8 md:py-8">
         <Greeting />
         <ShortcutCards />

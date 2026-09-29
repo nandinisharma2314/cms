@@ -1,144 +1,173 @@
 "use client";
 
 import React from "react";
-import { MetricCards, MetricCardData } from "./MetricCards";
-import { ComplaintsTrendChart } from "./ComplaintsTrendChart";
-import { ComplaintsByStatusChart } from "./ComplaintsByStatusChart";
-import { TopDepartments } from "./TopDepartments";
-import { RecentComplaintsTable } from "./RecentComplaintsTable";
-import { PendingActionsList } from "./PendingActionsList";
-import { QuickActionsBar } from "./QuickActionsBar";
-import { FileText, Clock, CheckCircle2, Hourglass } from "lucide-react";
-import { api } from "@/lib/api";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, Clock, FileText, Hourglass } from "lucide-react";
+import { api, ConfigurationProblem } from "@/lib/api";
+import { useConfig, useDocumentTitle } from "@/lib/config";
 import { useApiData } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
+import { ComplaintTable } from "./ComplaintTable";
+import { ComplaintsByStatusChart } from "./ComplaintsByStatusChart";
+import { DashboardTrend } from "./DashboardTrend";
+import { MetricCards, MetricCardData } from "./MetricCards";
+import { PendingActionsList } from "./PendingActionsList";
 import { scopeLabel } from "./ScopeEditor";
-import { ErrorBanner } from "./ui";
+import { TopDepartments } from "./TopDepartments";
+import { Card, ErrorBanner } from "./ui";
 
-const ROLE_TAGLINES: Record<string, string> = {
-  super_admin: "Together for a cleaner, safer and better community.",
-  admin: "Municipal Grievance Redressal & Operations Management.",
-  manager: "Department Performance, SLA Tracking & Allocation.",
-  supervisor: "Zonal Inspection, Verification & Squad Dispatch.",
-  agent: "On-ground Task Execution & Work Order Completion.",
+const AREA_LINKS: Record<ConfigurationProblem["area"], string> = {
+  settings: "/settings",
+  locations: "/locations",
+  priorities: "/sla",
+  sla: "/sla",
 };
 
+/** What the Super Admin still has to set up; hidden once everything is configured. */
+function SetupChecklist() {
+  const { data } = useApiData(() => api.settings.status(), []);
+  if (!data || data.problems.length === 0) return null;
+  return (
+    <Card className="p-5 border-amber-200 bg-amber-50/60">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-amber-900">Finish setting up</h2>
+          <p className="text-xs text-amber-800">Parts of the system don&apos;t work until these are configured:</p>
+          <ul className="text-xs text-amber-900 space-y-1">
+            {data.problems.map((p) => (
+              <li key={p.field}>
+                <Link href={AREA_LINKS[p.area]} className="underline underline-offset-2 hover:text-amber-700">
+                  {p.message}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function DashboardView() {
-  const { me, can, canAny } = useSession();
+  useDocumentTitle("Dashboard");
+  const { me, can } = useSession();
+  const { ui } = useConfig();
   const canViewComplaints = can("complaint.view");
 
-  // Every number below is already filtered to the user's department/location scope by the API.
-  const { data, error, loading: isLoadingData, reload: loadBackendData } = useApiData(async () => {
-    if (!canViewComplaints) return { stats: null, complaints: [] };
-    const [stats, complaints] = await Promise.all([api.complaints.stats(), api.complaints.list()]);
-    return { stats, complaints };
-  }, [canViewComplaints]);
-  const backendStats = data?.stats ?? null;
-  const complaints = data?.complaints ?? [];
-
-  const m = backendStats?.metrics;
-  const metrics: MetricCardData[] = [
-    {
-      id: "total",
-      title: "Total Complaints",
-      value: (m?.total ?? 0).toLocaleString(),
-      trend: m?.total_trend ?? null,
-      trendType: m?.total_trend_type ?? "positive",
-      icon: FileText,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-    },
-    {
-      id: "open",
-      title: "Open",
-      value: (m?.open ?? 0).toLocaleString(),
-      trend: m?.open_trend ?? null,
-      trendType: m?.open_trend_type ?? "negative",
-      icon: Clock,
-      iconBg: "bg-rose-50",
-      iconColor: "text-rose-500",
-    },
-    {
-      id: "resolved",
-      title: "Resolved",
-      value: (m?.resolved ?? 0).toLocaleString(),
-      trend: m?.resolved_trend ?? null,
-      trendType: m?.resolved_trend_type ?? "positive",
-      icon: CheckCircle2,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-600",
-    },
-    {
-      id: "in-progress",
-      title: "In Progress",
-      value: (m?.in_progress ?? 0).toLocaleString(),
-      trend: m?.in_progress_trend ?? null,
-      trendType: m?.in_progress_trend_type ?? "negative",
-      icon: Hourglass,
-      iconBg: "bg-purple-50",
-      iconColor: "text-purple-600",
-    },
-  ];
-
-  const showPendingActions = canAny("user.reset_password", "complaint.respond", "complaint.assign");
-  const scopeText = me.is_super_admin
-    ? "Entire system"
-    : me.scopes.map(scopeLabel).join("; ") || "No scope assigned";
+  // Every number below is already limited to the user's department/location scope by the API.
+  const stats = useApiData(() => (canViewComplaints ? api.complaints.stats() : Promise.resolve(undefined)), [canViewComplaints]);
+  const recent = useApiData(
+    () => (canViewComplaints ? api.complaints.list({ page_size: ui.dashboard_recent_items }) : Promise.resolve(undefined)),
+    [canViewComplaints, ui.dashboard_recent_items],
+  );
+  const m = stats.data?.metrics;
+  const metrics: MetricCardData[] = m
+    ? [
+        {
+          id: "total",
+          title: "Total complaints",
+          value: m.total,
+          change: m.total_change,
+          icon: FileText,
+          tint: "bg-blue-50 text-blue-600",
+        },
+        {
+          id: "open",
+          title: "Awaiting action",
+          value: m.open,
+          change: m.open_change,
+          icon: Clock,
+          tint: "bg-rose-50 text-rose-500",
+        },
+        {
+          id: "in_progress",
+          title: "In progress",
+          value: m.in_progress,
+          change: m.in_progress_change,
+          icon: Hourglass,
+          tint: "bg-violet-50 text-violet-600",
+        },
+        {
+          id: "resolved",
+          title: "Resolved",
+          value: m.resolved,
+          change: m.resolved_change,
+          icon: CheckCircle2,
+          tint: "bg-emerald-50 text-emerald-600",
+        },
+      ]
+    : [];
+  const scopeText = me.is_super_admin ? "Entire system" : me.scopes.map(scopeLabel).join("; ") || "No scope assigned";
 
   return (
     <>
-      {/* Welcome Greeting Section */}
-      <div className="flex flex-col">
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-          Welcome, {me.name}
-        </h1>
+      <div>
+        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Welcome, {me.name}</h1>
         <p className="text-xs text-slate-500 font-medium mt-1">
-          <span className="font-semibold text-slate-700">{me.role.name}</span>
-          {" • "}
-          {ROLE_TAGLINES[me.role.key] ?? ROLE_TAGLINES.super_admin}
+          <span className="font-semibold text-slate-700">{me.role.name}</span> · {scopeText}
         </p>
-        <p className="text-[11px] text-slate-400 mt-0.5">Showing: {scopeText}</p>
       </div>
 
-      <ErrorBanner message={error} />
+      {can("settings.manage") && <SetupChecklist />}
+      <ErrorBanner message={stats.error ?? recent.error} />
 
-      {canViewComplaints && (
+      {canViewComplaints ? (
         <>
-          {/* Row 1: KPI Metric Cards */}
-          <MetricCards metrics={metrics} isLoading={isLoadingData} />
+          {/* Shown while loading or with data; a failed load is reported by the banner above, not as zeros. */}
+          {(stats.loading || stats.data) && (
+            <>
+              <MetricCards metrics={metrics} loading={stats.loading} days={ui.dashboard_comparison_days} />
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                <div className="lg:col-span-5 min-h-75">
+                  <DashboardTrend trend={stats.data?.trend} loading={stats.loading} />
+                </div>
+                <div className="lg:col-span-4 min-h-75">
+                  <ComplaintsByStatusChart stats={stats.data} loading={stats.loading} />
+                </div>
+                <div className="lg:col-span-3 min-h-75">
+                  <TopDepartments departments={stats.data?.departments ?? []} loading={stats.loading} />
+                </div>
+              </div>
+            </>
+          )}
 
-          {/* Row 2: Trend, Status Donut, Top Departments */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-            <div className="lg:col-span-5 min-h-[300px]">
-              <ComplaintsTrendChart trend={backendStats?.trend} isLoading={isLoadingData} />
-            </div>
-            <div className="lg:col-span-4 min-h-[300px]">
-              <ComplaintsByStatusChart stats={backendStats} isLoading={isLoadingData} />
-            </div>
-            <div className="lg:col-span-3 min-h-[300px]">
-              <TopDepartments departments={backendStats?.departments} isLoading={isLoadingData} />
-            </div>
-          </div>
-
-          {/* Row 3: Recent Complaints Table + Pending Actions */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-            <div className={showPendingActions ? "lg:col-span-8" : "lg:col-span-12"}>
-              <RecentComplaintsTable complaints={complaints} isLoading={isLoadingData} />
-            </div>
-            {showPendingActions && (
-              <div className="lg:col-span-4">
-                <PendingActionsList
-                  pendingSummary={backendStats?.pending_summary}
-                  slaBreached={backendStats?.metrics.sla_breached}
-                  isLoading={isLoadingData}
-                  onRefresh={loadBackendData}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+            {(recent.loading || recent.data) && (
+              <Card className="xl:col-span-8 overflow-hidden">
+                <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                  <h2 className="text-base font-bold text-slate-800">
+                    Latest complaints
+                    {recent.data && (
+                      <span className="ml-2 text-xs text-slate-400 font-medium">
+                        ({recent.data.total.toLocaleString()} in your scope)
+                      </span>
+                    )}
+                  </h2>
+                  <Link href="/complaints" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+                    View all
+                  </Link>
+                </div>
+                <ComplaintTable
+                  compact
+                  complaints={recent.data?.items ?? []}
+                  loading={recent.loading}
+                  emptyText="No complaints in your scope yet."
                 />
+              </Card>
+            )}
+            {(stats.loading || stats.data) && (
+              <div className="xl:col-span-4">
+                <PendingActionsList stats={stats.data} loading={stats.loading} onRefresh={stats.reload} />
               </div>
             )}
           </div>
         </>
+      ) : (
+        <Card className="p-8 text-center text-xs text-slate-500">
+          Your role doesn&apos;t include complaints. Use the menu for the areas you manage.
+        </Card>
       )}
-
     </>
   );
 }

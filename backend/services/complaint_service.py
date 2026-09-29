@@ -1,67 +1,86 @@
-import os
-import shutil
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
-from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import and_, not_, or_
-from sqlalchemy.orm import Query, Session
+from fastapi import HTTPException, status
+from sqlalchemy import Integer, and_, case, cast, func, not_, or_, true
+from sqlalchemy.orm import Query, Session, selectinload
 
+from config import DESCRIPTION_MAX_LENGTH, NOTE_MAX_LENGTH
 from models import (
-    Complaint, ComplaintAttachment, ComplaintCategory, ComplaintComment, Department, EndUser, Location, User,
+    Complaint, ComplaintAttachment, ComplaintCategory, ComplaintComment, Department, EndUser, Location, Priority,
+    User, max_length,
 )
-from services import rejection_service, routing_service, sla_service
+from services import attachment_service, priority_service, rejection_service, routing_service, settings_service, \
+    sla_service
 from services.access_service import AccessContext
-from services.location_service import path_names, serialize_location
-from services.statuses import AWAITING_RESPONSE, end_user_status_label
-from services.workflow_service import (
-    ACTION_PERMISSIONS, ACTIVE_STATUSES, CLOSED, GROUP_OF, REJECTED, STATUS_GROUPS, SUBMITTED,
-    end_user_actions_for, record_event, reopen_deadline, staff_actions_for, status_label,
+from services.events import record_event
+from services.location_service import path_names, require_usable, serialize_location
+from services.statuses import (
+    ACTIVE_STATUSES, AWAITING_RESPONSE, CLOSED, GROUP_OF, REJECTED, STATUS_GROUPS, SUBMITTED, end_user_status_label,
+    status_label,
 )
+from services.workflow_service import ACTION_PERMISSIONS, end_user_actions_for, reopen_deadline, staff_actions_for
 from utils.security import utcnow
+from utils.text import multi_line, single_line
 
-PRIORITIES = ["Low", "Medium", "High", "Critical"]
-
-UPLOAD_DIR = "uploads"
-MAX_ATTACHMENTS = 5
-MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
-# SVG/HTML are excluded: they are served from the API origin and can run scripts.
-ALLOWED_ATTACHMENT_EXTENSIONS = {
-    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf", ".mp4", ".mov", ".csv", ".doc", ".docx",
-}
+# Eager loading for complaint lists (avoids one query per row).
+LIST_OPTIONS = (
+    selectinload(Complaint.attachments).selectinload(ComplaintAttachment.comment),
+    selectinload(Complaint.assigned_to),
+    selectinload(Complaint.escalated_to),
+)
+DETAIL_OPTIONS = LIST_OPTIONS + (
+    selectinload(Complaint.comments).selectinload(ComplaintComment.attachments),
+    selectinload(Complaint.events),
+    selectinload(Complaint.assignments),
+    selectinload(Complaint.escalations),
+    selectinload(Complaint.rejection_requests),
+    selectinload(Complaint.end_user),
+)
 
 
 def resolve_classification(
-    db: Session, department_id: int, category_id: int | None, location_id: int
-) -> tuple[Department, ComplaintCategory | None, Location]:
+    db: Session, department_id: int, category_id: int | None, location_id: int | None,
+) -> tuple[Department, ComplaintCategory, Location]:
     department = db.get(Department, department_id)
     if department is None or not department.is_active:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Department not found")
-    category = None
-    if category_id is not None:
-        category = db.get(ComplaintCategory, category_id)
-        if category is None or category.department_id != department.id or not category.is_active:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Category does not belong to this department")
-    location = db.get(Location, location_id)
-    if location is None or not location.is_active:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Location not found")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Department not found or inactive")
+    if category_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose a category")
+    category = db.get(ComplaintCategory, category_id)
+    if category is None or category.department_id != department.id or not category.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Category not found in this department")
+    if location_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose the location of the issue")
+    location = require_usable(db, db.get(Location, location_id))
     return department, category, location
 
 
-def validate_priority(priority: str | None) -> str:
-    priority = (priority or "Medium").strip().capitalize()
-    if priority not in PRIORITIES:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Priority must be one of: {', '.join(PRIORITIES)}")
-    return priority
+def highest_number_used(db: Session, prefix: str) -> int | None:
+    """The largest number already issued as `<prefix>-<number>`."""
+    number = cast(func.substring(Complaint.generated_id, len(prefix) + 2), Integer)
+    return db.query(func.max(number)).filter(Complaint.generated_id.like(f"{prefix}-%")).scalar()
+
+
+def _next_generated_id(db: Session) -> str:
+    """Takes the next complaint number under a row lock, so concurrent
+    submissions never get the same ID."""
+    settings = settings_service.get_settings(db, for_update=True)
+    if not settings.complaint_id_prefix:
+        raise settings_service.SettingNotConfigured("complaint_id_prefix")
+    if settings.complaint_next_number is None:
+        raise settings_service.SettingNotConfigured("complaint_next_number")
+    number = settings.complaint_next_number
+    settings.complaint_next_number = number + 1
+    return f"{settings.complaint_id_prefix}-{number}"
 
 
 def register_complaint(
     db: Session,
     *,
     department: Department,
-    category: ComplaintCategory | None,
+    category: ComplaintCategory,
     location: Location,
-    priority: str,
+    priority: Priority,
     title: str,
     description: str,
     additional_details: str | None = None,
@@ -71,11 +90,10 @@ def register_complaint(
     end_user_phone: str | None = None,
     at: datetime | None = None,
 ) -> Complaint:
-    """Creates a complaint, records its submission and routes it to an officer.
-    The caller commits."""
+    """Creates a complaint, records its submission and routes it. The caller commits."""
     now = at or utcnow()
     complaint = Complaint(
-        generated_id=f"TMP-{uuid.uuid4().hex}",
+        generated_id=_next_generated_id(db),
         end_user=end_user,
         created_by_user_id=created_by.id if created_by else None,
         department=department,
@@ -94,62 +112,26 @@ def register_complaint(
     )
     db.add(complaint)
     db.flush()
-    complaint.generated_id = f"CMP-{10000 + complaint.id}"
 
     submitter = end_user or created_by
-    if end_user is not None:
-        message = public = f"Complaint submitted by {end_user.name}"
+    if created_by is None:
+        message = public = "Complaint submitted"
+    elif end_user is not None:
+        message = f"Registered by {created_by.name} for {end_user.name}"
+        public = "Complaint registered for you by the support team"
     else:
-        message = f"Registered by {created_by.name} on behalf of {end_user_name or 'an end user'}"
-        public = "Complaint registered by a municipal officer"
+        message = f"Registered by {created_by.name} for {end_user_name or 'someone without an account'}"
+        public = "Complaint registered by the support team"
     record_event(db, complaint, "submitted", submitter, message, public_message=public, to_status=SUBMITTED, at=now)
     record_event(
         db, complaint, "routed", None,
-        f"Routed to the {department.name} department for {location.name}",
+        f"Routed to the {department.name} department for {location.name} ({priority.name} priority)",
         public_message=f"Forwarded to the {department.name} department",
         at=now,
     )
     sla_service.start_clocks(db, complaint, now)
     routing_service.auto_route(db, complaint, at=now)
     return complaint
-
-
-def save_attachments(
-    db: Session,
-    complaint: Complaint,
-    files: list[UploadFile],
-    uploader: User | EndUser,
-    comment: ComplaintComment | None = None,
-) -> list[dict]:
-    files = [f for f in files if f.filename]
-    if len(files) > MAX_ATTACHMENTS:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"At most {MAX_ATTACHMENTS} attachments are allowed")
-    for upload in files:
-        ext = os.path.splitext(upload.filename)[1].lower()
-        if ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"File type {ext or '(none)'} is not allowed")
-        if upload.size is not None and upload.size > MAX_ATTACHMENT_BYTES:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{upload.filename} is larger than 10 MB")
-
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    saved = []
-    for upload in files:
-        ext = os.path.splitext(upload.filename)[1].lower()
-        unique_filename = f"{uuid.uuid4()}{ext}"
-        with open(os.path.join(UPLOAD_DIR, unique_filename), "wb") as buffer:
-            shutil.copyfileobj(upload.file, buffer)
-        public_path = f"/uploads/{unique_filename}"
-        db.add(ComplaintAttachment(
-            complaint=complaint,
-            comment=comment,
-            file_path=public_path,
-            file_type=upload.content_type,
-            file_name=upload.filename[:200],
-            uploaded_by_type="staff" if isinstance(uploader, User) else "end_user",
-            uploaded_by_id=uploader.id,
-        ))
-        saved.append({"file_path": public_path, "file_name": upload.filename})
-    return saved
 
 
 # ---------------------------------------------------------------------------
@@ -160,31 +142,22 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
-def _attachment(a: ComplaintAttachment) -> dict:
-    return {
-        "id": a.id,
-        "file_path": a.file_path,
-        "file_name": a.file_name,
-        "file_type": a.file_type or "",
-        "comment_id": a.comment_id,
-        "uploaded_by_type": a.uploaded_by_type,
-        "created_at": _iso(a.created_at),
-    }
+def serialize_priority(priority: Priority) -> dict:
+    return {"id": priority.id, "key": priority.key, "name": priority.name, "tone": priority.tone,
+            "rank": priority.rank}
 
 
 def serialize_complaints(db: Session, complaints: list[Complaint], for_end_user: bool = False) -> list[dict]:
     names = path_names(db, [c.location for c in complaints])
     now = utcnow()
     result = []
-    for num, c in enumerate(complaints, start=1):
+    for c in complaints:
         attachments = [
             a for a in c.attachments
             if not (for_end_user and a.comment is not None and a.comment.is_internal)
         ]
         item = {
-            "num": num,
             "id": c.generated_id,
-            "generated_id": c.generated_id,
             "title": c.title,
             "description": c.description,
             "additional_details": c.additional_details,
@@ -192,15 +165,12 @@ def serialize_complaints(db: Session, complaints: list[Complaint], for_end_user:
             "department_id": c.department_id,
             "category": c.category.name if c.category else None,
             "category_id": c.category_id,
-            "priority": c.priority,
+            "priority": serialize_priority(c.priority),
             "location": c.location.name,
             "location_detail": serialize_location(c.location, names),
-            "end_user_name": c.end_user_name,
-            "end_user_phone": c.end_user_phone,
             "status": c.status,
             "status_label": end_user_status_label(c.status) if for_end_user else status_label(c.status),
-            "status_group": GROUP_OF.get(c.status, "open"),
-            "date": c.created_at.strftime("%d %b %Y"),
+            "status_group": GROUP_OF[c.status],
             "created_at": c.created_at.isoformat(),
             "updated_at": c.updated_at.isoformat(),
             "assigned_at": _iso(c.assigned_at),
@@ -211,13 +181,14 @@ def serialize_complaints(db: Session, complaints: list[Complaint], for_end_user:
             "reopen_count": c.reopen_count,
             "feedback_rating": c.feedback_rating,
             "feedback_comment": c.feedback_comment,
-            "attachments": [_attachment(a) for a in attachments],
+            "attachments": [attachment_service.serialize(a) for a in attachments],
             # targets the end user can see; breach details stay internal
             "response_due_at": _iso(c.response_due_at) if c.status in AWAITING_RESPONSE else None,
             "resolution_due_at": _iso(c.resolution_due_at) if c.status in ACTIVE_STATUSES else None,
-            "is_escalated": c.escalated_to_id is not None,
         }
         if not for_end_user:
+            item["end_user_name"] = c.end_user_name
+            item["end_user_phone"] = c.end_user_phone
             item["assignee"] = (
                 {"id": c.assigned_to.id, "name": c.assigned_to.name, "role": c.assigned_to.role.name}
                 if c.assigned_to else None
@@ -242,12 +213,12 @@ def _comment(comment: ComplaintComment, for_end_user: bool, department_name: str
     return {
         "id": comment.id,
         "author_type": comment.author_type,
-        # End users see the department rather than the individual officer.
-        "author_name": f"{department_name} Department" if (staff and for_end_user) else comment.author_name,
+        # End users see the department rather than the individual staff member.
+        "author_name": f"{department_name} department" if (staff and for_end_user) else comment.author_name,
         "body": comment.body,
         "is_internal": comment.is_internal,
         "created_at": comment.created_at.isoformat(),
-        "attachments": [_attachment(a) for a in comment.attachments],
+        "attachments": [attachment_service.serialize(a) for a in comment.attachments],
     }
 
 
@@ -269,7 +240,7 @@ def staff_detail(ctx: AccessContext, complaint: Complaint) -> dict:
             "from_status": e.from_status,
             "to_status": e.to_status,
             "actor_type": e.actor_type,
-            "actor_name": e.actor_name or "System",
+            "actor_name": e.actor_name,
             "created_at": e.created_at.isoformat(),
         }
         for e in complaint.events
@@ -280,7 +251,7 @@ def staff_detail(ctx: AccessContext, complaint: Complaint) -> dict:
             "assignee": {"id": a.assignee.id, "name": a.assignee.name, "role": a.assignee.role.name},
             "method": a.method,
             "reason": a.reason,
-            "assigned_by": a.assigned_by.name if a.assigned_by else "Routing engine",
+            "assigned_by": a.assigned_by.name if a.assigned_by else None,
             "assigned_at": a.assigned_at.isoformat(),
             "ended_at": _iso(a.ended_at),
         }
@@ -290,7 +261,7 @@ def staff_detail(ctx: AccessContext, complaint: Complaint) -> dict:
         {
             "type": e.breach_type,
             "level": e.level,
-            "from": e.from_user.name if e.from_user else "Department queue",
+            "from": e.from_user.name if e.from_user else None,
             "to": e.to_user.name if e.to_user else None,
             "created_at": e.created_at.isoformat(),
             "resolved_at": _iso(e.resolved_at),
@@ -309,15 +280,25 @@ def staff_detail(ctx: AccessContext, complaint: Complaint) -> dict:
     ]
     data["rejection"] = {
         "can_request": rejection_service.can_request(ctx, complaint),
-        "categories": rejection_service.REASON_CATEGORIES,
+        "reasons": [rejection_service.serialize_reason(r) for r in rejection_service.list_reasons(ctx.db)],
         "requests": [rejection_service.serialize(r, ctx) for r in complaint.rejection_requests],
     }
-    open_for_assignment = complaint.status not in (CLOSED, REJECTED)
-    data["can_assign"] = open_for_assignment and ctx.has(
+    open_for_changes = complaint.status not in (CLOSED, REJECTED)
+    pending = rejection_service.pending_request(complaint) is not None
+    data["can_assign"] = open_for_changes and not pending and ctx.has(
         "complaint.reassign" if complaint.assigned_to_id else "complaint.assign"
     )
-    data["can_comment"] = ctx.has("complaint.respond") and open_for_assignment
+    data["can_comment"] = ctx.has("complaint.respond") and open_for_changes
+    data["can_reclassify"] = ctx.has("complaint.reclassify") and open_for_changes
+    data["attachment_room"] = attachment_room(ctx.db, complaint)
     return data
+
+
+def attachment_room(db: Session, complaint: Complaint) -> int | None:
+    """How many more files the complaint may take (every attachment counts, including
+    those on internal notes), or None while the limit is not configured."""
+    limit = settings_service.get_settings(db).max_attachments_per_complaint
+    return None if limit is None else max(0, limit - len(complaint.attachments))
 
 
 def end_user_detail(db: Session, end_user: EndUser, complaint: Complaint, permissions: frozenset[str]) -> dict:
@@ -330,40 +311,107 @@ def end_user_detail(db: Session, end_user: EndUser, complaint: Complaint, permis
         if e.public_message is None:
             continue
         if e.actor_type == "end_user":
-            actor = "You" if e.actor_id == end_user.id else "End User"
+            actor = "You"
         elif e.actor_type == "staff":
-            actor = f"{department} Department"
+            actor = f"{department} department"
         else:
-            actor = "System"
+            actor = None
         timeline.append({
             "id": e.id,
             "type": e.event_type,
             "message": e.public_message,
             # routing/assignment notes are internal; status notes are addressed to the end user
             "note": e.note if e.event_type in ("status_changed", "feedback") else None,
-            "from_status": e.from_status,
-            "to_status": e.to_status,
             "actor_name": actor,
             "created_at": e.created_at.isoformat(),
         })
     data["timeline"] = timeline
     data["comments"] = [_comment(c, True, department) for c in complaint.comments if not c.is_internal]
-    data["actions"] = [a for a in end_user_actions_for(complaint) if ACTION_PERMISSIONS[a] in permissions]
-    deadline = reopen_deadline(complaint)
-    data["reopen_until"] = _iso(deadline) if "reopen" in data["actions"] else None
+    data["actions"] = [a for a in end_user_actions_for(db, complaint) if ACTION_PERMISSIONS[a] in permissions]
+    data["reopen_until"] = _iso(reopen_deadline(db, complaint)) if "reopen" in data["actions"] else None
+    data["attachment_room"] = attachment_room(db, complaint)
     return data
+
+
+# ---------------------------------------------------------------------------
+# Reclassification
+# ---------------------------------------------------------------------------
+
+def reclassify(
+    ctx: AccessContext, complaint: Complaint, *, department_id: int, category_id: int, location_id: int,
+    priority_id: int, reason: str, at: datetime | None = None,
+) -> list[str]:
+    """Changes department, category, location and/or priority. Re-routes the
+    complaint when its handler no longer covers it and shifts the SLA clocks
+    to the new targets. Returns the names of the changed fields. The caller commits."""
+    ctx.require("complaint.reclassify")
+    if complaint.status in (CLOSED, REJECTED):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Closed or rejected complaints cannot be changed")
+    reason = multi_line(reason, "The reason for the change", NOTE_MAX_LENGTH)
+    db, now = ctx.db, at or utcnow()
+    # Values that stay the same are kept even if they were switched off since the complaint was filed.
+    if (department_id, category_id) == (complaint.department_id, complaint.category_id):
+        department, category = complaint.department, complaint.category
+        location = (complaint.location if location_id == complaint.location_id
+                    else require_usable(db, db.get(Location, location_id)))
+    else:
+        department, category, location = resolve_classification(db, department_id, category_id, location_id)
+    priority = complaint.priority if priority_id == complaint.priority_id else priority_service.get_active(db, priority_id)
+    ctx.require_covers(department.id, location.path)
+
+    before = {"department": complaint.department.name, "category": complaint.category.name if complaint.category else None,
+              "location": complaint.location.name, "priority": complaint.priority.name}
+    after = {"department": department.name, "category": category.name, "location": location.name,
+             "priority": priority.name}
+    changed = [field for field in before if before[field] != after[field]]
+    if not changed:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing was changed")
+
+    old_rule = sla_service.sla_for(db, complaint)
+    complaint.department, complaint.category, complaint.location, complaint.priority = (
+        department, category, location, priority,
+    )
+    db.flush()
+    sla_service.apply_target_change(db, complaint, old_rule, now)
+
+    public = []
+    if "department" in changed:
+        public.append(f"moved to the {department.name} department")
+    if "location" in changed:
+        public.append(f"location updated to {location.name}")
+    if "priority" in changed:
+        public.append(f"priority set to {priority.name}")
+    summary = ", ".join(f"{field} {before[field] or '—'} → {after[field]}" for field in changed)
+    record_event(db, complaint, "reclassified", ctx.user, f"Changed {summary}",
+                 public_message=("Complaint " + ", ".join(public)) if public else None, note=reason, at=now)
+
+    if complaint.escalated_to is not None and not sla_service.covers(complaint.escalated_to, complaint):
+        sla_service.end_escalation(complaint, now)
+    handler = complaint.assigned_to
+    if handler is not None and not routing_service.still_handles(handler, complaint):
+        routing_service.unassign(db, complaint, ctx.user, "no longer covers the complaint after it was changed", now)
+        routing_service.auto_route(db, complaint, actor=ctx.user, at=now)
+    elif handler is None:
+        routing_service.auto_route(db, complaint, actor=ctx.user, at=now, record_queue_event=False)
+    return changed
 
 
 # ---------------------------------------------------------------------------
 # Stats
 # ---------------------------------------------------------------------------
 
-def _trend(current: int, previous: int) -> tuple[str | None, str]:
-    """Percentage change vs the previous 30 days; None when there is no baseline."""
+def _change(current: int, previous: int, good_when: str) -> dict | None:
+    """Change vs the previous period: signed percent, direction, and whether it
+    is good news. None when there is no baseline."""
     if previous == 0:
-        return None, "positive"
-    change = round((current - previous) / previous * 100)
-    return f"{abs(change)}%", "positive" if change >= 0 else "negative"
+        return None
+    percent = round((current - previous) / previous * 100)
+    direction = "up" if percent > 0 else "down" if percent < 0 else "flat"
+    if direction == "flat" or good_when == "neutral":
+        sentiment = "neutral"
+    else:
+        sentiment = "good" if direction == good_when else "bad"
+    return {"percent": percent, "direction": direction, "sentiment": sentiment}
 
 
 def sla_breached_clause(now: datetime):
@@ -390,75 +438,63 @@ def sla_at_risk_clause(now: datetime):
 
 
 def group_counts(scoped: Query) -> dict[str, int]:
-    return {group: scoped.filter(Complaint.status.in_(statuses)).count() for group, statuses in STATUS_GROUPS.items()}
+    counts = dict(scoped.with_entities(Complaint.status, func.count(Complaint.id)).group_by(Complaint.status).all())
+    return {group: sum(counts.get(s, 0) for s in statuses) for group, statuses in STATUS_GROUPS.items()}
 
 
-def dashboard_stats(scoped: Query) -> dict:
-    """Counts and trends over an already-scoped Complaint query."""
-    total = scoped.count()
-    counts = group_counts(scoped)
-    by_status: dict[str, int] = {}
-    for (value,) in scoped.with_entities(Complaint.status).all():
-        by_status[value] = by_status.get(value, 0) + 1
-
+def dashboard_stats(db: Session, scoped: Query, trend_days: int, comparison_days: int) -> dict:
+    """Counts, changes over the last `comparison_days` (vs the same span before)
+    and a daily trend over an already-scoped Complaint query. Days follow the
+    organisation's time zone."""
+    tz = settings_service.timezone(db)
     now = utcnow()
-    last_30 = now - timedelta(days=30)
-    prev_30 = now - timedelta(days=60)
+    by_status = dict(scoped.with_entities(Complaint.status, func.count(Complaint.id)).group_by(Complaint.status).all())
+    total = sum(by_status.values())
+    counts = {group: sum(by_status.get(s, 0) for s in statuses) for group, statuses in STATUS_GROUPS.items()}
 
-    def created_between(start: datetime, end: datetime | None = None, statuses: list[str] | None = None) -> int:
-        q = scoped.filter(Complaint.created_at >= start)
-        if end is not None:
-            q = q.filter(Complaint.created_at < end)
-        if statuses is not None:
-            q = q.filter(Complaint.status.in_(statuses))
-        return q.count()
+    current_start = now - timedelta(days=comparison_days)
+    previous_start = now - timedelta(days=2 * comparison_days)
 
-    total_trend, total_type = _trend(created_between(last_30), created_between(prev_30, last_30))
-    trends = {
-        group: _trend(
-            created_between(last_30, statuses=statuses),
-            created_between(prev_30, last_30, statuses=statuses),
-        )
-        for group, statuses in STATUS_GROUPS.items()
-    }
+    def window_counts(statuses: list[str] | None) -> tuple[int, int]:
+        condition = Complaint.status.in_(statuses) if statuses is not None else true()
+        current, previous = scoped.with_entities(
+            func.coalesce(func.sum(case((and_(condition, Complaint.created_at >= current_start), 1), else_=0)), 0),
+            func.coalesce(func.sum(case((and_(condition, Complaint.created_at >= previous_start,
+                                              Complaint.created_at < current_start), 1), else_=0)), 0),
+        ).one()
+        return int(current), int(previous)
 
-    by_department: dict[str, int] = {}
-    for (name,) in scoped.with_entities(Department.name).join(Department, Complaint.department_id == Department.id).all():
-        by_department[name] = by_department.get(name, 0) + 1
+    total_change = _change(*window_counts(None), good_when="neutral")
+    good_when = {"open": "down", "in_progress": "down", "resolved": "up", "rejected": "neutral"}
+    changes = {group: _change(*window_counts(statuses), good_when=good_when[group])
+               for group, statuses in STATUS_GROUPS.items()}
 
-    today = now.date()
+    departments = scoped.with_entities(Department.name, func.count(Complaint.id)).join(
+        Department, Complaint.department_id == Department.id,
+    ).group_by(Department.name).order_by(func.count(Complaint.id).desc()).all()
+
+    local_today = datetime.now(tz).date()
     trend = []
-    for offset in range(6, -1, -1):
-        day = today - timedelta(days=offset)
-        start = datetime.combine(day, datetime.min.time())
-        end = start + timedelta(days=1)
-        trend.append({
-            "date": day.strftime("%d %b"),
-            "received": scoped.filter(Complaint.created_at >= start, Complaint.created_at < end).count(),
-            "resolved": scoped.filter(Complaint.resolved_at >= start, Complaint.resolved_at < end).count(),
-        })
+    for offset in range(trend_days - 1, -1, -1):
+        day = local_today - timedelta(days=offset)
+        local_start = datetime.combine(day, datetime.min.time(), tz)
+        start = local_start.astimezone(dt_timezone.utc).replace(tzinfo=None)
+        end = (local_start + timedelta(days=1)).astimezone(dt_timezone.utc).replace(tzinfo=None)
+        received, resolved = scoped.with_entities(
+            func.coalesce(func.sum(case((and_(Complaint.created_at >= start, Complaint.created_at < end), 1),
+                                        else_=0)), 0),
+            func.coalesce(func.sum(case((and_(Complaint.resolved_at >= start, Complaint.resolved_at < end), 1),
+                                        else_=0)), 0),
+        ).one()
+        trend.append({"date": day.isoformat(), "received": int(received), "resolved": int(resolved)})
 
     denominator = total or 1
-
-    def bad_when_up(group: str) -> str:
-        # more open / in-progress complaints is bad news
-        return "negative" if trends[group][1] == "positive" else "positive"
-
     return {
         "metrics": {
             "total": total,
-            "total_trend": total_trend,
-            "total_trend_type": total_type,
-            "open": counts["open"],
-            "open_trend": trends["open"][0],
-            "open_trend_type": bad_when_up("open"),
-            "in_progress": counts["in_progress"],
-            "in_progress_trend": trends["in_progress"][0],
-            "in_progress_trend_type": bad_when_up("in_progress"),
-            "resolved": counts["resolved"],
-            "resolved_trend": trends["resolved"][0],
-            "resolved_trend_type": trends["resolved"][1],
-            "rejected": counts["rejected"],
+            "total_change": total_change,
+            **{group: counts[group] for group in STATUS_GROUPS},
+            **{f"{group}_change": changes[group] for group in STATUS_GROUPS},
             "unassigned": scoped.filter(
                 Complaint.assigned_to_id.is_(None), Complaint.status.in_(ACTIVE_STATUSES)
             ).count(),
@@ -474,9 +510,15 @@ def dashboard_stats(scoped: Query) -> dict:
             {"status": value, "label": status_label(value), "count": count}
             for value, count in sorted(by_status.items(), key=lambda item: -item[1])
         ],
-        "departments": [
-            {"name": name, "count": count}
-            for name, count in sorted(by_department.items(), key=lambda item: -item[1])
-        ],
+        "departments": [{"name": name, "count": count} for name, count in departments],
         "trend": trend,
     }
+
+
+def clean_complaint_text(title: str | None, description: str | None,
+                         additional_details: str | None) -> tuple[str, str, str | None]:
+    return (
+        single_line(title, "Title", max_length(Complaint.title)),
+        multi_line(description, "Description", DESCRIPTION_MAX_LENGTH),
+        multi_line(additional_details, "Additional details", max_length(Complaint.additional_details), required=False),
+    )

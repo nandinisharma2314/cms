@@ -1,56 +1,100 @@
 """Reports over complaints in the viewer's scope.
 
 Complaints are selected by submission date (the period), loaded with only the
-columns the metrics need, and aggregated in Python so the maths is identical
-on SQLite and MySQL. Suitable for tens of thousands of complaints per query;
-beyond that, move the aggregation into SQL or a reporting table.
+columns the metrics need, and aggregated in Python. Dates and daily buckets
+follow the organisation's time zone (Settings). Suitable for tens of thousands
+of complaints per query; beyond that, move the aggregation into SQL or a
+reporting table.
 
 Definitions
-  response time    submission -> first staff response (acknowledged_at)
+  response time    submission -> first staff response (acknowledged_at: the
+                   first acknowledge / start / request-info / resolve / reject
+                   or rejection request; a reply alone does not count)
   resolution time  submission -> marked resolved (resolved_at)
   response SLA     met when the first response came without a recorded
-                   response breach; breached when a breach was recorded or the
+                   response breach; missed when a breach was recorded or the
                    complaint is still awaiting a response past its due time
   resolution SLA   likewise for resolution
+  reopened %       of the complaints resolved at least once, the share an end
+                   user or staff member reopened
+  "resolved" in the trend counts complaints submitted in the period that were
+  resolved on that day (complaints submitted earlier are not in the period).
 """
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from statistics import median
+from zoneinfo import ZoneInfo
 
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models import Complaint, ComplaintEvent, Department, Location, User
+from config import REPORT_DEFAULT_DAYS, REPORT_MAX_DAYS, REPORT_WEEKLY_AFTER_DAYS
+from models import Complaint, ComplaintEvent, Department, Location, Priority, User
+from services import settings_service
 from services.access_service import AccessContext
 from services.location_service import location_types_by_depth, path_ids, path_names
 from services.sla_service import RESOLUTION_BREACH_EVENT, RESPONSE_BREACH_EVENT
 from services.statuses import AWAITING_RESPONSE, GROUP_OF
 from utils.security import utcnow
 
+ID_CHUNK = 900
+
 
 @dataclass
 class Filters:
     date_from: date
     date_to: date
+    tz: ZoneInfo
     department_id: int | None = None
-    location_id: int | None = None
-    priority: str | None = None
+    location: Location | None = None
+    priority_id: int | None = None
+
+    def _utc(self, day: date) -> datetime:
+        return settings_service.day_start_utc(self.tz, day)
 
     @property
     def start(self) -> datetime:
-        return datetime.combine(self.date_from, datetime.min.time())
+        return self._utc(self.date_from)
 
     @property
     def end(self) -> datetime:
-        return datetime.combine(self.date_to + timedelta(days=1), datetime.min.time())
+        return settings_service.day_end_utc(self.tz, self.date_to)
+
+    def local_date(self, value: datetime) -> date:
+        return value.replace(tzinfo=timezone.utc).astimezone(self.tz).date()
+
+    def shifted_back(self) -> "Filters":
+        """The same number of days just before this period."""
+        length = self.date_to - self.date_from
+        return Filters(self.date_from - length - timedelta(days=1), self.date_from - timedelta(days=1), self.tz,
+                       self.department_id, self.location, self.priority_id)
 
 
-def default_filters(date_from: date | None, date_to: date | None, **rest) -> Filters:
-    today = utcnow().date()
+def build_filters(db: Session, date_from: date | None, date_to: date | None, department_id: int | None,
+                  location_id: int | None, priority_id: int | None) -> Filters:
+    tz = settings_service.timezone(db)
+    today = utcnow().replace(tzinfo=timezone.utc).astimezone(tz).date()
     date_to = date_to or today
-    date_from = date_from or date_to - timedelta(days=29)
+    date_from = date_from or date_to - timedelta(days=REPORT_DEFAULT_DAYS - 1)
     if date_from > date_to:
-        date_from, date_to = date_to, date_from
-    return Filters(date_from, date_to, **rest)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The start date must not be after the end date")
+    if (date_to - date_from).days + 1 > REPORT_MAX_DAYS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Choose a period of at most {REPORT_MAX_DAYS} days")
+    if department_id is not None and db.get(Department, department_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Department not found")
+    location = None
+    if location_id is not None:
+        location = db.get(Location, location_id)
+        if location is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Location not found")
+    if priority_id is not None and db.get(Priority, priority_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Priority not found")
+    filters = Filters(date_from, date_to, tz, department_id, location, priority_id)
+    try:  # dates at the ends of the calendar (e.g. year 1 typed into a date field) can't be converted
+        _ = (filters.end, filters.shifted_back().start)
+    except (OverflowError, ValueError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose dates in a realistic range") from None
+    return filters
 
 
 @dataclass
@@ -89,26 +133,24 @@ def load_rows(ctx: AccessContext, filters: Filters) -> list[Row]:
     query = ctx.apply_scope(query, Complaint.department_id)
     if filters.department_id is not None:
         query = query.filter(Complaint.department_id == filters.department_id)
-    if filters.priority:
-        query = query.filter(Complaint.priority == filters.priority)
-    if filters.location_id is not None:
-        within = db.get(Location, filters.location_id)
-        if within is not None:
-            query = query.filter(Location.path.startswith(within.path))
+    if filters.priority_id is not None:
+        query = query.filter(Complaint.priority_id == filters.priority_id)
+    if filters.location is not None:
+        query = query.filter(Location.path.startswith(filters.location.path))
 
     rows = [
         Row(
             id=r[0], department_id=r[1], location_id=r[2], location_path=r[3], assignee_id=r[4], status=r[5],
             created_at=r[6], acknowledged_at=r[7], resolved_at=r[8], response_due_at=r[9],
             resolution_due_at=r[10], sla_paused=r[11] is not None, escalated=r[12] is not None,
-            rating=r[13], reopen_count=r[14] or 0,
+            rating=r[13], reopen_count=r[14],
         )
         for r in query.all()
     ]
     by_id = {row.id: row for row in rows}
     ids = list(by_id)
-    for start in range(0, len(ids), 900):  # stay under SQLite's parameter limit
-        chunk = ids[start:start + 900]
+    for start in range(0, len(ids), ID_CHUNK):
+        chunk = ids[start:start + ID_CHUNK]
         for complaint_id, event_type in (
             db.query(ComplaintEvent.complaint_id, ComplaintEvent.event_type)
             .filter(ComplaintEvent.complaint_id.in_(chunk),
@@ -156,7 +198,7 @@ def metrics(rows: list[Row], now: datetime | None = None) -> dict:
     now = now or utcnow()
     groups = {"open": 0, "in_progress": 0, "resolved": 0, "rejected": 0}
     for row in rows:
-        groups[GROUP_OF.get(row.status, "open")] += 1
+        groups[GROUP_OF[row.status]] += 1
 
     response_times = [_hours(r.acknowledged_at - r.created_at) for r in rows if r.acknowledged_at]
     resolution_times = [_hours(r.resolved_at - r.created_at) for r in rows if r.resolved_at]
@@ -171,11 +213,13 @@ def metrics(rows: list[Row], now: datetime | None = None) -> dict:
     resolution_missed = sum(
         1 for r in rows
         if r.resolution_breached or (
-            GROUP_OF.get(r.status) in active and not r.sla_paused and r.resolution_due_at and now > r.resolution_due_at
+            GROUP_OF[r.status] in active and not r.sla_paused and r.resolution_due_at and now > r.resolution_due_at
         )
     )
-    ratings = [r.rating for r in rows if r.rating]
-    finished = groups["resolved"]
+    ratings = [r.rating for r in rows if r.rating is not None]
+    reopened = sum(1 for r in rows if r.reopen_count > 0)
+    # A reopened complaint was resolved before, even if it is open again now.
+    resolved_at_least_once = sum(1 for r in rows if r.resolved_at is not None or r.reopen_count > 0)
     return {
         "total": len(rows),
         "open": groups["open"],
@@ -183,7 +227,7 @@ def metrics(rows: list[Row], now: datetime | None = None) -> dict:
         "pending": groups["open"] + groups["in_progress"],
         "resolved": groups["resolved"],
         "rejected": groups["rejected"],
-        "unassigned": sum(1 for r in rows if r.assignee_id is None and GROUP_OF.get(r.status) in active),
+        "unassigned": sum(1 for r in rows if r.assignee_id is None and GROUP_OF[r.status] in active),
         "escalated_now": sum(1 for r in rows if r.escalated),
         "response_hours": _stats(response_times),
         "resolution_hours": _stats(resolution_times),
@@ -194,16 +238,17 @@ def metrics(rows: list[Row], now: datetime | None = None) -> dict:
         "sla_breaches": sum(1 for r in rows if r.response_breached or r.resolution_breached),
         "avg_rating": round(sum(ratings) / len(ratings), 2) if ratings else None,
         "rated": len(ratings),
-        "reopened": sum(1 for r in rows if r.reopen_count > 0),
-        "reopen_pct": _pct(sum(1 for r in rows if r.reopen_count > 0), finished),
+        "reopened": reopened,
+        "resolved_at_least_once": resolved_at_least_once,
+        "reopen_pct": _pct(reopened, resolved_at_least_once),
         "rejection_pct": _pct(groups["rejected"], len(rows)),
     }
 
 
 def trend(rows: list[Row], filters: Filters) -> dict:
-    """Received / resolved / breached per day (or per week for periods over 62 days)."""
+    """Received / resolved / breached per day (or per week for long periods)."""
     days = (filters.date_to - filters.date_from).days + 1
-    weekly = days > 62
+    weekly = days > REPORT_WEEKLY_AFTER_DAYS
     step = 7 if weekly else 1
 
     def bucket(d: date) -> date:
@@ -215,20 +260,18 @@ def trend(rows: list[Row], filters: Filters) -> dict:
         buckets[current] = {"received": 0, "resolved": 0, "breached": 0}
         current += timedelta(days=step)
     for row in rows:
-        key = bucket(row.created_at.date())
+        key = bucket(filters.local_date(row.created_at))
         if key in buckets:
             buckets[key]["received"] += 1
             if row.response_breached or row.resolution_breached:
                 buckets[key]["breached"] += 1
         if row.resolved_at:
-            resolved_key = bucket(row.resolved_at.date())
+            resolved_key = bucket(filters.local_date(row.resolved_at))
             if resolved_key in buckets:
                 buckets[resolved_key]["resolved"] += 1
     return {
         "interval": "week" if weekly else "day",
-        "points": [
-            {"date": key.isoformat(), "label": key.strftime("%d %b"), **values} for key, values in buckets.items()
-        ],
+        "points": [{"date": key.isoformat(), **values} for key, values in buckets.items()],
     }
 
 
@@ -277,16 +320,22 @@ def by_department(db: Session, rows: list[Row]) -> list[dict]:
     groups = _grouped(rows, lambda r: r.department_id)
     names = dict(db.query(Department.id, Department.name).filter(Department.id.in_(list(groups))).all()) if groups else {}
     return sorted(
-        (_performance_row(names.get(dept_id, "?"), group, {"id": dept_id}) for dept_id, group in groups.items()),
+        (_performance_row(names[dept_id], group, {"id": dept_id}) for dept_id, group in groups.items()),
         key=lambda r: -r["total"],
     )
 
 
+def levels(db: Session) -> list[dict]:
+    return [{"key": t.key, "name": t.name, "depth": t.depth} for t in location_types_by_depth(db)]
+
+
 def by_location(db: Session, rows: list[Row], level: str) -> list[dict]:
-    """Rolls complaints up to their ancestor at `level` (e.g. "district").
-    Complaints filed at a higher level than that stay at their own location."""
-    types = location_types_by_depth(db)
-    depth = next((t.depth for t in types if t.key == level), len(types) - 1)
+    """Rolls complaints up to their ancestor at `level`. Complaints filed at a
+    higher level than that stay at their own location."""
+    types = {t.key: t for t in location_types_by_depth(db)}
+    if level not in types:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown location level '{level}'")
+    depth = types[level].depth
 
     def ancestor(row: Row) -> int:
         ids = path_ids(row.location_path)
@@ -299,8 +348,8 @@ def by_location(db: Session, rows: list[Row], level: str) -> list[dict]:
     return sorted(
         (
             _performance_row(
-                names.get(loc_id, [by_id[loc_id].name])[-1], group,
-                {"id": loc_id, "path": " > ".join(names.get(loc_id, [])), "type": by_id[loc_id].type.name},
+                by_id[loc_id].name, group,
+                {"id": loc_id, "path": " > ".join(names[loc_id]), "type": by_id[loc_id].type.name},
             )
             for loc_id, group in groups.items()
         ),

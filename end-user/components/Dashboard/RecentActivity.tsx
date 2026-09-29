@@ -1,309 +1,198 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Send,
-  User,
-  Settings,
+  Activity as ActivityIcon,
+  ArrowUpCircle,
   CheckCircle,
-  Megaphone,
-  Leaf,
   ChevronRight,
   Clock,
-  Sparkles,
-  X,
   FileText,
-  Activity as ActivityIcon,
+  MessageSquare,
   RefreshCw,
+  RotateCcw,
+  Send,
+  UserCheck,
 } from "lucide-react";
-import { apis } from "@/lib/apis";
+import { Activity, api } from "@/lib/api";
+import { useConfig } from "@/lib/config";
+import { formatWhen } from "@/lib/format";
+import { Dialog } from "@/components/ui/Dialog";
 
-interface ActivityItem {
-  id: number;
-  title: string;
-  desc: string;
-  type: string;
-  complaint_id?: string;
-  time: string;
-  created_at: string;
+/** Icon and colour per kind of update (event types from the complaint timeline). */
+const KIND_STYLE: Record<string, { icon: React.ElementType; bg: string; color: string }> = {
+  submitted: { icon: Send, bg: "bg-blue-50", color: "text-blue-600" },
+  assigned: { icon: UserCheck, bg: "bg-purple-50", color: "text-purple-600" },
+  routed: { icon: UserCheck, bg: "bg-purple-50", color: "text-purple-600" },
+  status_changed: { icon: RefreshCw, bg: "bg-amber-50", color: "text-amber-600" },
+  resolved: { icon: CheckCircle, bg: "bg-emerald-50", color: "text-emerald-600" },
+  comment_added: { icon: MessageSquare, bg: "bg-sky-50", color: "text-sky-600" },
+  escalated: { icon: ArrowUpCircle, bg: "bg-rose-50", color: "text-rose-600" },
+  reclassified: { icon: RotateCcw, bg: "bg-orange-50", color: "text-orange-600" },
+  review_completed: { icon: CheckCircle, bg: "bg-sky-50", color: "text-sky-600" },
+};
+const OTHER_STYLE = { icon: FileText, bg: "bg-indigo-50", color: "text-indigo-600" };
+
+function ActivityRow({ item, onOpen, compact }: { item: Activity; onOpen: (item: Activity) => void; compact: boolean }) {
+  const { icon: Icon, bg, color } = KIND_STYLE[item.kind] ?? OTHER_STYLE;
+  return (
+    <button type="button" onClick={() => onOpen(item)} className="group flex w-full gap-3.5 rounded-xl text-left">
+      <span className={`flex shrink-0 items-center justify-center rounded-xl ${bg} ${compact ? "h-8 w-8" : "h-9 w-9"}`}>
+        <Icon className={`h-4 w-4 ${color}`} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1 pb-1">
+        <span className="flex items-start justify-between gap-1">
+          <span className="truncate text-xs font-bold text-slate-800 group-hover:text-blue-700">{item.title}</span>
+          <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap text-[10px] font-medium text-slate-400">
+            <Clock size={10} aria-hidden="true" /> {formatWhen(item.created_at)}
+          </span>
+        </span>
+        <span className={`block text-[11px] leading-snug text-slate-500 ${compact ? "line-clamp-2" : ""}`}>{item.message}</span>
+        <span className="mt-0.5 block font-mono text-[10px] text-slate-400">{item.complaint_id}</span>
+      </span>
+    </button>
+  );
 }
 
-const RecentActivity = () => {
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isViewAllOpen, setIsViewAllOpen] = useState(false);
+/** Recent public updates across the end user's complaints (the side panel on larger screens). */
+export default function RecentActivity() {
   const router = useRouter();
+  const { ui } = useConfig();
+  const [items, setItems] = useState<Activity[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [allOpen, setAllOpen] = useState(false);
+  const [all, setAll] = useState<{ items: Activity[]; total: number } | null>(null);
 
-  const fetchActivities = async (showRefresh = false) => {
-    try {
-      if (showRefresh) setIsRefreshing(true);
-      const actRes = await apis.notifications.getActivities();
+  const load = useCallback(
+    () =>
+      api.activities({ page_size: ui.dashboard_recent_items }).then(
+        (page) => {
+          setItems(page.items);
+          setError(null);
+        },
+        (err: Error) => setError(err.message),
+      ),
+    [ui.dashboard_recent_items],
+  );
 
-      if (actRes && actRes.success) {
-        setActivities(actRes.activities || []);
-      }
-    } catch (err) {
-      console.warn("Could not fetch activities:", err);
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
+  const refresh = () => {
+    setRefreshing(true);
+    load().finally(() => setRefreshing(false));
   };
 
   useEffect(() => {
-    fetchActivities();
-    // Live polling every 25 seconds
-    const interval = setInterval(() => {
-      fetchActivities();
-    }, 25000);
-    return () => clearInterval(interval);
-  }, []);
+    load();
+    const timer = setInterval(load, ui.notification_poll_seconds * 1000);
+    return () => clearInterval(timer);
+  }, [load, ui.notification_poll_seconds]);
 
-  const handleActivityClick = (item: ActivityItem) => {
-    if (item.complaint_id) router.push(`/dashboard/complaints/${encodeURIComponent(item.complaint_id)}`);
-  };
-
-  const getIconData = (type: string) => {
-    switch (type) {
-      case "forwarded":
-        return {
-          icon: Send,
-          bg: "bg-blue-50",
-          color: "text-blue-600",
-        };
-      case "assigned":
-        return {
-          icon: User,
-          bg: "bg-purple-50",
-          color: "text-purple-600",
-        };
-      case "in_progress":
-        return {
-          icon: Settings,
-          bg: "bg-amber-50",
-          color: "text-amber-600",
-        };
-      case "resolved":
-        return {
-          icon: CheckCircle,
-          bg: "bg-emerald-50",
-          color: "text-emerald-600",
-        };
-      case "announcement":
-        return {
-          icon: Megaphone,
-          bg: "bg-sky-50",
-          color: "text-sky-600",
-        };
-      default:
-        return {
-          icon: FileText,
-          bg: "bg-indigo-50",
-          color: "text-indigo-600",
-        };
+  const openAll = async () => {
+    setAllOpen(true);
+    try {
+      const page = await api.activities({ page_size: ui.max_page_size });
+      setAll({ items: page.items, total: page.total });
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
-  const displayActivities = activities.slice(0, 5);
+  const open = (item: Activity) => {
+    setAllOpen(false);
+    router.push(`/dashboard/complaints/${encodeURIComponent(item.complaint_id)}`);
+  };
 
   return (
     <>
-      <div className="w-[320px] shrink-0 bg-white shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col h-full overflow-hidden">
-        {/* Header */}
-        <div className="p-3 px-4 border-b shrink-0 border-slate-100 flex justify-between items-center bg-slate-50/40">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-slate-800">Recent Activity</h3>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Live real-time feed" />
-          </div>
+      <div className="flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/40 p-3 px-4">
+          <h2 className="text-base font-bold text-slate-800">Recent activity</h2>
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => fetchActivities(true)}
-              title="Refresh activity"
-              className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-white transition-colors cursor-pointer"
+              onClick={refresh}
+              aria-label="Refresh activity"
+              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-white hover:text-blue-600"
             >
-              <RefreshCw size={13} className={isRefreshing ? "animate-spin text-indigo-600" : ""} />
+              <RefreshCw size={13} className={refreshing ? "animate-spin text-blue-600" : ""} />
             </button>
             <button
               type="button"
-              onClick={() => setIsViewAllOpen(true)}
-              className="text-indigo-600 text-xs font-bold flex items-center hover:text-indigo-700 cursor-pointer ml-1"
+              onClick={openAll}
+              className="ml-1 flex items-center text-xs font-bold text-blue-600 hover:text-blue-700"
             >
-              View All <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+              View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Timeline Feed */}
         <div className="flex-1 overflow-y-auto p-4 pb-2">
-          {loading ? (
-            <div className="flex flex-col gap-4 animate-pulse">
+          {error ? (
+            <p role="alert" className="py-8 text-center text-xs text-red-600">
+              {error}
+            </p>
+          ) : items === null ? (
+            <div className="flex animate-pulse flex-col gap-4" aria-hidden="true">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="flex gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 shrink-0" />
+                  <div className="h-8 w-8 shrink-0 rounded-xl bg-slate-100" />
                   <div className="flex-1">
-                    <div className="h-3.5 bg-slate-100 rounded w-3/4 mb-1.5" />
-                    <div className="h-2.5 bg-slate-50 rounded w-full" />
+                    <div className="mb-1.5 h-3.5 w-3/4 rounded bg-slate-100" />
+                    <div className="h-2.5 w-full rounded bg-slate-50" />
                   </div>
                 </div>
               ))}
             </div>
-          ) : activities.length === 0 ? (
-            <div className="py-12 px-4 flex flex-col items-center justify-center text-center">
-              <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center mb-2">
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+              <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
                 <ActivityIcon size={18} />
               </div>
-              <p className="text-xs font-bold text-slate-700">No Recent Activity</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                New updates will appear here when you file complaints.
-              </p>
+              <p className="text-xs font-bold text-slate-700">Nothing yet</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">Updates on your complaints will show up here.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {displayActivities.map((activity, index) => {
-                const { icon: Icon, bg, color } = getIconData(activity.type);
-                const isClickable = Boolean(activity.complaint_id);
-
-                return (
-                  <div
-                    key={activity.id || index}
-                    onClick={() => handleActivityClick(activity)}
-                    className={`flex gap-3.5 relative group ${
-                      isClickable ? "cursor-pointer" : ""
-                    }`}
-                  >
-                    {/* Timeline line */}
-                    {index !== displayActivities.length - 1 && (
-                      <div className="absolute left-4 top-9 w-px h-[calc(100%-10px)] bg-slate-100 -translate-x-1/2" />
-                    )}
-
-                    <div
-                      className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center relative z-10 ${bg} shadow-sm group-hover:scale-105 transition-transform`}
-                    >
-                      <Icon className={`w-4 h-4 ${color}`} />
-                    </div>
-
-                    <div className="flex-1 pb-1 min-w-0">
-                      <div className="flex justify-between items-start gap-1 mb-0.5">
-                        <h4 className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-                          {activity.title}
-                        </h4>
-                        <span className="text-[9px] text-slate-400 font-medium whitespace-nowrap shrink-0 flex items-center gap-0.5">
-                          <Clock size={9} /> {activity.time}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
-                        {activity.desc}
-                      </p>
-                      {activity.complaint_id && (
-                        <span className="text-[10px] font-bold text-indigo-600 mt-1 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
-                          View details →
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ul className="flex flex-col gap-4">
+              {items.map((item) => (
+                <li key={item.id}>
+                  <ActivityRow item={item} onOpen={open} compact />
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
-
-        {/* Promo Footer Card */}
-        <div className="p-3 mt-auto shrink-0 border-t border-slate-100 bg-slate-50/30">
-          <div className="w-full bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-100/60 rounded-xl p-2.5 flex items-center justify-between text-left group">
-            <div className="flex items-center gap-2.5">
-              <div className="bg-emerald-100 p-1.5 rounded-lg text-emerald-600 shrink-0">
-                <Leaf className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-blue-900 leading-tight">
-                  Cleaner Communities
-                </p>
-                <p className="text-[10px] font-medium text-blue-700 leading-tight">
-                  Stronger Together
-                </p>
-              </div>
-            </div>
-            <Sparkles className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors" />
-          </div>
         </div>
       </div>
 
-      {/* View All Activities Modal */}
-      {isViewAllOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <ActivityIcon size={16} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">All Recent Activities</h3>
-                  <p className="text-xs text-slate-500">Live chronological stream of civic updates</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsViewAllOpen(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-white transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 divide-y divide-slate-100">
-              {activities.map((act) => {
-                const { icon: Icon, bg, color } = getIconData(act.type);
-                return (
-                  <div
-                    key={act.id}
-                    onClick={() => {
-                      handleActivityClick(act);
-                      setIsViewAllOpen(false);
-                    }}
-                    className="py-3 flex items-start gap-3.5 hover:bg-slate-50/80 rounded-xl px-2 transition-colors cursor-pointer"
-                  >
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
-                      <Icon className={`w-4 h-4 ${color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-slate-800 truncate">{act.title}</h4>
-                        <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                          {act.time}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{act.desc}</p>
-                      {act.complaint_id && (
-                        <span className="text-[10px] font-bold text-indigo-600 mt-1 inline-block">
-                          View Complaint Details →
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="p-3 px-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>{activities.length} total activity records</span>
-              <button
-                type="button"
-                onClick={() => setIsViewAllOpen(false)}
-                className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {allOpen && (
+        <Dialog
+          title="All activity"
+          icon={<ActivityIcon className="h-4 w-4 text-blue-600" />}
+          onClose={() => setAllOpen(false)}
+          wide
+        >
+          {!all ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading…</p>
+          ) : all.items.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">Nothing yet.</p>
+          ) : (
+            <>
+              <ul className="divide-y divide-slate-100">
+                {all.items.map((item) => (
+                  <li key={item.id} className="py-3">
+                    <ActivityRow item={item} onOpen={open} compact={false} />
+                  </li>
+                ))}
+              </ul>
+              {all.total > all.items.length && (
+                <p className="pt-3 text-center text-[12px] text-slate-400">
+                  Showing the latest {all.items.length} of {all.total} updates.
+                </p>
+              )}
+            </>
+          )}
+        </Dialog>
       )}
-
     </>
   );
-};
-
-export default RecentActivity;
+}

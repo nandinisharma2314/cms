@@ -1,10 +1,31 @@
-node_modules
-.next
-.dist
-.env
-.build/*
+# Dependencies and build output
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
 
+# Python
 venv/
-uploads/
+.venv/
 __pycache__/
+*.py[cod]
 .pytest_cache/
+.ruff_cache/
+
+# Local configuration and secrets (the *.example files are committed)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Uploaded files and other runtime data
+backend/uploads/
+backend/storage/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/

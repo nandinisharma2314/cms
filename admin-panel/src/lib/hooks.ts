@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useConfig } from "./config";
 
 type Dep = string | number | boolean | null | undefined;
 
@@ -20,9 +21,7 @@ export function useApiData<T>(fetcher: () => Promise<T>, deps: Dep[]) {
   useEffect(() => {
     fetcherRef.current = fetcher;
   });
-  const depsKey = JSON.stringify(deps);
-
-  const requestKey = `${depsKey}#${version}`;
+  const requestKey = `${JSON.stringify(deps)}#${version}`;
 
   useEffect(() => {
     let active = true;
@@ -49,12 +48,36 @@ export function useApiData<T>(fetcher: () => Promise<T>, deps: Dep[]) {
   };
 }
 
-/** `value`, updated only after it has stopped changing for `ms` milliseconds. */
-export function useDebounced<T>(value: T, ms = 250): T {
+/** `value`, updated only once it has stopped changing for the configured search delay. */
+export function useDebounced<T>(value: T): T {
+  const delay = useConfig().ui.search_debounce_ms;
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), ms);
+    const timer = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(timer);
-  }, [value, ms]);
+  }, [value, delay]);
   return debounced;
+}
+
+/**
+ * Runs an async action with busy/error state, for buttons and forms.
+ * Resolves to true when the action succeeded.
+ */
+export function useAction() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = useCallback(async (action: () => Promise<unknown>): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      return true;
+    } catch (err) {
+      setError((err as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+  return { busy, error, setError, run };
 }

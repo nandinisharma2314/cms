@@ -17,11 +17,12 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "complaint.respond": ("Complaints", "Acknowledge and update complaint progress"),
     "complaint.resolve": ("Complaints", "Mark complaints as resolved"),
     "complaint.close": ("Complaints", "Close resolved complaints and reopen closed ones"),
-    "complaint.receive": ("Complaints", "Receive new complaints from automatic routing"),
+    "complaint.receive": ("Complaints", "Receive new complaints from automatic routing (needs complaint.respond too)"),
     "complaint.assign": ("Complaints", "Assign complaints to staff"),
     "complaint.reassign": ("Complaints", "Reassign complaints between staff"),
     "complaint.reject.request": ("Complaints", "Request rejection of a complaint"),
     "complaint.reject.approve": ("Complaints", "Approve or deny rejection requests"),
+    "complaint.reclassify": ("Complaints", "Change a complaint's department, category, location or priority"),
 
     "user.view": ("Staff Users", "View staff users within scope"),
     "user.create": ("Staff Users", "Create staff users below own role"),
@@ -30,6 +31,7 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "user.reset_password": ("Staff Users", "Approve staff password reset requests"),
 
     "end_user.view": ("End Users", "View end users within location scope"),
+    "end_user.create": ("End Users", "Add end users one at a time"),
     "end_user.update": ("End Users", "Edit or deactivate end users"),
     "end_user.import": ("End Users", "Import end users from CSV"),
 
@@ -39,13 +41,14 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
 
     "location.view": ("Locations", "View the location hierarchy"),
     "location.create": ("Locations", "Create locations"),
-    "location.update": ("Locations", "Rename or deactivate locations"),
+    "location.update": ("Locations", "Rename or deactivate locations and manage location levels"),
     "location.import": ("Locations", "Import the location hierarchy from CSV"),
 
     "role.view": ("Roles", "View roles"),
     "role.manage": ("Roles", "Create roles and change role permissions"),
 
-    "sla.manage": ("SLA", "Configure SLA targets and escalation rules"),
+    "sla.manage": ("SLA", "Configure priorities, SLA targets and escalation rules"),
+    "settings.manage": ("Settings", "Manage organisation settings and rejection reasons"),
 
     "reports.view": ("Reports", "View dashboards and reports"),
     "audit.view": ("Audit", "View the audit log"),
@@ -73,7 +76,7 @@ _COMPLAINT_HANDLING = [
     "complaint.view", "complaint.respond", "complaint.resolve",
 ]
 _COMPLAINT_SUPERVISION = _COMPLAINT_HANDLING + [
-    "complaint.assign", "complaint.reassign", "complaint.reject.approve", "complaint.close",
+    "complaint.assign", "complaint.reassign", "complaint.reject.approve", "complaint.close", "complaint.reclassify",
 ]
 _REFERENCE_DATA = ["department.view", "location.view", "role.view"]
 
@@ -88,7 +91,7 @@ SYSTEM_ROLES: dict[str, tuple[str, str, str | None, list[str]]] = {
         _COMPLAINT_SUPERVISION + _REFERENCE_DATA + [
             "complaint.create",
             "user.view", "user.create", "user.update", "user.deactivate", "user.reset_password",
-            "end_user.view", "end_user.update",
+            "end_user.view", "end_user.create", "end_user.update",
             "reports.view", "audit.view",
         ],
     ),
@@ -113,12 +116,3 @@ SYSTEM_ROLES: dict[str, tuple[str, str, str | None, list[str]]] = {
         "End User", "Everyone who signs in to the end-user portal.", None, PORTAL_PERMISSIONS,
     ),
 }
-
-# depth -> (key, name). The CSV importer expects one column per level, by key.
-DEFAULT_LOCATION_TYPES: list[tuple[str, str]] = [
-    ("country", "Country"),
-    ("state", "State"),
-    ("district", "District"),
-    ("city", "City"),
-    ("area", "Area"),
-]

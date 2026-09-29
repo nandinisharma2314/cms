@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from models import Complaint, ComplaintEvent, EndUser, User
+from models import Complaint, ComplaintEvent, EndUser, User, max_length
 from utils.security import utcnow
 
 
@@ -33,8 +33,8 @@ def record_event(
         event_type=event_type,
         from_status=from_status,
         to_status=to_status,
-        message=message[:500],
-        public_message=public_message[:500] if public_message else None,
+        message=message[:max_length(ComplaintEvent.message)],
+        public_message=public_message[:max_length(ComplaintEvent.public_message)] if public_message else None,
         note=note,
         created_at=at or utcnow(),
         **actor_fields(actor),

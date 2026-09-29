@@ -1,5 +1,5 @@
-import { LoginFlow } from"@/components/Login/LoginFlow";
+import { LoginFlow } from "@/components/Login/LoginFlow";
 
 export default function LoginPage() {
- return <LoginFlow />;
+  return <LoginFlow />;
 }

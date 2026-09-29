@@ -30,7 +30,7 @@ def test_dry_run_reports_without_saving(client, login):
     assert not real["dry_run"] and real["created"] == 3
     assert "Ajmer" in area_names(client, root, "India", "Rajasthan")
 
-    history = client.get("/imports/", params={"kind": "locations"}, headers=root).json()
+    history = client.get("/imports/", params={"kind": "locations"}, headers=root).json()["items"]
     statuses = [b["status"] for b in history[:2]]
     assert statuses == ["completed", "validated"]
 
@@ -67,14 +67,18 @@ def test_end_user_import_flags_likely_duplicates(client, login):
     result = upload(client, root, "/end-users/import", body).json()
     assert (result["created"], result["failed"]) == (4, 1)
     warnings = {(w["row"], w["message"].split(";")[0]) for w in result["warning_list"]}
-    assert (2, "Mobile already registered to Rahul Sharma with email rahul@example.com") in warnings
-    assert any(row == 3 and "Indian mobile" in m for row, m in warnings)
+    assert (2, "Mobile already registered to Rahul Sharma with email rahul@example.test") in warnings
+    assert any(row == 3 and "does not start with an expected digit" in m for row, m in warnings)
     assert any(row == 5 and "Same mobile as row 4" in m for row, m in warnings)
     assert result["errors"] == [{"row": 6, "message": "Email is not valid"}]
 
     # names are cleaned up on the way in
     listing = client.get("/end-users/", params={"search": "USR200"}, headers=root).json()["items"]
     assert listing[0]["name"] == "Rahul Sharma"
+
+    # the file must say whether it is a trial run
+    missing = client.post("/end-users/import", headers=root, files={"file": ("u.csv", body, "text/csv")})
+    assert missing.status_code == 422
 
 
 def test_failed_rows_report_can_be_fixed_and_reuploaded(client, login):
@@ -87,14 +91,15 @@ def test_failed_rows_report_can_be_fixed_and_reuploaded(client, login):
     batch_id = upload(client, root, "/end-users/import", body, name="end_users.csv").json()["batch_id"]
     detail = client.get(f"/imports/{batch_id}", headers=root).json()
     assert detail["filename"] == "end_users.csv" and detail["failed"] == 1
-    assert detail["issues"] == [{"row": 3, "severity": "error", "message": "Mobile must be a 10-digit number"}]
+    mobile_error = "Mobile must be a 10-digit number (optionally with +91 in front)"
+    assert detail["issues"] == [{"row": 3, "severity": "error", "message": mobile_error}]
 
     report = client.get(f"/imports/{batch_id}/report", headers=root)
     assert report.headers["content-type"].startswith("text/csv")
-    rows = list(csv.DictReader(io.StringIO(report.text)))
+    rows = list(csv.DictReader(io.StringIO(report.content.decode("utf-8-sig"))))
     assert rows == [{
         "user_id": "USR301", "name": "No Mobile", "mobile": "", "email": "nomobile@example.com",
-        "source_row": "3", "severity": "error", "issue": "Mobile must be a 10-digit number",
+        "source_row": "3", "severity": "error", "issue": mobile_error,
     }]
 
     # fix the row in the report and upload it again (extra report columns are just ignored)
@@ -111,7 +116,7 @@ def test_rejected_file_is_recorded_in_history(client, login):
     root = login(SUPER_ADMIN)
     response = upload(client, root, "/end-users/import", "name,phone\nX,1\n", name="wrong-columns.csv")
     assert response.status_code == 400
-    latest = client.get("/imports/", params={"kind": "end_users"}, headers=root).json()[0]
+    latest = client.get("/imports/", params={"kind": "end_users"}, headers=root).json()["items"][0]
     assert latest["status"] == "rejected" and latest["filename"] == "wrong-columns.csv"
     assert "missing required column" in latest["error"]
 
@@ -119,7 +124,7 @@ def test_rejected_file_is_recorded_in_history(client, login):
 def test_exports_round_trip_and_respect_scope(client, login):
     root = login(SUPER_ADMIN)
     exported = client.get("/locations/export", headers=root)
-    assert exported.text.startswith("country,state,district,city,area")
+    assert exported.text.startswith("\ufeffcountry,state,district,city,area")  # BOM for spreadsheet apps
     reimport = upload(client, root, "/locations/import", exported.text, dry_run=True).json()
     assert reimport["created"] == 0 and reimport["failed"] == 0 and reimport["unchanged"] == reimport["total_rows"]
 
@@ -130,7 +135,53 @@ def test_exports_round_trip_and_respect_scope(client, login):
 
 def test_import_history_visibility(client, login):
     assert client.get("/imports/", headers=login(ELEC_MANAGER)).status_code == 403  # cannot import anything
-    everyone = client.get("/imports/", headers=login(SUPER_ADMIN)).json()
-    assert everyone
+    everyone = client.get("/imports/", params={"page_size": 2}, headers=login(SUPER_ADMIN)).json()
+    assert len(everyone["items"]) == 2 and everyone["total"] > 2
+    assert client.get("/imports/", params={"kind": "bogus"}, headers=login(SUPER_ADMIN)).status_code == 400
     # admins can't import by default, so they don't see import history either
     assert client.get("/imports/", headers=login(ADMIN)).status_code == 403
+
+
+def test_exports_neutralise_spreadsheet_formulas(client, login):
+    root = login(SUPER_ADMIN)
+    body = "user_id,name,mobile,email\nUSR400,=HYPERLINK(\"http://x.test\"),9000000400,formula@example.com\n"
+    assert upload(client, root, "/end-users/import", body).json()["created"] == 1
+    exported = client.get("/end-users/export", headers=root).text
+    assert "'=HYPERLINK" in exported and ",=HYPERLINK" not in exported
+
+
+def test_import_changing_a_contact_signs_the_end_user_out(client, login):
+    from conftest import new_client, portal_login
+
+    root = login(SUPER_ADMIN)
+    body = "user_id,name,mobile,email\nUSR410,Meera Joshi,9000000410,meera@example.com\n"
+    assert upload(client, root, "/end-users/import", body).json()["created"] == 1
+    own = new_client()
+    headers = portal_login(own, "9000000410")
+    assert own.get("/portal/me", headers=headers).status_code == 200
+    changed = body.replace("9000000410", "9000000411")
+    assert upload(client, root, "/end-users/import", changed, dry_run=True).json()["updated"] == 1
+    assert own.get("/portal/me", headers=headers).status_code == 200  # a trial run changes nothing
+    assert upload(client, root, "/end-users/import", changed).json()["updated"] == 1
+    assert own.get("/portal/me", headers=headers).status_code == 401
+    inbox = own.get("/portal/notifications", headers=portal_login(own, "9000000411")).json()["items"]
+    assert inbox[0]["title"] == "Your registered mobile was updated"
+
+
+def test_a_conflict_the_checks_missed_fails_only_its_row(client, login, monkeypatch):
+    """Rows are written in batches; a database conflict (e.g. someone saving the same person at
+    that moment) rolls the batch back and it is written row by row, so only that row fails."""
+    from services import import_service
+
+    root = login(SUPER_ADMIN)
+    taken = client.get("/end-users/", params={"search": "USR004"}, headers=root).json()["items"][0]
+    monkeypatch.setattr(import_service, "WRITE_BATCH", 4)
+    # hide the existing end users from the checks, as if they were saved after the file was read
+    monkeypatch.setattr(import_service, "_existing_end_users", lambda db, parsed: [])
+    rows = [f"BATCH-{i},Batch Person {i},98700{i:05d},batch.{i}@example.test" for i in range(6)]
+    rows.insert(2, f"{taken['external_id']},Someone Else,9870099999,someone.else@example.test")
+    result = upload(client, root, "/end-users/import", "user_id,name,mobile,email\n" + "\n".join(rows) + "\n").json()
+    assert (result["created"], result["failed"]) == (6, 1), result
+    assert result["errors"][0]["row"] == 4 and "Conflicts" in result["errors"][0]["message"]
+    created = client.get("/end-users/", params={"search": "Batch Person"}, headers=root).json()["total"]
+    assert created == 6

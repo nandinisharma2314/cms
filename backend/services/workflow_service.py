@@ -7,7 +7,10 @@
                                                   +-> REOPENED <+
     Any open status -> REJECTED (only by holders of complaint.reject.approve, with a reason)
 
-Assignment (SUBMITTED -> ASSIGNED) lives in routing_service.
+Assignment (SUBMITTED -> ASSIGNED) lives in routing_service. End users may
+reopen within the organisation's reopen window, up to its reopen limit
+(Settings); staff reopening a complaint is a management decision and is not
+limited by either, but needs a reason and is audited.
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -15,17 +18,17 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from config import MAX_REOPENS, REOPEN_WINDOW_DAYS
-from models import Complaint, ComplaintComment, EndUser, User
-from services import notification_service, rejection_service, sla_service
+from config import COMMENT_MAX_LENGTH, NOTE_MAX_LENGTH
+from models import Complaint, ComplaintComment, EndUser, User, max_length
+from services import notification_service, rejection_service, settings_service, sla_service
 from services.access_service import AccessContext
-from services.events import actor_fields, record_event  # noqa: F401  (re-exported)
-from utils.security import utcnow
-
-from services.statuses import (  # noqa: F401  (re-exported for callers)
-    ACKNOWLEDGED, ACTIVE_STATUSES, ASSIGNED, CLOSED, GROUP_OF, IN_PROGRESS, REJECTED, REJECTION_REQUESTED,
-    REOPENED, RESOLVED, STATUS_GROUPS, STATUS_LABELS, SUBMITTED, WAITING, end_user_status_label, status_label,
+from services.events import record_event
+from services.statuses import (
+    ACKNOWLEDGED, ASSIGNED, CLOSED, IN_PROGRESS, REJECTED, REOPENED, RESOLVED, SUBMITTED, WAITING,
+    end_user_status_label, status_label,
 )
+from utils.security import utcnow
+from utils.text import multi_line
 
 
 @dataclass(frozen=True)
@@ -39,29 +42,27 @@ class StaffAction:
     handler_only: bool
     note: str  # "required" | "optional"
     note_label: str
-    # Whether the note is shown to the end user.
-    public_note: bool
 
 
 _WORKING = frozenset({ASSIGNED, ACKNOWLEDGED, IN_PROGRESS, WAITING, REOPENED})
 
 STAFF_ACTIONS = [
     StaffAction("acknowledge", "Acknowledge", frozenset({ASSIGNED, REOPENED}), ACKNOWLEDGED,
-                "complaint.respond", True, "optional", "Message to the end user (optional)", True),
+                "complaint.respond", True, "optional", "Message to the end user (optional)"),
     StaffAction("start", "Start Work", frozenset({ASSIGNED, ACKNOWLEDGED, REOPENED}), IN_PROGRESS,
-                "complaint.respond", True, "optional", "Message to the end user (optional)", True),
+                "complaint.respond", True, "optional", "Message to the end user (optional)"),
     StaffAction("request_info", "Ask End User for Information", frozenset({ACKNOWLEDGED, IN_PROGRESS, REOPENED}),
-                WAITING, "complaint.respond", True, "required", "What do you need from the end user?", True),
+                WAITING, "complaint.respond", True, "required", "What do you need from the end user?"),
     StaffAction("resume", "Resume Work", frozenset({WAITING}), IN_PROGRESS,
-                "complaint.respond", True, "optional", "Note (optional)", True),
+                "complaint.respond", True, "optional", "Message to the end user (optional)"),
     StaffAction("resolve", "Mark Resolved", _WORKING, RESOLVED,
-                "complaint.resolve", True, "required", "Resolution (shown to the end user)", True),
+                "complaint.resolve", True, "required", "Resolution (shown to the end user)"),
     StaffAction("close", "Close", frozenset({RESOLVED}), CLOSED,
-                "complaint.close", False, "optional", "Closing note (optional)", True),
+                "complaint.close", False, "optional", "Closing note (optional, shown to the end user)"),
     StaffAction("reopen", "Reopen", frozenset({RESOLVED, CLOSED}), REOPENED,
-                "complaint.close", False, "required", "Why is it being reopened?", True),
+                "complaint.close", False, "required", "Why is it being reopened? (shown to the end user)"),
     StaffAction("reject", "Reject", frozenset({SUBMITTED}) | _WORKING, REJECTED,
-                "complaint.reject.approve", False, "required", "Reason for rejection (shown to the end user)", True),
+                "complaint.reject.approve", False, "required", "Reason for rejection (shown to the end user)"),
 ]
 STAFF_ACTIONS_BY_KEY = {a.key: a for a in STAFF_ACTIONS}
 
@@ -126,21 +127,32 @@ def staff_actions_for(ctx: AccessContext, complaint: Complaint) -> list[StaffAct
     ]
 
 
+def _clean_note(note: str | None) -> str | None:
+    note = (note or "").strip() or None
+    if note is not None and len(note) > NOTE_MAX_LENGTH:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"The note is too long (max {NOTE_MAX_LENGTH} characters)")
+    return note
+
+
 def apply_staff_action(
-    ctx: AccessContext, complaint: Complaint, key: str, note: str | None, at: datetime | None = None
+    ctx: AccessContext, complaint: Complaint, key: str, note: str | None, reason_id: int | None = None,
+    at: datetime | None = None,
 ) -> None:
     """Performs a workflow action. Adds events; the caller commits."""
     action = STAFF_ACTIONS_BY_KEY.get(key)
     if action is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown action '{key}'")
-    if action not in staff_actions_for(ctx, complaint):
+    if not ctx.has(action.permission) or (action.handler_only and not is_handler(ctx, complaint)):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"You are not allowed to use '{action.label}' on this complaint")
+    if complaint.status not in action.from_statuses:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             f"'{action.label}' is not available for a {status_label(complaint.status).lower()} complaint",
         )
-    note = (note or "").strip() or None
+    note = _clean_note(note)
     if action.note == "required" and not note:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{action.note_label} is required")
+    reason = rejection_service.active_reason(ctx.db, reason_id) if key == "reject" else None
 
     now = at or utcnow()
     db = ctx.db
@@ -157,9 +169,9 @@ def apply_staff_action(
         complaint.reopen_count += 1
 
     previous_status = complaint.status
-    change_status(db, complaint, action.to_status, ctx.user, note=note, at=now, public=action.public_note)
+    change_status(db, complaint, action.to_status, ctx.user, note=note, at=now)
     if key == "reject":
-        rejection_service.record_direct_rejection(db, ctx.user, complaint, previous_status, note, now)
+        rejection_service.record_direct_rejection(db, ctx.user, complaint, previous_status, reason, note, now)
     elif key == "request_info":
         # The question goes into the conversation so the end user can reply to it.
         add_comment(db, complaint, ctx.user, note, is_internal=False, at=now, record=False)
@@ -169,9 +181,11 @@ def apply_staff_action(
 # End user
 # ---------------------------------------------------------------------------
 
-def reopen_deadline(complaint: Complaint) -> datetime | None:
+def reopen_deadline(db: Session, complaint: Complaint) -> datetime | None:
     reference = complaint.resolved_at or complaint.closed_at
-    return reference + timedelta(days=REOPEN_WINDOW_DAYS) if reference else None
+    if reference is None:
+        return None
+    return reference + timedelta(days=settings_service.require(db, "reopen_window_days"))
 
 
 # The End User role permission each end-user action needs.
@@ -183,7 +197,7 @@ ACTION_PERMISSIONS = {
 }
 
 
-def end_user_actions_for(complaint: Complaint, now: datetime | None = None) -> list[str]:
+def end_user_actions_for(db: Session, complaint: Complaint, now: datetime | None = None) -> list[str]:
     """What the complaint's state allows the end user to do; permissions are
     checked separately (see ACTION_PERMISSIONS)."""
     actions = []
@@ -191,8 +205,8 @@ def end_user_actions_for(complaint: Complaint, now: datetime | None = None) -> l
         actions.append("comment")
     if complaint.status == RESOLVED:
         actions.append("confirm")
-    if complaint.status in (RESOLVED, CLOSED) and complaint.reopen_count < MAX_REOPENS:
-        deadline = reopen_deadline(complaint)
+    if complaint.status in (RESOLVED, CLOSED) and complaint.reopen_count < settings_service.require(db, "max_reopens"):
+        deadline = reopen_deadline(db, complaint)
         if deadline is None or (now or utcnow()) <= deadline:
             actions.append("reopen")
     if complaint.status in (RESOLVED, CLOSED) and complaint.feedback_rating is None:
@@ -200,8 +214,8 @@ def end_user_actions_for(complaint: Complaint, now: datetime | None = None) -> l
     return actions
 
 
-def _require_end_user_action(complaint: Complaint, action: str, now: datetime | None = None) -> None:
-    if action not in end_user_actions_for(complaint, now):
+def _require_end_user_action(db: Session, complaint: Complaint, action: str, now: datetime | None = None) -> None:
+    if action not in end_user_actions_for(db, complaint, now):
         raise HTTPException(status.HTTP_409_CONFLICT, "This action is not available for this complaint")
 
 
@@ -211,7 +225,8 @@ def _store_feedback(complaint: Complaint, rating: int | None, comment: str | Non
     if not 1 <= rating <= 5:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Rating must be between 1 and 5")
     complaint.feedback_rating = rating
-    complaint.feedback_comment = (comment or "").strip()[:1000] or None
+    complaint.feedback_comment = multi_line(comment, "The comment", max_length(Complaint.feedback_comment),
+                                            required=False)
     complaint.feedback_at = now
 
 
@@ -219,33 +234,35 @@ def end_user_confirm(
     db: Session, end_user: EndUser, complaint: Complaint, rating: int | None, comment: str | None,
     at: datetime | None = None,
 ) -> None:
-    _require_end_user_action(complaint, "confirm")
+    _require_end_user_action(db, complaint, "confirm")
     now = at or utcnow()
     if complaint.feedback_rating is None:
         _store_feedback(complaint, rating, comment, now)
     complaint.closed_at = now
-    change_status(db, complaint, CLOSED, end_user, at=now, message="End user confirmed the resolution; complaint closed")
+    change_status(db, complaint, CLOSED, end_user, at=now, message="End user confirmed the resolution; complaint closed",
+                  public_message="You confirmed the resolution; complaint closed")
 
 
 def end_user_reopen(
     db: Session, end_user: EndUser, complaint: Complaint, reason: str, at: datetime | None = None,
 ) -> None:
-    _require_end_user_action(complaint, "reopen", at)
-    reason = (reason or "").strip()
+    _require_end_user_action(db, complaint, "reopen", at)
+    reason = _clean_note(reason)
     if not reason:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Please tell us why the issue is not resolved")
     now = at or utcnow()
     complaint.resolved_at = None
     complaint.closed_at = None
     complaint.reopen_count += 1
-    change_status(db, complaint, REOPENED, end_user, note=reason, at=now, message="End user reopened the complaint")
+    change_status(db, complaint, REOPENED, end_user, note=reason, at=now, message="End user reopened the complaint",
+                  public_message="You reopened the complaint")
 
 
 def end_user_feedback(
     db: Session, end_user: EndUser, complaint: Complaint, rating: int, comment: str | None,
     at: datetime | None = None,
 ) -> None:
-    _require_end_user_action(complaint, "feedback")
+    _require_end_user_action(db, complaint, "feedback")
     now = at or utcnow()
     _store_feedback(complaint, rating, comment, now)
     record_event(
@@ -278,8 +295,8 @@ def add_comment(
     body = (body or "").strip()
     if not body:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Comment cannot be empty")
-    if len(body) > 5000:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Comment is too long (max 5000 characters)")
+    if len(body) > COMMENT_MAX_LENGTH:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Comment is too long (max {COMMENT_MAX_LENGTH} characters)")
     now = at or utcnow()
     staff = isinstance(author, User)
     comment = ComplaintComment(
@@ -302,10 +319,10 @@ def add_comment(
                 body[:300], complaint, exclude=author, at=now,
             )
         elif staff:
-            if complaint.acknowledged_at is None:
-                complaint.acknowledged_at = now
+            # A reply alone is not the response the SLA asks for (acknowledging or acting on it is),
+            # so it leaves acknowledged_at and the response clock alone.
             record_event(db, complaint, "comment_added", author, f"{author.name} replied to the end user",
-                         public_message="An officer replied", at=now)
+                         public_message="The team replied", at=now)
             notification_service.notify(
                 db, [complaint.end_user], "complaint.reply", f"New reply on {gid}", body[:300], complaint, at=now,
             )
@@ -318,5 +335,6 @@ def add_comment(
             )
             if complaint.status == WAITING:
                 change_status(db, complaint, IN_PROGRESS, author, at=now,
-                            message="End user provided the requested information; back in progress")
+                              message="End user provided the requested information; back in progress",
+                              public_message="You provided the requested information; work continues")
     return comment
