@@ -25,6 +25,7 @@ interface RecentComplaintsTableProps {
   /** Show every row instead of the first five. */
   showAllRows?: boolean;
   emptyText?: string;
+  className?: string;
 }
 
 const getDeptIconInfo = (dept: string) => {
@@ -70,13 +71,14 @@ export function RecentComplaintsTable({
   title = "Recent Complaints",
   showAllRows = false,
   emptyText = "No complaints in your scope.",
+  className = "",
 }: RecentComplaintsTableProps) {
   const router = useRouter();
   const [showAll, setShowAll] = useState(showAllRows);
   const displayList = showAll ? complaints : complaints.slice(0, 5);
 
   return (
-    <div className="flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-[450px]">
+    <div className={`flex flex-col p-6 bg-white rounded-none border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] ${className || "h-[350px]"}`}>
       {/* Table Card Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">

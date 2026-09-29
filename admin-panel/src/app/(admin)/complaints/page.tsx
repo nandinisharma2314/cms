@@ -53,14 +53,16 @@ function ComplaintsList({ initial }: { initial: Filters }) {
   const visible = departmentFilter === "All" ? complaints : complaints.filter((c) => c.department === departmentFilter);
 
   return (
-    <>
-      <PageHeader
-        title="Complaints"
-        description={
-          me.is_super_admin ? "All complaints in the system." : "Complaints inside your department and location scope."
-        }
-      />
-      <div className="flex items-center justify-between gap-4 w-full relative z-20 overflow-visible">
+    <div className="flex flex-col h-[calc(100vh-130px)] -mt-2">
+      <div className="shrink-0">
+        <PageHeader
+          title="Complaints"
+          description={
+            me.is_super_admin ? "All complaints in the system." : "Complaints inside your department and location scope."
+          }
+        />
+      </div>
+      <div className="flex items-center justify-between gap-4 w-full relative z-20 overflow-visible shrink-0 mt-7">
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative w-[220px]">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -174,9 +176,11 @@ function ComplaintsList({ initial }: { initial: Filters }) {
           ))}
         </div>
       </div>
-      <ErrorBanner message={error} />
-      <RecentComplaintsTable title="Complaints" complaints={visible} isLoading={loading} showAllRows />
-    </>
+      <div className="mt-7 flex-1 min-h-0 flex flex-col">
+        <ErrorBanner message={error} />
+        <RecentComplaintsTable title="Complaints" complaints={visible} isLoading={loading} showAllRows className="flex-1 min-h-0" />
+      </div>
+    </div>
   );
 }
 

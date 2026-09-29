@@ -264,19 +264,21 @@ function UsersList() {
   };
 
   return (
-    <>
-      <PageHeader
-        title="Staff Users"
-        description="Officers below you in the role hierarchy whose scope sits inside yours."
-        actions={
-          can("user.create") && (
-            <button className={primaryButtonClass} onClick={() => setCreating(true)}>
-              <UserPlus className="w-3.5 h-3.5" /> Add Staff User
-            </button>
-          )
-        }
-      />
-      <div className="flex flex-wrap gap-3">
+    <div className="flex flex-col h-[calc(100vh-130px)] -mt-2">
+      <div className="shrink-0">
+        <PageHeader
+          title="Staff Users"
+          description="Officers below you in the role hierarchy whose scope sits inside yours."
+          actions={
+            can("user.create") && (
+              <button className={primaryButtonClass} onClick={() => setCreating(true)}>
+                <UserPlus className="w-3.5 h-3.5" /> Add Staff User
+              </button>
+            )
+          }
+        />
+      </div>
+      <div className="flex flex-wrap gap-3 shrink-0 mt-7">
         <input
           className={`${inputClass} max-w-xs`}
           placeholder="Search name, email or mobile"
@@ -301,11 +303,11 @@ function UsersList() {
         )}
       </div>
       <ErrorBanner message={error} />
-      {notice && <p className="text-xs text-emerald-700">{notice}</p>}
+      {notice && <p className="text-xs text-emerald-700 shrink-0 mt-2">{notice}</p>}
 
-      <Card className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
+      <Card className="mt-7 overflow-x-auto overflow-y-auto flex-1 min-h-0 mb-6 relative">
+        <table className="w-full text-left text-xs relative">
+          <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
             <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider">
               <th className="px-5 py-3 font-semibold">User</th>
               <th className="px-3 py-3 font-semibold">Role</th>
@@ -410,7 +412,7 @@ function UsersList() {
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
