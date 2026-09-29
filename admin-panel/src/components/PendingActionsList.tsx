@@ -100,7 +100,7 @@ export function PendingActionsList({
             summary.escalated_to_me > 0 && (
               <ActionRow
                 key="escalated"
-                href="/complaints?escalated=me"
+                href="/escalated"
                 icon={ArrowUpCircle}
                 tint="bg-rose-600 text-white"
                 title={`${plural(summary.escalated_to_me, "complaint", "complaints")} escalated to you`}

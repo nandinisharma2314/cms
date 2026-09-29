@@ -1,7 +1,7 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { api, StatusGroup } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
@@ -19,7 +19,7 @@ interface Filters {
   priority_id: string;
   department_id: string;
   sla: "breached" | "at_risk" | "";
-  escalated: "me" | "any" | "";
+  escalated: "me" | "any";
 }
 
 const GROUP_TABS: { value: StatusGroup | ""; label: string }[] = [
@@ -31,15 +31,17 @@ function pick<T extends string>(value: string | null, allowed: readonly T[]): T 
   return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : "";
 }
 
-function ComplaintsList({ initial }: { initial: Filters }) {
-  const { me, can } = useSession();
+function EscalatedList({ initial }: { initial: Filters }) {
+  const { can } = useSession();
   const { ui } = useConfig();
   const [filters, setFilters] = useState<Filters>(initial);
-  useDocumentTitle(filters.escalated === "me" ? "Escalated to me" : filters.escalated === "any" ? "Escalated complaints" : "Complaints");
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(
-    Boolean(initial.assigned || initial.priority_id || initial.department_id || initial.sla || initial.escalated),
+    Boolean(initial.assigned || initial.priority_id || initial.department_id || initial.sla || (initial.escalated && initial.escalated !== "me")),
   );
+
+  useDocumentTitle(filters.escalated === "any" ? "All Escalated" : "Escalated to me");
+
   const search = useDebounced(filters.search.trim());
   const set = (patch: Partial<Filters>) => {
     setFilters({ ...filters, ...patch });
@@ -73,29 +75,23 @@ function ComplaintsList({ initial }: { initial: Filters }) {
     ],
   );
 
-  const activeFilters = [filters.assigned, filters.priority_id, filters.department_id, filters.sla, filters.escalated].filter(
-    Boolean,
-  ).length;
+  const activeFilters = [
+    filters.assigned,
+    filters.priority_id,
+    filters.department_id,
+    filters.sla,
+    filters.escalated !== "me" ? filters.escalated : "",
+  ].filter(Boolean).length;
 
   return (
     <div className="flex flex-col h-[calc(100vh-130px)] -mt-2">
       <div className="shrink-0">
         <PageHeader
-          title={
-            filters.escalated === "me"
-              ? "Complaints (Escalated to me)"
-              : filters.escalated === "any"
-              ? "Escalated complaints"
-              : "Complaints"
-          }
+          title={filters.escalated === "any" ? "All Escalated Complaints" : "Escalated to me"}
           description={
-            filters.escalated === "me"
-              ? "Complaints where an SLA target was missed and escalated to you for supervision."
-              : filters.escalated === "any"
-              ? "Complaints across the system currently in an escalated state."
-              : me.is_super_admin
-              ? "All complaints in the system."
-              : "Complaints inside your department and location scope."
+            filters.escalated === "any"
+              ? "All complaints across the organization currently in an escalated state."
+              : "Complaints escalated to you requiring immediate supervisor attention and resolution."
           }
         />
       </div>
@@ -108,7 +104,7 @@ function ComplaintsList({ initial }: { initial: Filters }) {
               type="search"
               className="w-full h-10 pl-10 pr-4 text-xs font-medium bg-white border border-slate-200 text-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
               placeholder="Search by ID, title or area"
-              aria-label="Search complaints"
+              aria-label="Search escalated complaints"
               value={filters.search}
               onChange={(e) => set({ search: e.target.value })}
             />
@@ -142,6 +138,15 @@ function ComplaintsList({ initial }: { initial: Filters }) {
 
         {filtersOpen && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 items-center">
+            <select
+              className={inputClass}
+              aria-label="Scope"
+              value={filters.escalated}
+              onChange={(e) => set({ escalated: e.target.value as Filters["escalated"] })}
+            >
+              <option value="me">Escalated to me</option>
+              {can("complaint.assign") && <option value="any">All escalated</option>}
+            </select>
             <select
               className={inputClass}
               aria-label="Assignment"
@@ -179,30 +184,20 @@ function ComplaintsList({ initial }: { initial: Filters }) {
                 </option>
               ))}
             </select>
-            <select
-              className={inputClass}
-              aria-label="SLA"
-              value={filters.sla}
-              onChange={(e) => set({ sla: e.target.value as Filters["sla"] })}
-            >
-              <option value="">Any SLA state</option>
-              <option value="breached">Target missed</option>
-              <option value="at_risk">Due soon</option>
-            </select>
             <div className="flex gap-2">
               <select
                 className={inputClass}
-                aria-label="Escalation"
-                value={filters.escalated}
-                onChange={(e) => set({ escalated: e.target.value as Filters["escalated"] })}
+                aria-label="SLA"
+                value={filters.sla}
+                onChange={(e) => set({ sla: e.target.value as Filters["sla"] })}
               >
-                <option value="">Escalated or not</option>
-                <option value="me">Escalated to me</option>
-                <option value="any">All escalated</option>
+                <option value="">Any SLA state</option>
+                <option value="breached">Target missed</option>
+                <option value="at_risk">Due soon</option>
               </select>
               {activeFilters > 0 && (
                 <button
-                  onClick={() => set({ assigned: "", priority_id: "", department_id: "", sla: "", escalated: "" })}
+                  onClick={() => set({ assigned: "", priority_id: "", department_id: "", sla: "", escalated: "me" })}
                   className="px-3 h-9 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer shrink-0"
                 >
                   Clear
@@ -217,29 +212,21 @@ function ComplaintsList({ initial }: { initial: Filters }) {
         <ErrorBanner message={error} />
         {(loading || data) && (
           <Card className={`overflow-x-auto overflow-y-auto flex-1 min-h-0 relative transition-opacity ${refreshing ? "opacity-60" : ""}`}>
-            <ComplaintTable complaints={data?.items ?? []} loading={loading} emptyText="No complaints match these filters." />
+            <ComplaintTable
+              complaints={data?.items ?? []}
+              loading={loading}
+              emptyText={filters.escalated === "any" ? "No escalated complaints found." : "No complaints are currently escalated to you."}
+            />
           </Card>
         )}
-        {data && <Pagination page={page} pageSize={data.page_size} total={data.total} noun="complaints" onPage={setPage} />}
+        {data && <Pagination page={page} pageSize={data.page_size} total={data.total} noun="escalated complaints" onPage={setPage} />}
       </div>
     </div>
   );
 }
 
-function ComplaintsRoute() {
-  // Links from the dashboard, sidebar and header search set these; remount when they change.
+function EscalatedRoute() {
   const params = useSearchParams();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (params.get("escalated") === "me") {
-      const q = new URLSearchParams(params.toString());
-      q.delete("escalated");
-      const qs = q.toString();
-      router.replace(`/escalated${qs ? `?${qs}` : ""}`);
-    }
-  }, [params, router]);
-
   const initial: Filters = {
     search: params.get("search") ?? "",
     group: pick(params.get("group"), ["open", "in_progress", "resolved", "rejected"] as const),
@@ -247,16 +234,16 @@ function ComplaintsRoute() {
     priority_id: params.get("priority_id") ?? "",
     department_id: params.get("department_id") ?? "",
     sla: pick(params.get("sla"), ["breached", "at_risk"] as const),
-    escalated: pick(params.get("escalated"), ["me", "any"] as const),
+    escalated: pick(params.get("escalated"), ["me", "any"] as const) || "me",
   };
-  return <ComplaintsList key={params.toString()} initial={initial} />;
+  return <EscalatedList key={params.toString()} initial={initial} />;
 }
 
-export default function ComplaintsPage() {
+export default function EscalatedPage() {
   return (
-    <RequirePermission anyOf={["complaint.view"]}>
+    <RequirePermission anyOf={["complaint.assign"]}>
       <Suspense>
-        <ComplaintsRoute />
+        <EscalatedRoute />
       </Suspense>
     </RequirePermission>
   );

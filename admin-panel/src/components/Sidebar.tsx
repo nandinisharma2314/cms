@@ -40,7 +40,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/complaints", label: "Complaints", icon: FileText, anyOf: ["complaint.view"] },
-  { href: "/complaints?escalated=me", label: "Escalated to me", icon: ArrowUpCircle, anyOf: ["complaint.assign"] },
+  { href: "/escalated", label: "Escalated to me", icon: ArrowUpCircle, anyOf: ["complaint.assign"] },
   {
     href: "/rejection-requests",
     label: "Rejection requests",
@@ -151,8 +151,8 @@ export function Sidebar({
         <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-1">
           {items.map((item) => {
             const Icon = item.icon;
-            // Filtered views (links with a query) are not highlighted; their base page is.
-            const active = !item.href.includes("?") && (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
+            const itemPath = item.href.split("?")[0];
+            const active = itemPath === "/" ? pathname === "/" : pathname === itemPath || pathname.startsWith(itemPath + "/");
             return (
               <Link
                 key={item.href}
