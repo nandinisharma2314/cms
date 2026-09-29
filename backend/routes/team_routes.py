@@ -5,12 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from models import Complaint, User
+from models import Complaint, ComplaintAssignment, User, max_length
 from services import audit_service, team_service
 from services.access_service import AccessContext
 from services.complaint_service import serialize_complaints
 from services.user_service import serialize_users
 from utils.auth_middleware import get_access_context, require_permission
+from utils.text import single_line
 
 router = APIRouter()
 
@@ -117,8 +118,9 @@ def reassign_complaint(
 ):
     """Manager action: reassign a complaint to a team member."""
     db = ctx.db
+    clean_reason = single_line(payload.reason, "Reason", max_length(ComplaintAssignment.reason), required=False)
     complaint = team_service.reassign_team_complaint(
-        db, ctx, payload.complaint_id, payload.new_assignee_id, payload.reason
+        db, ctx, payload.complaint_id, payload.new_assignee_id, clean_reason
     )
     audit_service.record(
         db,

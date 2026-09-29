@@ -298,3 +298,104 @@ def test_user_management_with_primary_workplace_and_custom_permissions(client, l
     me_updated = client.get("/auth/me", headers=new_user_headers).json()
     assert "team.view" in me_updated["permissions"]
     assert "complaint.view" not in me_updated["permissions"], "Explicitly revoked permission must be removed"
+
+
+def test_input_field_validations(client, login):
+    agent_headers = login(ELEC_AGENT)
+    admin_headers = login(ADMIN)
+
+    # 1. Staff login input validations
+    empty_id_res = client.post("/auth/login", json={"identifier": "   ", "password": PASSWORD})
+    assert empty_id_res.status_code == 400
+    assert "required" in empty_id_res.json()["detail"].lower()
+
+    empty_pw_res = client.post("/auth/login", json={"identifier": ELEC_AGENT, "password": ""})
+    assert empty_pw_res.status_code == 400
+    assert "required" in empty_pw_res.json()["detail"].lower()
+
+    # 2. Grievance subject too long (> 200 chars)
+    long_subject_res = client.post(
+        "/grievances/",
+        data={
+            "subject": "A" * 201,
+            "description": "Valid description",
+            "target_type": "other",
+            "category": "other",
+            "severity": "low",
+        },
+        headers=agent_headers,
+    )
+    assert long_subject_res.status_code == 400
+    assert "too long" in long_subject_res.json()["detail"].lower()
+
+    # 3. Grievance incident date in the future
+    from datetime import date, timedelta
+    future_date = (date.today() + timedelta(days=10)).isoformat()
+    future_date_res = client.post(
+        "/grievances/",
+        data={
+            "subject": "Valid subject",
+            "description": "Valid description",
+            "target_type": "other",
+            "category": "other",
+            "severity": "low",
+            "incident_date": future_date,
+        },
+        headers=agent_headers,
+    )
+    assert future_date_res.status_code == 400
+    assert "cannot be in the future" in future_date_res.json()["detail"].lower()
+
+    # 4. Valid grievance creation
+    grv_res = client.post(
+        "/grievances/",
+        data={
+            "subject": "Valid Subject For Validation Tests",
+            "description": "Valid description for testing",
+            "target_type": "other",
+            "category": "other",
+            "severity": "low",
+        },
+        headers=agent_headers,
+    )
+    assert grv_res.status_code == 201
+    tracking_id = grv_res.json()["tracking_id"]
+
+    # 5. Grievance note too long (> 3000 chars)
+    long_note_res = client.post(
+        f"/grievances/{tracking_id}/notes",
+        json={"note": "N" * 3001},
+        headers=admin_headers,
+    )
+    assert long_note_res.status_code == 400
+    assert "too long" in long_note_res.json()["detail"].lower()
+
+    # 6. Grievance status message too long (> 500 chars)
+    long_msg_res = client.post(
+        f"/grievances/{tracking_id}/status",
+        json={"status": "under_review", "message": "M" * 501},
+        headers=admin_headers,
+    )
+    assert long_msg_res.status_code == 400
+    assert "too long" in long_msg_res.json()["detail"].lower()
+
+    # 7. Team reassign complaint reason too long (> 255 chars)
+    # Find an open complaint
+    complaint_res = client.get("/complaints/", headers=admin_headers)
+    assert complaint_res.status_code == 200
+    items = complaint_res.json()["items"]
+    if items:
+        cid = items[0]["id"]
+        # Try reassigning with reason > 255 chars
+        long_reassign_res = client.post(
+            "/team/reassign",
+            json={
+                "complaint_id": cid,
+                "new_assignee_id": 1,
+                "reason": "R" * 256,
+            },
+            headers=admin_headers,
+        )
+        assert long_reassign_res.status_code == 400
+        assert "too long" in long_reassign_res.json()["detail"].lower()
+

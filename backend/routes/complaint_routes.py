@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
 
 from config import DASHBOARD_COMPARISON_DAYS, DASHBOARD_TREND_DAYS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, NOTE_MAX_LENGTH
-from models import Complaint, Department, EndUser, Location, RejectionRequest, User, max_length
+from models import Complaint, ComplaintAssignment, Department, EndUser, Location, RejectionRequest, User, max_length
 from services import (
     attachment_service, audit_service, priority_service, rejection_service, routing_service, workflow_service,
 )
@@ -390,7 +390,8 @@ def assign_complaint(
 ):
     complaint = _get_scoped(ctx, complaint_id)
     previous = complaint.assigned_to.name if complaint.assigned_to else None
-    assignee = routing_service.manual_assign(ctx, complaint, payload.assignee_id, payload.reason)
+    reason = single_line(payload.reason, "Reason", max_length(ComplaintAssignment.reason), required=False)
+    assignee = routing_service.manual_assign(ctx, complaint, payload.assignee_id, reason)
     audit_service.record(
         ctx.db, actor=ctx.user, action="complaint.reassign" if previous else "complaint.assign",
         entity_type="complaint", entity_id=complaint.generated_id,

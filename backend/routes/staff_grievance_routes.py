@@ -26,6 +26,7 @@ from models import (
     StaffGrievanceAttachment,
     StaffGrievanceEvent,
     User,
+    max_length,
 )
 from services import audit_service, grievance_service, settings_service
 from services.access_service import AccessContext
@@ -39,6 +40,7 @@ from services.grievance_service import (
 )
 from utils.auth_middleware import get_access_context, require_permission
 from utils.security import signature_valid, utcnow
+from utils.text import multi_line, single_line
 
 router = APIRouter()
 
@@ -191,10 +193,8 @@ def file_grievance(
     db = ctx.db
     reporter = ctx.user
 
-    if not subject.strip():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Subject is required")
-    if not description.strip():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Description is required")
+    clean_subject = single_line(subject, "Subject", max_length(StaffGrievance.subject))
+    clean_description = multi_line(description, "Description", 5000)
     if category not in GRIEVANCE_CATEGORIES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid category: {category}")
     if target_type not in GRIEVANCE_TARGET_TYPES:
@@ -216,6 +216,8 @@ def file_grievance(
             parsed_date = date.fromisoformat(incident_date)
         except ValueError:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid incident date format (YYYY-MM-DD)")
+        if parsed_date > utcnow().date():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Incident date cannot be in the future")
 
     if department_id is not None and db.get(Department, department_id) is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Department not found")
@@ -232,8 +234,8 @@ def file_grievance(
         target_type=target_type,
         category=category,
         severity=severity,
-        subject=subject.strip(),
-        description=description.strip(),
+        subject=clean_subject,
+        description=clean_description,
         incident_date=parsed_date,
         department_id=department_id,
         location_id=location_id,
@@ -325,6 +327,8 @@ def assign_investigator(
     if grievance.status == GRIEVANCE_STATUS_SUBMITTED:
         grievance.status = GRIEVANCE_STATUS_UNDER_REVIEW
 
+    clean_assign_note = multi_line(payload.note, "Note", 2000, required=False) if payload.note else None
+
     event = StaffGrievanceEvent(
         grievance_id=grievance.id,
         event_type="assigned",
@@ -333,7 +337,7 @@ def assign_investigator(
         from_status=GRIEVANCE_STATUS_SUBMITTED,
         to_status=grievance.status,
         message=f"Investigator {investigator.name} assigned.",
-        note=payload.note,
+        note=clean_assign_note,
         is_confidential_note=False,
     )
     db.add(event)
@@ -368,15 +372,25 @@ def update_status(
     if payload.status not in GRIEVANCE_STATUSES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Invalid status: {payload.status}")
 
+    clean_message = single_line(payload.message, "Status update message", max_length(StaffGrievanceEvent.message))
+    clean_action = (
+        single_line(payload.resolution_action, "Resolution action", max_length(StaffGrievance.resolution_action), required=False)
+        if payload.resolution_action else None
+    )
+    clean_summary = (
+        multi_line(payload.resolution_summary, "Resolution summary", 5000, required=False)
+        if payload.resolution_summary else None
+    )
+
     prev_status = grievance.status
     grievance.status = payload.status
 
     if payload.status in (GRIEVANCE_STATUS_RESOLVED, GRIEVANCE_STATUS_ACTION_TAKEN, GRIEVANCE_STATUS_DISMISSED):
         grievance.resolved_at = utcnow()
-        if payload.resolution_action:
-            grievance.resolution_action = payload.resolution_action
-        if payload.resolution_summary:
-            grievance.resolution_summary = payload.resolution_summary
+        if clean_action:
+            grievance.resolution_action = clean_action
+        if clean_summary:
+            grievance.resolution_summary = clean_summary
 
     event = StaffGrievanceEvent(
         grievance_id=grievance.id,
@@ -385,7 +399,7 @@ def update_status(
         actor_name=ctx.user.name,
         from_status=prev_status,
         to_status=payload.status,
-        message=payload.message,
+        message=clean_message,
         is_confidential_note=payload.is_confidential_note,
     )
     db.add(event)
@@ -417,8 +431,7 @@ def add_note(
     grievance = _get_grievance(db, identifier)
     check_grievance_access(db, grievance, ctx)
 
-    if not payload.note.strip():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Note cannot be empty")
+    clean_note = multi_line(payload.note, "Note", 3000)
 
     event = StaffGrievanceEvent(
         grievance_id=grievance.id,
@@ -428,7 +441,7 @@ def add_note(
         from_status=grievance.status,
         to_status=grievance.status,
         message="Investigation note recorded.",
-        note=payload.note.strip(),
+        note=clean_note,
         is_confidential_note=payload.is_confidential,
     )
     db.add(event)

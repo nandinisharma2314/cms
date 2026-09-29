@@ -68,11 +68,16 @@ def _session_response(response: Response, db: Session, user: User) -> dict:
 def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     """Email or mobile + password, for staff (Super Admin down to Agent)."""
     ip = client_ip(request)
+    identifier = (payload.identifier or "").strip()
+    if not identifier:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email or phone number is required")
+    if not payload.password:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Password is required")
     rate_limit_service.enforce(db, "login_ip", ip, config.LOGIN_ATTEMPTS_PER_IP_PER_HOUR, HOUR,
                                "Too many sign-in attempts from this network. Please try again later.")
-    user = find_staff_by_identifier(db, payload.identifier)
+    user = find_staff_by_identifier(db, identifier)
     # Failures count per account, however the email/mobile was typed (unknown identifiers per normalized value).
-    failure_key = f"user:{user.id}" if user else login_identifier_key(db, payload.identifier)
+    failure_key = f"user:{user.id}" if user else login_identifier_key(db, identifier)
     lockout = timedelta(minutes=config.LOGIN_LOCKOUT_MINUTES)
     if rate_limit_service.count(db, "login_failures", failure_key, lockout) >= config.LOGIN_MAX_FAILURES:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,

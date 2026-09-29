@@ -7,12 +7,14 @@ import { ChevronRight, Clock, FileText } from "lucide-react";
 const SHORTCUTS = [
   {
     title: "My complaints",
+    subtitle: "Track status and progress",
     href: "/dashboard/complaints",
     icon: FileText,
     tone: "bg-blue-50 text-blue-600",
   },
   {
     title: "Updates",
+    subtitle: "Recent activity and alerts",
     href: "/dashboard/notifications",
     icon: Clock,
     tone: "bg-emerald-50 text-emerald-600",

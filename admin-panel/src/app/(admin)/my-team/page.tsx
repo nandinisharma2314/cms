@@ -186,6 +186,7 @@ function MemberComplaintsModal({
               </Field>
               <Field label="Reason for Reassignment (optional)">
                 <input
+                  maxLength={255}
                   className={inputClass}
                   placeholder="e.g. Workload rebalancing"
                   value={reassignReason}

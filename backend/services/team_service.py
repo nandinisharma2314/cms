@@ -10,12 +10,13 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from models import Complaint, ComplaintAssignment, ComplaintEvent, User
+from models import Complaint, ComplaintAssignment, ComplaintEvent, User, max_length
 from services import analytics_service, audit_service, routing_service, settings_service
 from services.access_service import AccessContext
 from services.analytics_service import Filters, Row, _hours, _performance_row, load_rows, metrics
 from services.user_service import serialize_role, serialize_users
 from utils.security import utcnow
+from utils.text import single_line
 
 
 def get_direct_reports(db: Session, manager_id: int) -> list[User]:
@@ -200,11 +201,13 @@ def reassign_team_complaint(
     if complaint.status == "SUBMITTED":
         complaint.status = "ASSIGNED"
 
+    clean_reason = single_line(reason, "Reason", max_length(ComplaintAssignment.reason), required=False)
+
     assignment = ComplaintAssignment(
         complaint_id=complaint.id,
         assignee_id=new_assignee.id,
         method="manual",
-        reason=reason or "Team workload rebalance by manager",
+        reason=clean_reason or "Team workload rebalance by manager",
         assigned_by_id=ctx.user.id,
     )
     db.add(assignment)
@@ -218,7 +221,7 @@ def reassign_team_complaint(
         from_status=complaint.status,
         to_status=complaint.status,
         message=f"Reassigned from {old_assignee_name} to {new_assignee.name} by {ctx.user.name}.",
-        note=reason,
+        note=clean_reason,
     )
     db.add(event)
     db.commit()

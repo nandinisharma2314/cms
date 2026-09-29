@@ -224,6 +224,7 @@ function FileGrievanceModal({
           <Field label="Approximate Date of Incident (optional)">
             <input
               type="date"
+              max={new Date().toISOString().split("T")[0]}
               className={inputClass}
               value={incidentDate}
               onChange={(e) => setIncidentDate(e.target.value)}
@@ -251,6 +252,7 @@ function FileGrievanceModal({
         <Field label="Grievance Title / Summary">
           <input
             required
+            maxLength={200}
             className={inputClass}
             placeholder="Brief headline summarizing the issue"
             value={subject}
@@ -262,6 +264,7 @@ function FileGrievanceModal({
           <textarea
             required
             rows={4}
+            maxLength={5000}
             className={inputClass}
             placeholder="Describe what occurred, dates, locations, witnesses, and any direct quotes or details."
             value={description}
@@ -560,6 +563,7 @@ function GrievanceDetailDrawer({
                     </Field>
                     <Field label="Assignment Note (optional)">
                       <input
+                        maxLength={2000}
                         className={inputClass}
                         placeholder="Internal instructions for the investigator"
                         value={assignNote}
@@ -597,6 +601,7 @@ function GrievanceDetailDrawer({
                       {(newStatus === "action_taken" || newStatus === "resolved") && (
                         <Field label="Resolution / Disciplinary Action">
                           <input
+                            maxLength={100}
                             className={inputClass}
                             placeholder="e.g. Formal Warning, Counseling, Reassignment"
                             value={resolutionAction}
@@ -609,6 +614,7 @@ function GrievanceDetailDrawer({
                       <textarea
                         required
                         rows={2}
+                        maxLength={500}
                         className={inputClass}
                         placeholder="Summary of findings or explanation of this status change"
                         value={statusMessage}
@@ -632,6 +638,7 @@ function GrievanceDetailDrawer({
                       <textarea
                         required
                         rows={3}
+                        maxLength={3000}
                         className={inputClass}
                         placeholder="Confidential interview notes, evidence verification notes, or updates"
                         value={noteContent}
