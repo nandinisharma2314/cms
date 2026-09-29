@@ -30,7 +30,7 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
 
   return (
     <header
-      className={`sticky top-0 z-30 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-2 md:px-8 md:py-3 lg:px-12 ${
+      className={`sticky top-0 z-30 items-center justify-between gap-4 border-b border-slate-200 bg-white px-2 py-2 md:px-4 md:py-3 ${
         hideOnMobile ? "hidden md:flex" : "flex"
       }`}
     >

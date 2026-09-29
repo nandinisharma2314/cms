@@ -27,7 +27,7 @@ export default function ShortcutCards() {
         <Link
           key={title}
           href={href}
-          className="flex items-center rounded-2xl bg-white py-3 pl-2.5 pr-1.5 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)] transition-shadow hover:shadow-md active:scale-[0.99] md:p-5"
+          className="flex items-center rounded-2xl border border-slate-200 bg-white py-3 pl-2.5 pr-1.5 active:scale-[0.99] md:p-5"
         >
           <span
             className={`mr-2 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl md:mr-4 md:h-12 md:w-12 ${tone}`}

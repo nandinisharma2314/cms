@@ -84,9 +84,9 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="flex-col">
-        <div className="overflow-hidden bg-white shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
+    <div className="flex flex-1 flex-col items-center overflow-y-auto bg-white p-0 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
+      <div className="flex w-full max-w-5xl flex-col overflow-hidden bg-white md:rounded-b-3xl md:border-x md:border-b md:border-slate-100 md:shadow-sm mb-20 md:mb-20">
+        <div className="overflow-hidden bg-white">
           <div className="flex items-center justify-between">
           
             <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => act(api.notifications.markAllRead)}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-1.5 rounded-none border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-700 hover:bg-slate-50"
                 >
                   <CheckCheck size={14} /> Mark all read
                 </button>
@@ -103,7 +103,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => confirm("Delete all your notifications?") && act(api.notifications.clear)}
-                  className="flex items-center gap-1.5 rounded-xl border border-red-100 bg-red-50/50 px-3 py-1.5 text-[12px] font-bold text-red-600 hover:bg-red-50"
+                  className="flex items-center gap-1.5 rounded-none border border-red-100 bg-red-50/50 px-3 py-1.5 text-[12px] font-bold text-red-600 hover:bg-red-50"
                 >
                   <Trash2 size={13} /> Clear all
                 </button>
@@ -139,7 +139,7 @@ export default function NotificationsPage() {
             {items === null ? (
               !error && (
               <li className="flex animate-pulse gap-4 p-6" aria-hidden="true">
-                <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-100" />
+                <div className="h-10 w-10 shrink-0 rounded-none bg-slate-100" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 w-1/3 rounded bg-slate-100" />
                   <div className="h-3 w-3/4 rounded bg-slate-50" />
@@ -148,7 +148,7 @@ export default function NotificationsPage() {
               )
             ) : items.length === 0 ? (
               <li className="flex flex-col items-center px-6 py-16 text-center">
-                <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-500">
+                <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-none bg-blue-50 text-blue-500">
                   <Bell size={26} />
                 </span>
                 <p className="text-[14px] font-bold text-slate-800">You&apos;re all caught up</p>
@@ -164,7 +164,7 @@ export default function NotificationsPage() {
                       onClick={() => open(item)}
                       className={`flex w-full items-start gap-4 p-4 text-left transition-colors hover:bg-slate-50 md:p-5 ${item.read_at ? "" : "bg-blue-50/30"}`}
                     >
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${className}`}>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-none ${className}`}>
                         <Icon size={16} aria-hidden="true" />
                       </span>
                       <span className="min-w-0 flex-1">
@@ -202,7 +202,7 @@ export default function NotificationsPage() {
               type="button"
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-none border border-slate-200 bg-white px-4 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-40"
             >
               Newer
             </button>
@@ -213,7 +213,7 @@ export default function NotificationsPage() {
               type="button"
               disabled={page >= pages}
               onClick={() => setPage(page + 1)}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-none border border-slate-200 bg-white px-4 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-40"
             >
               Older
             </button>

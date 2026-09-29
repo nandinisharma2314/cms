@@ -75,16 +75,6 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
   return (
     <div className="flex-1 md:min-h-0 md:overflow-y-auto">
       <div className="flex-col gap-3 p-2 pb-2 md:px-4">
-        <div className="flex items-end justify-between gap-3 px-1">
-          {canCreate && (
-            <Link
-              href="/dashboard/register"
-              className="hidden items-center gap-1.5  bg-blue-600 px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm hover:bg-blue-700 md:flex"
-            >
-              <Plus className="h-4 w-4" /> New complaint
-            </Link>
-          )}
-        </div>
 
         <div className={`${CARD} space-y-3 p-3 md:p-4`}>
           <label className="relative block">

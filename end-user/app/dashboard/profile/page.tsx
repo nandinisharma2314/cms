@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
-import { api, Gender, OtpChallenge, OtpChannel, Profile } from "@/lib/api";
+import { api, OtpChallenge, OtpChannel, Profile } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { initials, today } from "@/lib/format";
 import { useEndUser } from "@/lib/session";
@@ -25,15 +25,9 @@ import { Dialog } from "@/components/ui/Dialog";
 
 type Tab = "personal" | "contact" | "notifications" | "help";
 
-const GENDERS: { value: Gender; label: string }[] = [
-  { value: "female", label: "Female" },
-  { value: "male", label: "Male" },
-  { value: "other", label: "Other" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
-];
 
 const fieldClass =
-  "w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-800 shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500";
+  "w-full rounded-none border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-800 shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500";
 
 function IconField({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -177,7 +171,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<Tab>("personal");
   const [name, setName] = useState(profile.name);
   const [dob, setDob] = useState(profile.dob ?? "");
-  const [gender, setGender] = useState<Gender | null>(profile.gender);
+
   const [address, setAddress] = useState(profile.address ?? "");
   const [notifySms, setNotifySms] = useState(profile.notify_sms);
   const [notifyEmail, setNotifyEmail] = useState(profile.notify_email);
@@ -193,10 +187,7 @@ export default function ProfilePage() {
         if (dob) data.dob = dob;
         else data.clear_dob = true;
       }
-      if (gender !== profile.gender) {
-        if (gender) data.gender = gender;
-        else data.clear_gender = true;
-      }
+
     } else if (tab === "contact") {
       if (address.trim() !== (profile.address ?? "")) data.address = address;
     } else if (tab === "notifications") {
@@ -236,9 +227,9 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div className="flex flex-1 flex-col items-center overflow-y-auto bg-slate-50 p-0 md:p-6 lg:p-8">
-      <div className="flex w-full max-w-5xl flex-col gap-0 pb-0 md:gap-6 md:pb-20">
-        <div className="flex shrink-0 flex-col overflow-hidden rounded-t-3xl border-b border-slate-100 bg-white md:rounded-3xl md:border md:shadow-sm">
+    <div className="flex flex-1 flex-col items-center overflow-y-auto bg-white p-0 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
+      <div className="flex w-full max-w-5xl flex-col overflow-hidden bg-white md:rounded-b-3xl md:border-x md:border-b md:border-slate-100 md:shadow-sm mb-20 md:mb-20">
+        <div className="flex shrink-0 flex-col border-b border-slate-100">
           <div className="h-16 bg-linear-to-r from-sky-100 via-blue-50 to-indigo-50 md:h-28" aria-hidden="true" />
           <div className="relative z-10 -mt-7 flex flex-col items-center gap-2 px-4 pb-3 sm:flex-row sm:items-end sm:gap-6 sm:px-8 md:-mt-12 md:pb-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-white bg-blue-50 text-xl font-extrabold text-blue-700 shadow-sm md:h-24 md:w-24 md:text-3xl">
@@ -292,19 +283,8 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col overflow-hidden bg-white md:rounded-3xl md:border md:border-slate-100 md:shadow-sm">
+        <div className="flex flex-1 flex-col">
           <form onSubmit={save} className="flex h-full flex-col">
-            <div className="hidden shrink-0 items-center gap-3 border-b border-slate-100 px-8 py-5 md:flex">
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard")}
-                aria-label="Back to home"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <h2 className="text-xl font-extrabold text-slate-800">{tabs.find((t) => t.id === tab)?.label}</h2>
-            </div>
 
             <div className="flex flex-1 flex-col gap-4 px-4 py-4 sm:px-8 md:gap-5 md:py-6">
               {message && (
@@ -354,27 +334,7 @@ export default function ProfilePage() {
                       />
                     </IconField>
                   </div>
-                  <fieldset className="flex flex-col gap-1.5 md:col-span-2">
-                    <legend className="mb-1.5 text-xs font-bold text-slate-800">Gender (optional)</legend>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {GENDERS.map((g) => (
-                        <button
-                          key={g.value}
-                          type="button"
-                          disabled={!canEdit}
-                          aria-pressed={gender === g.value}
-                          onClick={() => setGender(gender === g.value ? null : g.value)}
-                          className={`rounded-xl border py-3 text-xs font-bold transition-all ${
-                            gender === g.value
-                              ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                              : "border-slate-200 bg-[#F8FAFC] text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {g.label}
-                        </button>
-                      ))}
-                    </div>
-                  </fieldset>
+
                 </div>
               )}
 
@@ -386,7 +346,7 @@ export default function ProfilePage() {
                         <span className="text-xs font-bold text-slate-800">
                           {channel === "sms" ? "Mobile number" : "Email address"}
                         </span>
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-4 pr-2">
+                        <div className="flex items-center gap-2 rounded-none border border-slate-200 bg-slate-50 py-2.5 pl-4 pr-2">
                           {channel === "sms" ? (
                             <Phone size={16} className="text-slate-400" />
                           ) : (
@@ -399,7 +359,7 @@ export default function ProfilePage() {
                             <button
                               type="button"
                               onClick={() => setChanging(channel)}
-                              className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-blue-600 shadow-sm hover:bg-blue-50"
+                              className="shrink-0 rounded-none bg-white px-3 py-1.5 text-xs font-bold text-blue-600 shadow-sm hover:bg-blue-50"
                             >
                               Change
                             </button>
@@ -435,7 +395,7 @@ export default function ProfilePage() {
                 <div className="flex flex-col gap-3">
                   <p className="text-[13px] text-slate-500">Updates always appear here in the app. You can also get them by:</p>
                   {notifications.sms && (
-                    <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <label className="flex items-center justify-between gap-4 rounded-none border border-slate-200 bg-slate-50 p-4">
                       <span>
                         <span className="block text-sm font-bold text-slate-800">Text message</span>
                         <span className="mt-0.5 block text-xs text-slate-500">To {profile.mobile}</span>
@@ -486,14 +446,14 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={logout}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-6 py-2.5 text-sm font-bold text-red-600 hover:bg-red-100 md:hidden"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-none border border-red-200 bg-red-50 px-6 py-2.5 text-sm font-bold text-red-600 hover:bg-red-100 md:hidden"
                 >
                   <LogOut size={16} /> Sign out
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !canEdit}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F62FE] px-8 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-60 md:flex-none"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-none bg-[#0F62FE] px-8 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-60 md:flex-none"
                 >
                   {saving ? "Saving…" : "Save changes"}
                 </button>

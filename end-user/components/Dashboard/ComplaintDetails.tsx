@@ -264,8 +264,8 @@ export default function ComplaintDetails({ complaintId }: { complaintId: string 
   const attachments = (detail?.attachments ?? []).filter((a) => a.comment_id === null);
 
   return (
-    <div className="flex-1 bg-linear-to-b from-[#e5effd] via-[#f0f5fd] to-slate-50 md:min-h-0 md:overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 pb-8 pt-4 md:gap-5 md:px-8 md:py-8">
+    <div className="flex-1 bg-white md:min-h-0 md:overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 pb-8 pt-4 md:gap-5 md:px-8 md:py-8">
         <div className="flex items-center gap-3">
           <button
             type="button"

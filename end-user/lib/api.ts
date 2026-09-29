@@ -362,7 +362,11 @@ async function send(path: string, init: RequestInit, query?: Query): Promise<Res
   } catch {
     throw new ApiError(UNREACHABLE, 0);
   }
-  if (res.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    // Wait forever so the UI doesn't render an error while the session provider redirects to /login.
+    await new Promise(() => {});
+  }
   if (!res.ok) throw new ApiError(await errorMessage(res), res.status);
   return res;
 }
