@@ -78,15 +78,17 @@ function ComplaintsList({ initial }: { initial: Filters }) {
   ).length;
 
   return (
-    <>
-      <PageHeader
-        title="Complaints"
-        description={
-          me.is_super_admin ? "All complaints in the system." : "Complaints inside your department and location scope."
-        }
-      />
+    <div className="flex flex-col h-[calc(100vh-130px)] -mt-2">
+      <div className="shrink-0">
+        <PageHeader
+          title="Complaints"
+          description={
+            me.is_super_admin ? "All complaints in the system." : "Complaints inside your department and location scope."
+          }
+        />
+      </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 shrink-0 mt-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -199,14 +201,16 @@ function ComplaintsList({ initial }: { initial: Filters }) {
         )}
       </div>
 
-      <ErrorBanner message={error} />
-      {(loading || data) && (
-        <Card className={`overflow-hidden transition-opacity ${refreshing ? "opacity-60" : ""}`}>
-          <ComplaintTable complaints={data?.items ?? []} loading={loading} emptyText="No complaints match these filters." />
-        </Card>
-      )}
-      {data && <Pagination page={page} pageSize={data.page_size} total={data.total} noun="complaints" onPage={setPage} />}
-    </>
+      <div className="mt-4 flex-1 min-h-0 flex flex-col gap-3">
+        <ErrorBanner message={error} />
+        {(loading || data) && (
+          <Card className={`overflow-x-auto overflow-y-auto flex-1 min-h-0 relative transition-opacity ${refreshing ? "opacity-60" : ""}`}>
+            <ComplaintTable complaints={data?.items ?? []} loading={loading} emptyText="No complaints match these filters." />
+          </Card>
+        )}
+        {data && <Pagination page={page} pageSize={data.page_size} total={data.total} noun="complaints" onPage={setPage} />}
+      </div>
+    </div>
   );
 }
 
