@@ -41,6 +41,14 @@ export interface LocationRef {
   label: string;
 }
 
+export interface UserCustomPermission {
+  id: number;
+  key: string;
+  group: string;
+  description: string;
+  is_granted: boolean;
+}
+
 export interface UserScope {
   department: { id: number; name: string } | null;
   location: LocationRef | null;
@@ -53,6 +61,9 @@ export interface StaffUser {
   mobile: string | null;
   role: RoleRef;
   reports_to: { id: number; name: string } | null;
+  primary_department?: { id: number; name: string } | null;
+  primary_location?: LocationRef | null;
+  custom_permissions?: UserCustomPermission[];
   scopes: UserScope[];
   is_active: boolean;
   /** Off = skipped by automatic complaint routing (e.g. on leave). */
@@ -569,6 +580,119 @@ export interface ScopeInput {
   location_id: number | null;
 }
 
+export interface CustomPermissionInput {
+  permission_id?: number | null;
+  permission_key?: string | null;
+  is_granted: boolean;
+}
+
+export type GrievanceTargetType = "colleague" | "superior" | "management" | "department" | "other";
+export type GrievanceSeverity = "low" | "medium" | "high" | "critical";
+export type GrievanceStatus = "submitted" | "under_review" | "investigating" | "action_taken" | "resolved" | "dismissed";
+
+export interface GrievanceAttachment {
+  id: number;
+  file_name: string;
+  content_type: string;
+  file_size: number | null;
+  url: string;
+  created_at: string;
+}
+
+export interface GrievanceEvent {
+  id: number;
+  event_type: string;
+  actor_name: string;
+  from_status: string | null;
+  to_status: string | null;
+  message: string;
+  is_confidential_note: boolean;
+  note: string | null;
+  created_at: string;
+}
+
+export interface StaffGrievance {
+  id: number;
+  tracking_id: string;
+  reporter: {
+    id: number | null;
+    name: string;
+    email: string | null;
+    is_anonymous: boolean;
+  };
+  is_anonymous: boolean;
+  accused_user: {
+    id: number;
+    name: string;
+    role: string | null;
+  } | null;
+  target_type: GrievanceTargetType;
+  category: string;
+  severity: GrievanceSeverity;
+  subject: string;
+  description: string;
+  incident_date: string | null;
+  department: { id: number; name: string } | null;
+  location: { id: number; name: string } | null;
+  status: GrievanceStatus;
+  assigned_investigator: {
+    id: number;
+    name: string;
+    role: string | null;
+  } | null;
+  resolution_summary: string | null;
+  resolution_action: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  attachments: GrievanceAttachment[];
+  events?: GrievanceEvent[];
+}
+
+export interface GrievanceOptions {
+  target_types: GrievanceTargetType[];
+  categories: string[];
+  severities: GrievanceSeverity[];
+  statuses: GrievanceStatus[];
+  colleagues: { id: number; name: string }[];
+  investigators: { id: number; name: string; role: string }[];
+  departments: { id: number; name: string }[];
+  locations: { id: number; name: string }[];
+}
+
+export interface TeamAggregateMetrics {
+  total_assigned: number;
+  pending: number;
+  resolved: number;
+  rejected: number;
+  escalated_now: number;
+  avg_response_hours: number | null;
+  avg_resolution_hours: number | null;
+  response_sla_pct: number | null;
+  resolution_sla_pct: number | null;
+  sla_breaches: number;
+  avg_rating: number | null;
+  reopen_pct: number | null;
+}
+
+export interface TeamMemberPerformance extends PerformanceRow {
+  email: string;
+  is_available: boolean;
+  is_active: boolean;
+  current_active_complaints: number;
+  reports_to_id: number | null;
+  reports_to_name: string | null;
+  primary_department: { id: number; name: string } | null;
+  primary_location: { id: number; name: string } | null;
+}
+
+export interface TeamDashboardResponse {
+  period: { date_from: string; date_to: string };
+  team_size: number;
+  aggregate: TeamAggregateMetrics | null;
+  members: TeamMemberPerformance[];
+}
+
 export interface SystemSettings {
   organisation_name: string | null;
   product_name: string | null;
@@ -989,7 +1113,10 @@ export const api = {
       role_id: number;
       password: string;
       reports_to_id: number | null;
-      scopes: ScopeInput[];
+      primary_department_id?: number | null;
+      primary_location_id?: number | null;
+      scopes?: ScopeInput[];
+      custom_permissions?: CustomPermissionInput[];
     }) => request<StaffUser>("/users/", { method: "POST", body: data }),
     /** Only the fields that are sent change. */
     update: (
@@ -1002,7 +1129,12 @@ export const api = {
         role_id: number;
         reports_to_id: number;
         clear_reports_to: boolean;
+        primary_department_id: number;
+        clear_primary_department: boolean;
+        primary_location_id: number;
+        clear_primary_location: boolean;
         scopes: ScopeInput[];
+        custom_permissions: CustomPermissionInput[];
         is_available: boolean;
       }>,
     ) => request<StaffUser>(`/users/${userId}`, { method: "PATCH", body: data }),
@@ -1133,5 +1265,46 @@ export const api = {
       request<Paged<AuditEntry>>("/audit-logs/", { query }),
     entityTypes: () => request<string[]>("/audit-logs/entity-types"),
     exportCsv: (query: AuditQuery = {}) => downloadFile("/audit-logs/export", query),
+  },
+  grievances: {
+    options: () => request<GrievanceOptions>("/grievances/options"),
+    list: (
+      query: {
+        view?: "my_filed" | "investigations" | "all";
+        status_filter?: string;
+        severity?: string;
+        page?: number;
+        page_size?: number;
+      } = {},
+    ) => request<Paged<StaffGrievance>>("/grievances/", { query }),
+    get: (identifier: string) => request<StaffGrievance>(`/grievances/${id(identifier)}`),
+    file: (data: FormData) => request<StaffGrievance>("/grievances/", { method: "POST", body: data }),
+    assign: (identifier: string, data: { investigator_id: number; note?: string }) =>
+      request<StaffGrievance>(`/grievances/${id(identifier)}/assign`, { method: "POST", body: data }),
+    updateStatus: (
+      identifier: string,
+      data: {
+        status: string;
+        message: string;
+        is_confidential_note?: boolean;
+        resolution_action?: string;
+        resolution_summary?: string;
+      },
+    ) => request<StaffGrievance>(`/grievances/${id(identifier)}/status`, { method: "POST", body: data }),
+    addNote: (identifier: string, data: { note: string; is_confidential?: boolean }) =>
+      request<StaffGrievance>(`/grievances/${id(identifier)}/notes`, { method: "POST", body: data }),
+  },
+  team: {
+    dashboard: (query: { date_from?: string; date_to?: string; direct_only?: boolean } = {}) =>
+      request<TeamDashboardResponse>("/team/dashboard", { query }),
+    members: (query: { direct_only?: boolean } = {}) => request<StaffUser[]>("/team/members", { query }),
+    memberComplaints: (memberId: number) => request<ComplaintData[]>(`/team/members/${memberId}/complaints`),
+    setAvailability: (memberId: number, is_available: boolean) =>
+      request<{ id: number; name: string; is_available: boolean }>(`/team/members/${memberId}/availability`, {
+        method: "POST",
+        body: { is_available },
+      }),
+    reassign: (data: { complaint_id: string; new_assignee_id: number; reason?: string }) =>
+      request<ComplaintData>("/team/reassign", { method: "POST", body: data }),
   },
 };

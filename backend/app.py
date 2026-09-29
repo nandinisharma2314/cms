@@ -15,7 +15,8 @@ from database import SessionLocal, engine
 from routes import (
     audit_routes, auth_routes, complaint_routes, department_routes, end_user_routes, file_routes, health_routes,
     import_routes, location_routes, notification_routes, portal_routes, priority_routes, public_routes,
-    rejection_routes, report_routes, role_routes, settings_routes, sla_routes, user_routes,
+    rejection_routes, report_routes, role_routes, settings_routes, sla_routes, staff_grievance_routes, team_routes,
+    user_routes,
 )
 from schema_version import schema_problem
 from services import messaging, settings_service
@@ -146,6 +147,8 @@ app.include_router(rejection_routes.router, prefix="/rejection-requests", tags=[
 app.include_router(import_routes.router, prefix="/imports", tags=["imports"])
 app.include_router(report_routes.router, prefix="/reports", tags=["reports"])
 app.include_router(complaint_routes.router, prefix="/complaints", tags=["complaints"])
+app.include_router(staff_grievance_routes.router, prefix="/grievances", tags=["grievances"])
+app.include_router(team_routes.router, prefix="/team", tags=["team"])
 app.include_router(portal_routes.router, prefix="/portal", tags=["portal"])
 
 

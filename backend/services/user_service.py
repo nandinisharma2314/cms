@@ -14,7 +14,10 @@ def serialize_role(role: Role) -> dict:
 
 
 def serialize_users(db: Session, users: list[User], ctx: AccessContext | None = None) -> list[dict]:
-    names = path_names(db, [s.location for u in users for s in u.scopes])
+    all_locations = [s.location for u in users for s in u.scopes if s.location] + [
+        u.primary_location for u in users if u.primary_location
+    ]
+    names = path_names(db, all_locations)
     result = []
     for u in users:
         item = {
@@ -24,6 +27,19 @@ def serialize_users(db: Session, users: list[User], ctx: AccessContext | None = 
             "mobile": u.mobile,
             "role": serialize_role(u.role),
             "reports_to": {"id": u.reports_to.id, "name": u.reports_to.name} if u.reports_to else None,
+            "primary_department": {"id": u.primary_department.id, "name": u.primary_department.name} if u.primary_department else None,
+            "primary_location": serialize_location(u.primary_location, names) if u.primary_location else None,
+            "custom_permissions": [
+                {
+                    "id": up.permission.id,
+                    "key": up.permission.key,
+                    "group": up.permission.group,
+                    "description": up.permission.description,
+                    "is_granted": up.is_granted,
+                }
+                for up in getattr(u, "custom_permissions", [])
+                if up.permission
+            ],
             "scopes": [
                 {
                     "department": {"id": s.department.id, "name": s.department.name} if s.department else None,

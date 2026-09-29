@@ -53,6 +53,14 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "reports.view": ("Reports", "View dashboards and reports"),
     "audit.view": ("Audit", "View the audit log"),
 
+    "grievance.file": ("Staff Grievances", "File an internal grievance against a colleague or superior"),
+    "grievance.view_own": ("Staff Grievances", "View own filed grievances and track status"),
+    "grievance.manage": ("Staff Grievances", "Investigate, update and resolve staff grievances"),
+    "grievance.view_all": ("Staff Grievances", "View all staff grievances within scope (subject to anti-conflict rules)"),
+
+    "team.view": ("My Team", "View team members, reporting structure and individual performance metrics"),
+    "team.manage": ("My Team", "Manage team workload, availability and reassign complaints between members"),
+
     # What end users may do in the portal. Signing in and viewing their own
     # complaints and notifications are always allowed.
     "portal.complaint.create": ("End User Portal", "Register new complaints"),
@@ -79,6 +87,9 @@ _COMPLAINT_SUPERVISION = _COMPLAINT_HANDLING + [
     "complaint.assign", "complaint.reassign", "complaint.reject.approve", "complaint.close", "complaint.reclassify",
 ]
 _REFERENCE_DATA = ["department.view", "location.view", "role.view"]
+_STAFF_GRIEVANCE_BASIC = ["grievance.file", "grievance.view_own"]
+_STAFF_GRIEVANCE_FULL = _STAFF_GRIEVANCE_BASIC + ["grievance.manage", "grievance.view_all"]
+_TEAM_MANAGEMENT = ["team.view", "team.manage"]
 
 # Ordered top-down; each role's parent is the previous entry's key where given.
 # key -> (name, description, parent_key, default permissions)
@@ -88,7 +99,7 @@ SYSTEM_ROLES: dict[str, tuple[str, str, str | None, list[str]]] = {
     ),
     "admin": (
         "Admin", "Administrative management of users and complaints.", SUPER_ADMIN_ROLE_KEY,
-        _COMPLAINT_SUPERVISION + _REFERENCE_DATA + [
+        _COMPLAINT_SUPERVISION + _REFERENCE_DATA + _STAFF_GRIEVANCE_FULL + _TEAM_MANAGEMENT + [
             "complaint.create",
             "user.view", "user.create", "user.update", "user.deactivate", "user.reset_password",
             "end_user.view", "end_user.create", "end_user.update",
@@ -97,7 +108,7 @@ SYSTEM_ROLES: dict[str, tuple[str, str, str | None, list[str]]] = {
     ),
     "manager": (
         "Manager", "Manages teams and complaints for a department and area.", "admin",
-        _COMPLAINT_SUPERVISION + _REFERENCE_DATA + [
+        _COMPLAINT_SUPERVISION + _REFERENCE_DATA + _STAFF_GRIEVANCE_FULL + _TEAM_MANAGEMENT + [
             "complaint.create",
             "user.view", "user.create", "user.update", "user.deactivate",
             "end_user.view",
@@ -106,11 +117,11 @@ SYSTEM_ROLES: dict[str, tuple[str, str, str | None, list[str]]] = {
     ),
     "supervisor": (
         "Supervisor / Team Lead", "Supervises agents and their complaints.", "manager",
-        _COMPLAINT_SUPERVISION + ["user.view", "role.view", "reports.view"],
+        _COMPLAINT_SUPERVISION + _STAFF_GRIEVANCE_BASIC + _TEAM_MANAGEMENT + ["user.view", "role.view", "reports.view"],
     ),
     "agent": (
         "Agent", "Handles assigned complaints.", "supervisor",
-        _COMPLAINT_HANDLING + ["complaint.reject.request", "complaint.receive"],
+        _COMPLAINT_HANDLING + _STAFF_GRIEVANCE_BASIC + ["complaint.reject.request", "complaint.receive"],
     ),
     END_USER_ROLE_KEY: (
         "End User", "Everyone who signs in to the end-user portal.", None, PORTAL_PERMISSIONS,

@@ -4,9 +4,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
-from models import Role, User, max_length
+from models import Department, Location, Permission, Role, User, UserPermission, max_length
 from services import audit_service, routing_service, token_service
 from services.access_service import AccessContext
+from services.location_service import require_usable
 from services.phone_service import phone_format
 from services.user_service import build_scopes, scope_snapshot, serialize_role, serialize_users, validate_reports_to
 from utils.auth_middleware import get_access_context, require_permission
@@ -22,6 +23,12 @@ class ScopeInput(BaseModel):
     location_id: int | None
 
 
+class CustomPermissionInput(BaseModel):
+    permission_id: int | None = None
+    permission_key: str | None = None
+    is_granted: bool = True
+
+
 class CreateUserRequest(BaseModel):
     name: str
     email: str
@@ -29,7 +36,10 @@ class CreateUserRequest(BaseModel):
     role_id: int
     password: str
     reports_to_id: int | None = None
-    scopes: list[ScopeInput]
+    primary_department_id: int | None = None
+    primary_location_id: int | None = None
+    scopes: list[ScopeInput] = []
+    custom_permissions: list[CustomPermissionInput] = []
 
 
 class UpdateUserRequest(BaseModel):
@@ -40,7 +50,12 @@ class UpdateUserRequest(BaseModel):
     role_id: int | None = None
     reports_to_id: int | None = None
     clear_reports_to: bool = False
+    primary_department_id: int | None = None
+    clear_primary_department: bool = False
+    primary_location_id: int | None = None
+    clear_primary_location: bool = False
     scopes: list[ScopeInput] | None = None
+    custom_permissions: list[CustomPermissionInput] | None = None
     is_available: bool | None = None
 
 
@@ -89,6 +104,41 @@ def _get_manageable(ctx: AccessContext, user_id: int) -> User:
     return user
 
 
+def _validate_primary_workplace(db: Session, ctx: AccessContext, department_id: int | None, location_id: int | None) -> tuple[Department | None, Location | None]:
+    dept = None
+    if department_id is not None:
+        dept = db.get(Department, department_id)
+        if dept is None or not dept.is_active:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Primary department not found or inactive")
+    loc = None
+    if location_id is not None:
+        loc = require_usable(db, db.get(Location, location_id))
+    if department_id is not None or location_id is not None:
+        if not ctx.covers(department_id, loc.path if loc else None):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Primary workplace is outside your scope")
+    return dept, loc
+
+
+def _build_custom_permissions(db: Session, ctx: AccessContext, user: User, requested: list[CustomPermissionInput]) -> list[UserPermission]:
+    result = []
+    seen = set()
+    for item in requested:
+        perm = None
+        if item.permission_id is not None:
+            perm = db.get(Permission, item.permission_id)
+        elif item.permission_key:
+            perm = db.query(Permission).filter(Permission.key == item.permission_key).first()
+        if perm is None:
+            continue
+        if perm.id in seen:
+            continue
+        seen.add(perm.id)
+        if not ctx.is_super_admin and not ctx.has(perm.key):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"You cannot grant permission '{perm.key}' which you do not hold")
+        result.append(UserPermission(user=user, permission=perm, is_granted=item.is_granted))
+    return result
+
+
 @router.get("/")
 def list_users(
     search: str | None = None,
@@ -103,7 +153,11 @@ def list_users(
     below_ids = [r.id for r in ctx.assignable_roles()]
     if not below_ids:
         return {"items": [], "total": 0, "page": page, "page_size": page_size}
-    query = ctx.db.query(User).options(selectinload(User.scopes)).filter(User.role_id.in_(below_ids))
+    query = (
+        ctx.db.query(User)
+        .options(selectinload(User.scopes), selectinload(User.custom_permissions))
+        .filter(User.role_id.in_(below_ids))
+    )
     if role_id is not None:
         query = query.filter(User.role_id == role_id)
     if not include_inactive:
@@ -150,14 +204,21 @@ def create_user(payload: CreateUserRequest, request: Request,
     error = validate_password_strength(payload.password)
     if error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
-    scopes = build_scopes(db, ctx, role, [s.model_dump() for s in payload.scopes])
+    primary_dept, primary_loc = _validate_primary_workplace(db, ctx, payload.primary_department_id, payload.primary_location_id)
+    scope_inputs = [s.model_dump() for s in payload.scopes]
+    if not scope_inputs and (payload.primary_department_id is not None or payload.primary_location_id is not None):
+        scope_inputs = [{"department_id": payload.primary_department_id, "location_id": payload.primary_location_id}]
+    scopes = build_scopes(db, ctx, role, scope_inputs)
     reports_to = validate_reports_to(db, ctx, role, payload.reports_to_id)
 
     user = User(
         name=name, email=email, mobile=mobile, role=role,
         password_hash=hash_password(payload.password), must_change_password=True,
-        reports_to=reports_to, created_by_id=ctx.user.id, scopes=scopes,
+        reports_to=reports_to, primary_department=primary_dept, primary_location=primary_loc,
+        created_by_id=ctx.user.id, scopes=scopes,
     )
+    if payload.custom_permissions:
+        user.custom_permissions = _build_custom_permissions(db, ctx, user, payload.custom_permissions)
     db.add(user)
     try:
         db.flush()
@@ -204,6 +265,27 @@ def update_user(
         build_scopes(db, ctx, role, [{"department_id": s.department_id, "location_id": s.location_id}
                                      for s in user.scopes])
     user.role = role
+
+    if payload.clear_primary_department:
+        user.primary_department = None
+        user.primary_department_id = None
+    elif payload.primary_department_id is not None:
+        dept, _ = _validate_primary_workplace(db, ctx, payload.primary_department_id, None)
+        user.primary_department = dept
+        user.primary_department_id = dept.id if dept else None
+
+    if payload.clear_primary_location:
+        user.primary_location = None
+        user.primary_location_id = None
+    elif payload.primary_location_id is not None:
+        _, loc = _validate_primary_workplace(db, ctx, None, payload.primary_location_id)
+        user.primary_location = loc
+        user.primary_location_id = loc.id if loc else None
+
+    if payload.custom_permissions is not None:
+        user.custom_permissions.clear()
+        db.flush()
+        user.custom_permissions = _build_custom_permissions(db, ctx, user, payload.custom_permissions)
 
     if payload.clear_reports_to:
         user.reports_to = None

@@ -191,6 +191,7 @@ export default function NotificationsPage() {
                   </li>
                 );
               })
+              
             )}
           </ul>
         </div>

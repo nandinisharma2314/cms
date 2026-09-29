@@ -86,6 +86,22 @@ class Role(Base):
     permissions = relationship("Permission", secondary=role_permissions, lazy="selectin")
 
 
+class UserPermission(Base):
+    """Explicit permission override for an individual user.
+    is_granted=True grants a permission not in their role.
+    is_granted=False revokes a permission granted by their role."""
+    __tablename__ = "user_permissions"
+    __table_args__ = (UniqueConstraint("user_id", "permission_id", name="uq_user_permission"),)
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    permission_id = Column(Integer, ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False)
+    is_granted = Column(Boolean, default=True, nullable=False)
+
+    permission = relationship("Permission", lazy="joined")
+    user = relationship("User", back_populates="custom_permissions")
+
+
 # ---------------------------------------------------------------------------
 # Priorities, departments, categories, locations
 # ---------------------------------------------------------------------------
@@ -189,6 +205,8 @@ class User(Base):
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     reports_to_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    primary_department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    primary_location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     # Off (e.g. on leave) = skipped by automatic complaint routing.
     is_available = Column(Boolean, default=True, nullable=False)
@@ -198,7 +216,10 @@ class User(Base):
 
     role = relationship("Role", lazy="joined")
     reports_to = relationship("User", remote_side=[id], foreign_keys=[reports_to_id])
+    primary_department = relationship("Department", foreign_keys=[primary_department_id], lazy="joined")
+    primary_location = relationship("Location", foreign_keys=[primary_location_id], lazy="joined")
     scopes = relationship("UserScope", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    custom_permissions = relationship("UserPermission", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
 
     def __repr__(self):
         return f"<User {self.email}>"
@@ -712,3 +733,123 @@ class AuditLog(Base):
     changes = Column(Text, nullable=True)  # JSON: {"field": [old, new]}
     ip_address = Column(String(45), nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+
+
+# ---------------------------------------------------------------------------
+# Staff Grievances / Whistleblower System
+# ---------------------------------------------------------------------------
+
+GRIEVANCE_STATUS_SUBMITTED = "submitted"
+GRIEVANCE_STATUS_UNDER_REVIEW = "under_review"
+GRIEVANCE_STATUS_INVESTIGATING = "investigating"
+GRIEVANCE_STATUS_ACTION_TAKEN = "action_taken"
+GRIEVANCE_STATUS_RESOLVED = "resolved"
+GRIEVANCE_STATUS_DISMISSED = "dismissed"
+
+GRIEVANCE_STATUSES = (
+    GRIEVANCE_STATUS_SUBMITTED,
+    GRIEVANCE_STATUS_UNDER_REVIEW,
+    GRIEVANCE_STATUS_INVESTIGATING,
+    GRIEVANCE_STATUS_ACTION_TAKEN,
+    GRIEVANCE_STATUS_RESOLVED,
+    GRIEVANCE_STATUS_DISMISSED,
+)
+
+GRIEVANCE_CATEGORIES = (
+    "harassment",
+    "bullying",
+    "discrimination",
+    "corruption_bribery",
+    "retaliation",
+    "policy_violation",
+    "workplace_safety",
+    "abuse_of_authority",
+    "other",
+)
+
+GRIEVANCE_TARGET_TYPES = (
+    "colleague",
+    "superior",
+    "management",
+    "department",
+    "other",
+)
+
+GRIEVANCE_SEVERITIES = ("low", "medium", "high", "critical")
+
+
+class StaffGrievance(Base):
+    """Internal grievance/whistleblower complaint filed by a staff member.
+    Enforces strict anti-conflict isolation: accused colleagues/superiors
+    are blocked from accessing or investigating grievances naming them."""
+    __tablename__ = "staff_grievances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tracking_id = Column(String(50), unique=True, index=True, nullable=False)
+    reporter_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_anonymous = Column(Boolean, default=False, nullable=False)
+    accused_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    target_type = Column(String(30), nullable=False)
+    category = Column(String(50), nullable=False)
+    severity = Column(String(20), default="medium", nullable=False)
+    subject = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    incident_date = Column(Date, nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
+    status = Column(String(30), default=GRIEVANCE_STATUS_SUBMITTED, nullable=False, index=True)
+    assigned_investigator_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    resolution_summary = Column(Text, nullable=True)
+    resolution_action = Column(String(100), nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    reporter = relationship("User", foreign_keys=[reporter_id])
+    accused_user = relationship("User", foreign_keys=[accused_user_id])
+    assigned_investigator = relationship("User", foreign_keys=[assigned_investigator_id])
+    department = relationship("Department", lazy="joined")
+    location = relationship("Location", lazy="joined")
+    attachments = relationship(
+        "StaffGrievanceAttachment", back_populates="grievance", cascade="all, delete-orphan",
+        order_by="StaffGrievanceAttachment.id",
+    )
+    events = relationship(
+        "StaffGrievanceEvent", back_populates="grievance", cascade="all, delete-orphan",
+        order_by="StaffGrievanceEvent.id",
+    )
+
+
+class StaffGrievanceAttachment(Base):
+    __tablename__ = "staff_grievance_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    grievance_id = Column(Integer, ForeignKey("staff_grievances.id", ondelete="CASCADE"), nullable=False, index=True)
+    storage_name = Column(String(100), unique=True, nullable=False)
+    content_type = Column(String(100), nullable=False)
+    file_name = Column(String(200), nullable=False)
+    file_size = Column(Integer, nullable=True)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    grievance = relationship("StaffGrievance", back_populates="attachments")
+    uploaded_by = relationship("User")
+
+
+class StaffGrievanceEvent(Base):
+    __tablename__ = "staff_grievance_events"
+
+    id = Column(Integer, primary_key=True)
+    grievance_id = Column(Integer, ForeignKey("staff_grievances.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = Column(String(40), nullable=False, index=True)
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    actor_name = Column(String(150), nullable=True)
+    from_status = Column(String(30), nullable=True)
+    to_status = Column(String(30), nullable=True)
+    message = Column(String(500), nullable=False)
+    is_confidential_note = Column(Boolean, default=False, nullable=False)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+
+    grievance = relationship("StaffGrievance", back_populates="events")
+    actor = relationship("User")
