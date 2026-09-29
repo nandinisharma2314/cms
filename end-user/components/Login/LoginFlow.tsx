@@ -434,7 +434,7 @@ export function LoginFlow() {
                 </button>
               )}
               <form onSubmit={verify} className="flex flex-1 flex-col">
-                <div className="mb-8 flex w-full items-center justify-between gap-2 px-2" role="group" aria-label="One-time code">
+                <div className="mb-8 flex w-full items-center justify-center gap-1.5 sm:gap-2" role="group" aria-label="One-time code">
                   {digits.map((digit, index) => (
                     <input
                       key={index}
@@ -450,7 +450,7 @@ export function LoginFlow() {
                       onChange={(e) => typeDigit(index, e.target.value)}
                       onPaste={(e) => pasteDigits(index, e)}
                       onKeyDown={(e) => e.key === "Backspace" && !digits[index] && index > 0 && boxes.current[index - 1]?.focus()}
-                      className="h-14 min-w-0 max-w-12.5 flex-1 rounded-xl border border-[#bae6fd] bg-white p-0 text-center text-[22px] font-bold text-[#0f172a] shadow-sm outline-none transition-all focus:border-[#1877f2] focus:ring-2 focus:ring-[#1877f2]/20"
+                      className="h-12 sm:h-14 min-w-0 max-w-[48px] sm:max-w-[56px] flex-1 rounded-xl border border-[#bae6fd] bg-white p-0 text-center text-[20px] sm:text-[22px] font-bold text-[#0f172a] shadow-sm outline-none transition-all focus:border-[#1877f2] focus:ring-2 focus:ring-[#1877f2]/20"
                     />
                   ))}
                 </div>

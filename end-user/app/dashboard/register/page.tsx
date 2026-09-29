@@ -221,14 +221,19 @@ export default function RegisterComplaintPage() {
   }
 
   return (
-    <div className="relative flex flex-1 flex-col bg-[#f4f7fe] pb-10 pt-2 font-sans md:pb-2">
-      <div className="relative z-10 mx-auto grid w-full max-w-350 flex-1 grid-cols-1 gap-8 px-4 md:p-2 lg:grid-cols-[1fr_1.4fr] xl:gap-12">
+    <div className="relative flex flex-1 flex-col bg-[#f4f7fe] pb-10 font-sans md:py-2">
+      <div className="relative z-10 mx-auto grid w-full max-w-350 flex-1 grid-cols-1 gap-8 md:px-4 lg:grid-cols-[1fr_1.4fr] xl:gap-12">
         <Aside />
 
-        <div className="relative mt-0.5 flex flex-col rounded-3xl bg-white p-4 shadow-sm md:px-6 md:py-5">
+        <div className="relative flex flex-col bg-white p-4 shadow-sm md:rounded-3xl md:px-6 md:py-5">
           {/* Stepper */}
           <ol className="relative mb-4 flex w-full items-center justify-between px-2">
-            <span className="absolute left-[10%] right-[10%] top-4 z-0 h-0.5 bg-slate-100" aria-hidden="true" />
+            <div className="absolute left-[10%] right-[10%] top-4 z-0 h-0.5 bg-slate-100" aria-hidden="true">
+              <div
+                className="h-full bg-blue-600 transition-all duration-500 ease-in-out"
+                style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }}
+              />
+            </div>
             {STEPS.map((s) => {
               const current = step === s.id;
               const done = step > s.id;

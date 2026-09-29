@@ -7,7 +7,6 @@ import { ChevronDown, FileText, LogOut, Search, User } from "lucide-react";
 import { initials } from "@/lib/format";
 import { useEndUser } from "@/lib/session";
 import { BrandMark } from "@/components/Brand/BrandMark";
-import NotificationBell from "./NotificationBell";
 
 /** Top bar on larger screens (and on phone pages other than home). */
 export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) {
@@ -58,7 +57,6 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
             className="h-10 w-64 rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 lg:w-80"
           />
         </form>
-        <NotificationBell />
 
         <div className="relative" ref={menuRef}>
           <button
