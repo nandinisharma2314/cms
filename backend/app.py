@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import models  # noqa: F401  (registers tables on Base.metadata)
-from config import CORS_ORIGINS, IS_PRODUCTION, WORKER_INTERVAL_SECONDS
+from config import CORS_ORIGINS, IS_DEVELOPMENT, IS_PRODUCTION, WORKER_INTERVAL_SECONDS
 from database import SessionLocal, engine
 from routes import (
     audit_routes, auth_routes, complaint_routes, department_routes, end_user_routes, file_routes, health_routes,
@@ -146,3 +147,17 @@ app.include_router(import_routes.router, prefix="/imports", tags=["imports"])
 app.include_router(report_routes.router, prefix="/reports", tags=["reports"])
 app.include_router(complaint_routes.router, prefix="/complaints", tags=["complaints"])
 app.include_router(portal_routes.router, prefix="/portal", tags=["portal"])
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+    import uvicorn
+
+    backend_dir = str(Path(__file__).resolve().parent)
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
+
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "5000"))
+    uvicorn.run("app:app", host=host, port=port, reload=IS_DEVELOPMENT)
+
