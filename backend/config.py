@@ -85,6 +85,7 @@ def _choice(name: str, choices: tuple[str, ...]) -> str:
 
 APP_ENV = _choice("APP_ENV", ("development", "test", "production"))
 IS_PRODUCTION = APP_ENV == "production"
+IS_DEVELOPMENT = APP_ENV == "development"
 
 DATABASE_URI = _str("DATABASE_URI")
 

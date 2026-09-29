@@ -8,7 +8,7 @@ def request_otp(client, **payload):
     return client.post("/portal/auth/request-otp", json=payload)
 
 
-def test_unknown_identifiers_get_the_same_answer(client, monkeypatch):
+def test_unknown_identifiers_are_told_to_contact_support(client, monkeypatch):
     import config
     from database import SessionLocal
     from models import OtpChallenge
@@ -19,16 +19,18 @@ def test_unknown_identifiers_get_the_same_answer(client, monkeypatch):
         db.commit()
     own = new_client()
     known = request_otp(own, channel="sms", identifier="+91 98765-43211")
-    unknown = request_otp(own, channel="sms", identifier="9000000999")
-    assert known.status_code == unknown.status_code == 200
-    assert set(known.json()) - {"dev_otp"} == set(unknown.json())
+    assert known.status_code == 200
     assert known.json()["sent_to"].endswith("3211")
-    assert "dev_otp" not in unknown.json()  # nothing was sent
-    # a decoy never verifies, whatever the code
-    for code in ("000000", "123456"):
-        wrong = own.post("/portal/auth/verify-otp", json={"challenge_id": unknown.json()["challenge_id"], "otp": code})
-        assert wrong.status_code == 400
-    # an immediate resend is throttled
+    assert "dev_otp" in known.json()
+
+    # unregistered identifier is rejected with 404 directing to support; no OTP or challenge created
+    unknown = request_otp(own, channel="sms", identifier="9000000999")
+    assert unknown.status_code == 404
+    assert "contact support" in unknown.json()["detail"].lower()
+    with SessionLocal() as db:
+        assert db.query(OtpChallenge).filter(OtpChallenge.target == "9000000999").count() == 0
+
+    # an immediate resend for known user is throttled
     assert request_otp(own, channel="sms", identifier="9876543211").status_code == 429
     # malformed identifiers are rejected before anything else
     assert request_otp(own, channel="sms", identifier="12345").status_code == 400
@@ -275,13 +277,24 @@ def test_a_code_that_could_not_be_sent_can_be_requested_again(client, login, mon
     monkeypatch.setattr(messaging, "send_sms", provider_down)
     own = new_client()
     failed = request_otp(own, channel="sms", identifier="9000000420")
-    assert failed.status_code == 200  # the same answer as always; sending happens afterwards
-    wrong = own.post("/portal/auth/verify-otp",
-                     json={"challenge_id": failed.json()["challenge_id"], "otp": failed.json()["dev_otp"]})
-    assert wrong.status_code == 400  # the unsent code was withdrawn ...
+    assert failed.status_code == 502  # message delivery failed, friendly error returned
+    assert "could not send" in failed.json()["detail"].lower() or "support" in failed.json()["detail"].lower()
     monkeypatch.undo()
     retry = request_otp(own, channel="sms", identifier="9000000420")
-    assert retry.status_code == 200  # ... so the cooldown doesn't apply
+    assert retry.status_code == 200  # ... unsent code was withdrawn so the cooldown doesn't apply
     session = own.post("/portal/auth/verify-otp",
                        json={"challenge_id": retry.json()["challenge_id"], "otp": retry.json()["dev_otp"]})
     assert session.status_code == 200
+
+
+def test_missing_settings_returns_friendly_error_to_user(client, login, monkeypatch):
+    from services import settings_service
+
+    def missing_setting(db, field):
+        raise settings_service.SettingNotConfigured("product_name")
+
+    monkeypatch.setattr(settings_service, "require", missing_setting)
+    own = new_client()
+    response = request_otp(own, channel="sms", identifier="9876543210")
+    assert response.status_code == 503
+    assert "temporarily unavailable due to a configuration issue" in response.json()["detail"]

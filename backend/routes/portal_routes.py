@@ -1,10 +1,11 @@
 """End-user portal. End users are imported by CSV or added by staff; they sign
 in with their mobile number or email + a one-time code and only ever see their
 own complaints."""
+import sys
 from datetime import date, datetime
 
 import jwt
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
@@ -15,7 +16,7 @@ from config import (
 from database import get_db
 from models import GENDERS, Complaint, ComplaintEvent, Department, EndUser, Notification, max_length
 from services import (
-    attachment_service, audit_service, notification_service, otp_service, routing_service, settings_service,
+    attachment_service, audit_service, messaging, notification_service, otp_service, routing_service, settings_service,
     token_service, workflow_service,
 )
 from services.complaint_service import (
@@ -132,12 +133,43 @@ def _challenge_response(db: Session, challenge, code: str | None) -> dict:
 # ---------------------------------------------------------------------------
 
 @router.post("/auth/request-otp")
-def request_otp(payload: RequestOtp, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
-    """Always answers the same way, and as fast, for registered and unregistered identifiers."""
-    challenge, code = otp_service.request_login_code(db, payload.channel, payload.identifier, client_ip(request))
-    if code is not None:
-        background.add_task(otp_service.send_login_code, challenge.challenge_id, code)
-    return _challenge_response(db, challenge, code)
+def request_otp(payload: RequestOtp, request: Request, db: Session = Depends(get_db)):
+    """Creates a sign-in challenge and sends the code. Unregistered users are directed to contact support."""
+    try:
+        challenge, code = otp_service.request_login_code(db, payload.channel, payload.identifier, client_ip(request))
+        otp_service.send_login_code(db, challenge, code)
+        return _challenge_response(db, challenge, code)
+    except settings_service.SettingNotConfigured as exc:
+        field_name = getattr(exc, "field", "unknown")
+        label = getattr(exc, "label", field_name)
+        print(
+            f"\n{'='*25} [SYSTEM CONFIGURATION ERROR] {'='*25}\n"
+            f"Missing required setting: '{field_name}' ({label})\n"
+            f"Path: POST /portal/auth/request-otp\n"
+            f"Detail: {exc.detail}\n"
+            f"Action required: Configure this setting in System Settings or run `python manage.py check`.\n"
+            f"{'='*78}\n",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The service is temporarily unavailable due to a configuration issue. Please contact support or try again later.",
+        ) from exc
+    except messaging.MessageError as exc:
+        print(
+            f"\n{'='*25} [MESSAGE DELIVERY ERROR] {'='*25}\n"
+            f"Path: POST /portal/auth/request-otp\n"
+            f"Detail: {exc}\n"
+            f"Action required: Check SMS/Email provider configuration in backend/.env.\n"
+            f"{'='*74}\n",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Could not send the verification code right now. Please try again in a few minutes or contact support.",
+        ) from exc
 
 
 @router.post("/auth/verify-otp")

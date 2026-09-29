@@ -40,6 +40,14 @@ def send_sms(to: str, body: str) -> None:
         raise MessageError("SMS is switched off (SMS_DELIVERY=off)")
     if config.SMS_DELIVERY == "console":
         logger.warning("SMS to %s: %s", to, body)
+        print(
+            f"\n"
+            f"======================================== [DEV SMS OTP] ========================================\n"
+            f"To: {to}\n"
+            f"Message: {body}\n"
+            f"===============================================================================================\n",
+            flush=True,
+        )
         return
     url = f"https://api.twilio.com/2010-04-01/Accounts/{config.TWILIO_ACCOUNT_SID}/Messages.json"
     data = urllib.parse.urlencode({"To": to, "From": config.TWILIO_FROM_NUMBER, "Body": body}).encode()
@@ -62,6 +70,15 @@ def send_email(to: str, subject: str, body: str) -> None:
         raise MessageError("Email is switched off (EMAIL_DELIVERY=off)")
     if config.EMAIL_DELIVERY == "console":
         logger.warning("Email to %s: %s\n%s", to, subject, body)
+        print(
+            f"\n"
+            f"======================================= [DEV EMAIL OTP] =======================================\n"
+            f"To: {to}\n"
+            f"Subject: {subject}\n"
+            f"Body:\n{body}\n"
+            f"===============================================================================================\n",
+            flush=True,
+        )
         return
     message = EmailMessage()
     message["Subject"] = subject

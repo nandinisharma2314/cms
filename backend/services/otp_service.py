@@ -61,26 +61,50 @@ def _send(db: Session, challenge: OtpChallenge, code: str) -> None:
     """Sends the code; raises messaging.MessageError when that fails."""
     product = settings_service.require(db, "product_name")
     text = f"{code} is your {product} verification code. It expires in {config.OTP_TTL_MINUTES} minutes."
+    if config.IS_DEVELOPMENT or config.EXPOSE_DEV_OTP:
+        print(
+            f"\n"
+            f"==================================== [DEV LOGIN OTP] ====================================\n"
+            f"Channel:    {challenge.channel.upper()}\n"
+            f"Target:     {challenge.target}\n"
+            f"OTP Code:   {code}\n"
+            f"Expires In: {config.OTP_TTL_MINUTES} minutes\n"
+            f"=========================================================================================\n",
+            flush=True,
+        )
     if challenge.channel == "sms":
         messaging.send_sms(phone_format(db).international(challenge.target), text)
     else:
         messaging.send_email(challenge.target, f"Your {product} verification code", text)
 
 
-def send_login_code(challenge_id: str, code: str) -> None:
-    """Sends a sign-in code after the response has gone out (a background task),
-    so registered and unknown identifiers take the same time to answer. When
-    sending fails the challenge is removed, so the person can ask again at once."""
-    with SessionLocal() as db:
-        challenge = db.query(OtpChallenge).filter(OtpChallenge.challenge_id == challenge_id).first()
-        if challenge is None:
-            return
+def send_login_code(db_or_id: Session | str, challenge_or_code: OtpChallenge | str, code: str | None = None) -> None:
+    """Sends a sign-in code. When sending fails the challenge is removed so the person can ask again at once."""
+    if isinstance(db_or_id, Session):
+        db = db_or_id
+        challenge = challenge_or_code
+        actual_code = code
         try:
-            _send(db, challenge, code)
+            _send(db, challenge, actual_code)
         except messaging.MessageError:
             logger.exception("Could not send a %s sign-in code", challenge.channel)
             db.delete(challenge)
             db.commit()
+            raise
+    else:
+        challenge_id = db_or_id
+        actual_code = challenge_or_code
+        with SessionLocal() as db:
+            challenge = db.query(OtpChallenge).filter(OtpChallenge.challenge_id == challenge_id).first()
+            if challenge is None:
+                return
+            try:
+                _send(db, challenge, actual_code)
+            except messaging.MessageError:
+                logger.exception("Could not send a %s sign-in code", challenge.channel)
+                db.delete(challenge)
+                db.commit()
+                raise
 
 
 def _issue(db: Session, purpose: str, channel: str, target: str, end_user: EndUser | None,
@@ -122,19 +146,48 @@ def matching_end_users(db: Session, channel: str, target: str) -> list[EndUser]:
 
 
 def request_login_code(db: Session, channel: str, raw_identifier: str | None,
-                       client_ip: str) -> tuple[OtpChallenge, str | None]:
-    """Creates a sign-in challenge. Returns it and, when the identifier is
-    registered, the code to send (see send_login_code). Commits."""
+                       client_ip: str) -> tuple[OtpChallenge, str]:
+    """Creates a sign-in challenge. Returns it and the code to send.
+    If the user is not found or inactive, tells them to contact support."""
     target = normalize_identifier(db, channel, raw_identifier)
     rate_limit_service.enforce(db, "otp_request_ip", client_ip, config.OTP_REQUESTS_PER_IP_PER_HOUR, HOUR,
                                "Too many code requests from this network. Please try again later.")
     rate_limit_service.enforce(db, "otp_request_target", f"{channel}:{target}",
                                config.OTP_REQUESTS_PER_TARGET_PER_HOUR, HOUR,
                                "Too many codes were requested for this address. Please try again later.")
-    decoy = not matching_end_users(db, channel, target)
-    challenge, code = _issue(db, OTP_PURPOSE_LOGIN, channel, target, None, decoy)
-    # The caller sends real codes with send_login_code once the response is on its way.
-    return challenge, None if decoy else code
+    
+    column = EndUser.mobile if channel == "sms" else EndUser.email
+    users = db.query(EndUser).filter(column == target).all()
+    if not users:
+        settings = settings_service.get_settings(db)
+        support = []
+        if settings.support_email:
+            support.append(f"email: {settings.support_email}")
+        if settings.support_phone:
+            support.append(f"phone: {settings.support_phone}")
+        contact_str = f" ({', '.join(support)})" if support else ""
+        channel_name = "mobile number" if channel == "sms" else "email address"
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"No registered account was found with this {channel_name}. Please contact support{contact_str} to register your account.",
+        )
+    
+    active_users = [u for u in users if u.is_active]
+    if not active_users:
+        settings = settings_service.get_settings(db)
+        support = []
+        if settings.support_email:
+            support.append(f"email: {settings.support_email}")
+        if settings.support_phone:
+            support.append(f"phone: {settings.support_phone}")
+        contact_str = f" ({', '.join(support)})" if support else ""
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"Your account is inactive. Please contact support{contact_str}.",
+        )
+
+    challenge, code = _issue(db, OTP_PURPOSE_LOGIN, channel, target, None, decoy=False)
+    return challenge, code
 
 
 def _check(db: Session, challenge_id: str, code: str, purpose: str, client_ip: str) -> OtpChallenge:

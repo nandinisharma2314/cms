@@ -1,10 +1,12 @@
 import asyncio
 import contextlib
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 import models  # noqa: F401  (registers tables on Base.metadata)
 from config import CORS_ORIGINS, IS_PRODUCTION, WORKER_INTERVAL_SECONDS
@@ -15,6 +17,7 @@ from routes import (
     rejection_routes, report_routes, role_routes, settings_routes, sla_routes, user_routes,
 )
 from schema_version import schema_problem
+from services import messaging, settings_service
 from services.bootstrap_service import system_data_problems
 from services.worker_service import run_forever
 from utils.auth_middleware import CLIENT_HEADER
@@ -71,6 +74,57 @@ async def security_headers(request: Request, call_next):
     if IS_PRODUCTION:  # production runs behind HTTPS (COOKIE_SECURE is required there)
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
+
+
+@app.exception_handler(settings_service.SettingNotConfigured)
+async def setting_not_configured_handler(request: Request, exc: settings_service.SettingNotConfigured):
+    field_name = getattr(exc, "field", "unknown")
+    label = getattr(exc, "label", field_name)
+    print(
+        f"\n{'='*25} [SYSTEM CONFIGURATION ERROR] {'='*25}\n"
+        f"Missing required setting: '{field_name}' ({label})\n"
+        f"Path: {request.method} {request.url.path}\n"
+        f"Detail: {exc.detail}\n"
+        f"Action required: Configure this setting in System Settings or run `python manage.py check`.\n"
+        f"{'='*78}\n",
+        file=sys.stderr,
+        flush=True,
+    )
+    if request.url.path.startswith("/portal/auth"):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "The service is temporarily unavailable due to a configuration issue. Please contact support or try again later."
+            },
+        )
+    return JSONResponse(
+        status_code=503,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(messaging.MessageError)
+async def message_error_handler(request: Request, exc: messaging.MessageError):
+    print(
+        f"\n{'='*25} [MESSAGE DELIVERY ERROR] {'='*25}\n"
+        f"Path: {request.method} {request.url.path}\n"
+        f"Detail: {exc}\n"
+        f"Action required: Check SMS/Email configuration in backend/.env or your network connectivity.\n"
+        f"{'='*74}\n",
+        file=sys.stderr,
+        flush=True,
+    )
+    if request.url.path.startswith("/portal"):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "detail": "Could not send the verification code right now. Please try again in a few minutes or contact support."
+            },
+        )
+    return JSONResponse(
+        status_code=502,
+        content={"detail": f"Message delivery failed: {exc}"},
+    )
 
 
 app.include_router(health_routes.router, prefix="/health", tags=["health"])

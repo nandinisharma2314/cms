@@ -80,10 +80,11 @@ REQUIRED_SETTINGS = {
 
 class SettingNotConfigured(HTTPException):
     def __init__(self, field: str):
-        label = REQUIRED_SETTINGS.get(field, field)
+        self.field = field
+        self.label = REQUIRED_SETTINGS.get(field, field)
         super().__init__(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            f"The system is not fully configured: '{label}' has not been set. "
+            f"The system is not fully configured: '{self.label}' has not been set. "
             "Ask the Super Admin to complete it under Settings.",
         )
 
