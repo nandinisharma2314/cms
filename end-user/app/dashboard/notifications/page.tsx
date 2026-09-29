@@ -84,38 +84,11 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-linear-to-b from-[#e5effd] via-[#f0f5fd] to-slate-50 p-4 md:p-8">
-      <div className="mx-auto flex max-w-3xl flex-col gap-3 pb-24 md:pb-8">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            className="flex items-center gap-1.5 text-[13px] font-bold text-slate-500 hover:text-blue-600"
-          >
-            <ArrowLeft size={16} /> Home
-          </button>
-          <button
-            type="button"
-            onClick={refresh}
-            className="flex items-center gap-1 text-[13px] font-bold text-blue-600 hover:text-blue-700"
-          >
-            <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} /> Refresh
-          </button>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl bg-white shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-            <div>
-              <h1 className="flex items-center gap-2 text-[20px] font-bold text-[#0b1a3f]">
-                Notifications
-                {unread > 0 && (
-                  <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[12px] font-bold text-red-600">
-                    {unread} unread
-                  </span>
-                )}
-              </h1>
-              <p className="mt-0.5 text-[13px] text-slate-500">Updates on the complaints you registered.</p>
-            </div>
+    <div className="flex-1 overflow-y-auto">
+      <div className="flex-col">
+        <div className="overflow-hidden bg-white shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
+          <div className="flex items-center justify-between">
+          
             <div className="flex items-center gap-2">
               {unread > 0 && (
                 <button

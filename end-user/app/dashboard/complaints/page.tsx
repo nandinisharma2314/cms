@@ -10,7 +10,7 @@ import { formatDateTime, shortPlace } from "@/lib/format";
 import { useEndUser } from "@/lib/session";
 import { departmentDot, GROUP_PILLS, TONE_PILLS } from "@/lib/status";
 
-const CARD = "rounded-2xl bg-white shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]";
+const CARD = " bg-white shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]";
 const GROUPS: (StatusGroup | "")[] = ["", "open", "in_progress", "resolved", "rejected"];
 
 function isGroup(value: string | null): value is StatusGroup {
@@ -73,17 +73,13 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
   };
 
   return (
-    <div className="flex-1 bg-linear-to-b from-[#e5effd] via-[#f0f5fd] to-slate-50 md:min-h-0 md:overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 pb-8 pt-5 md:gap-5 md:px-8 md:py-8">
+    <div className="flex-1 md:min-h-0 md:overflow-y-auto">
+      <div className="flex-col gap-3 p-2 pb-2 md:px-4">
         <div className="flex items-end justify-between gap-3 px-1">
-          <div>
-            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0b1a3f]">My complaints</h1>
-            <p className="mt-0.5 text-[13px] text-slate-500">Everything you have registered, newest first.</p>
-          </div>
           {canCreate && (
             <Link
               href="/dashboard/register"
-              className="hidden items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm hover:bg-blue-700 md:flex"
+              className="hidden items-center gap-1.5  bg-blue-600 px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm hover:bg-blue-700 md:flex"
             >
               <Plus className="h-4 w-4" /> New complaint
             </Link>
@@ -99,7 +95,7 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by title or complaint ID"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="h-11 w-full  border border-slate-200 bg-slate-50 pl-10 pr-4 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </label>
           <div className="flex gap-2 relative overflow-x-auto pb-0.5" role="tablist" aria-label="Status">
@@ -148,7 +144,7 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
               {canCreate && !term && !group && (
                 <Link
                   href="/dashboard/register"
-                  className="mt-4 inline-block rounded-xl bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white"
+                  className="mt-4 inline-block  bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white"
                 >
                   Register a complaint
                 </Link>
@@ -200,7 +196,7 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="rounded-xl border border-slate-200 bg-white px-5 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-60"
+                className=" border border-slate-200 bg-white px-5 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-60"
               >
                 {loadingMore ? "Loading…" : "Show more"}
               </button>

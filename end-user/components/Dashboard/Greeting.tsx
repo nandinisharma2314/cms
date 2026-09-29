@@ -26,7 +26,7 @@ export default function Greeting() {
           {profile.name} <span aria-hidden="true">👋</span>
         </h1>
         <p className="mt-1.5 max-w-57.5 text-[14px] leading-snug text-slate-500 md:max-w-none">
-          {product_name ? `Welcome to ${product_name}. ` : ""}Here is where your complaints stand.
+          {product_name ? `Welcome to ${product_name} ` : ""}
         </p>
       </div>
       <Link
