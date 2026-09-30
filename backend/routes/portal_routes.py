@@ -362,7 +362,7 @@ def create_complaint(
     request: Request,
     department_id: int = Form(...),
     category_id: int = Form(...),
-    location_id: int = Form(...),
+    location_id: int | None = Form(None),
     title: str = Form(...),
     description: str = Form(...),
     additional_details: str | None = Form(None),
@@ -373,7 +373,13 @@ def create_complaint(
     """The category decides the starting priority; staff may change it later."""
     _require_attach(db, files)
     title, description, additional_details = clean_complaint_text(title, description, additional_details)
-    department, category, location = resolve_classification(db, department_id, category_id, location_id)
+    resolved_location_id = location_id if location_id is not None else end_user.location_id
+    if resolved_location_id is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No location is assigned to your employee account. Please contact an administrator.",
+        )
+    department, category, location = resolve_classification(db, department_id, category_id, resolved_location_id)
     stored = attachment_service.StoredFiles()
     try:
         complaint = register_complaint(

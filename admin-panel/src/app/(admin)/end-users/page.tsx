@@ -55,6 +55,9 @@ function EndUserForm({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     run(async () => {
+      if (locationId === null) {
+        throw new Error("Please choose an assigned workplace location for this employee.");
+      }
       if (editing) {
         const changes: Parameters<typeof api.endUsers.update>[1] = {};
         if (externalId.trim() !== (editing.external_id ?? "")) changes.external_id = externalId;
@@ -62,8 +65,7 @@ function EndUserForm({
         if (mobile !== editing.mobile) changes.mobile = mobile;
         if (email !== editing.email) changes.email = email;
         if (locationId !== (editing.location?.id ?? null)) {
-          if (locationId === null) changes.clear_location = true;
-          else changes.location_id = locationId;
+          changes.location_id = locationId;
         }
         if (Object.keys(changes).length) await api.endUsers.update(editing.id, changes);
         onSaved(identityChanged ? `${name} updated. They were signed out and told about the change.` : `${name} updated.`);
@@ -122,8 +124,8 @@ function EndUserForm({
             Mobile and email are how this person signs in. Changing them signs them out everywhere and sends them a notice.
           </p>
         )}
-        <Field label="Location (optional)">
-          <LocationPicker tree={scopedTree} value={locationId} onChange={setLocationId} allowAny anyLabel="No location" />
+        <Field label="Assigned Location">
+          <LocationPicker tree={scopedTree} value={locationId} onChange={setLocationId} />
         </Field>
         <div className="pt-2 flex justify-end gap-2">
           <button type="button" className={secondaryButtonClass} onClick={onClose}>

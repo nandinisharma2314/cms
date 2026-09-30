@@ -104,7 +104,6 @@ def _get_manageable(ctx: AccessContext, user_id: int) -> User:
     return user
 
 
-<<<<<<< Updated upstream
 def _validate_primary_workplace(db: Session, ctx: AccessContext, department_id: int | None, location_id: int | None) -> tuple[Department | None, Location | None]:
     dept = None
     if department_id is not None:
@@ -140,10 +139,8 @@ def _build_custom_permissions(db: Session, ctx: AccessContext, user: User, reque
     return result
 
 
+@router.get("", include_in_schema=False)
 @router.get("/")
-=======
-@router.get("")
->>>>>>> Stashed changes
 def list_users(
     search: str | None = None,
     role_id: int | None = None,

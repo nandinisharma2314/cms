@@ -1096,7 +1096,7 @@ export const api = {
       additional_details: string | null;
       department_id: number;
       category_id: number;
-      location_id: number;
+      location_id?: number | null;
       priority_id: number | null;
       priority_reason: string | null;
       end_user_id: number | null;

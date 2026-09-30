@@ -106,12 +106,22 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!department || !category || locationId === null) {
-      setError("Choose the department, category and location.");
+    const effectiveLocationId =
+      reporter.kind === "registered" && reporter.endUser?.location ? reporter.endUser.location.id : locationId;
+    if (!department || !category) {
+      setError("Choose the department and category.");
+      return;
+    }
+    if (reporter.kind === "contact" && effectiveLocationId === null) {
+      setError("Choose the location.");
       return;
     }
     if (reporter.kind === "registered" && !reporter.endUser) {
       setError("Choose the end user, or enter the reporter's name instead.");
+      return;
+    }
+    if (reporter.kind === "registered" && reporter.endUser && !reporter.endUser.location) {
+      setError("This employee has no location assigned to their profile. Please assign a location to their profile first.");
       return;
     }
     setBusy(true);
@@ -123,7 +133,7 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
         additional_details: details.trim() || null,
         department_id: department.id,
         category_id: category.id,
-        location_id: locationId,
+        location_id: effectiveLocationId,
         priority_id: priorityChanged ? priorityId : null,
         priority_reason: priorityChanged ? priorityReason : null,
         end_user_id: reporter.kind === "registered" ? reporter.endUser!.id : null,
@@ -214,13 +224,30 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
             </select>
           </Field>
         </div>
-        <Field label="Location">
-          {department ? (
-            <LocationPicker tree={tree} value={locationId} onChange={setLocationId} />
-          ) : (
-            <p className="text-[11px] text-slate-400">Choose the department first.</p>
-          )}
-        </Field>
+        {reporter.kind === "registered" && reporter.endUser ? (
+          <Field label="Location">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs">
+              <span className="font-semibold text-slate-800">
+                {reporter.endUser.location?.label ?? "No location assigned to this employee"}
+              </span>
+              <span className="text-[11px] text-slate-400 ml-auto">(Assigned to employee)</span>
+            </div>
+          </Field>
+        ) : reporter.kind === "registered" ? (
+          <Field label="Location" hint="Location will be automatically assigned from the selected employee">
+            <div className="p-2.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-xs text-slate-400">
+              Select an employee below to automatically use their assigned location.
+            </div>
+          </Field>
+        ) : (
+          <Field label="Location">
+            {department ? (
+              <LocationPicker tree={tree} value={locationId} onChange={setLocationId} />
+            ) : (
+              <p className="text-[11px] text-slate-400">Choose the department first.</p>
+            )}
+          </Field>
+        )}
         {priorityChanged && (
           <Field label={`Why ${options?.priorities.find((p) => p.id === priorityId)?.name ?? "this"} priority? (internal)`}>
             <input
@@ -274,7 +301,15 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
             </div>
           )}
           {reporter.kind === "registered" ? (
-            <EndUserSearch selected={reporter.endUser} onSelect={(endUser) => setReporter({ kind: "registered", endUser })} />
+            <EndUserSearch
+              selected={reporter.endUser}
+              onSelect={(endUser) => {
+                setReporter({ kind: "registered", endUser });
+                if (endUser?.location?.id) {
+                  setLocationId(endUser.location.id);
+                }
+              }}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Name">

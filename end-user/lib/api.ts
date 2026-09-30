@@ -485,7 +485,7 @@ export const api = {
     create: (data: {
       department_id: number;
       category_id: number;
-      location_id: number;
+      location_id?: number | null;
       title: string;
       description: string;
       additional_details: string;
@@ -494,7 +494,9 @@ export const api = {
       const form = new FormData();
       form.append("department_id", String(data.department_id));
       form.append("category_id", String(data.category_id));
-      form.append("location_id", String(data.location_id));
+      if (data.location_id !== undefined && data.location_id !== null) {
+        form.append("location_id", String(data.location_id));
+      }
       form.append("title", data.title);
       form.append("description", data.description);
       if (data.additional_details.trim()) form.append("additional_details", data.additional_details);

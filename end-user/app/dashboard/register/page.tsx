@@ -25,20 +25,18 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { api, ComplaintDetail, LocationNode, PortalDepartment } from "@/lib/api";
+import { api, ComplaintDetail, PortalDepartment } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import { useEndUser } from "@/lib/session";
 import { attachmentProblem } from "@/lib/attachments";
-import { findPath, isLeaf, LocationSelect } from "@/components/Dashboard/LocationSelect";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3;
 
 const STEPS: { id: Step; label: string }[] = [
   { id: 1, label: "Details" },
-  { id: 2, label: "Location" },
-  { id: 3, label: "Review" },
-  { id: 4, label: "Done" },
+  { id: 2, label: "Review" },
+  { id: 3, label: "Done" },
 ];
 
 const fieldBox =
@@ -74,7 +72,7 @@ function Aside() {
           Register a <span className="text-indigo-600">complaint</span>
         </h1>
         <p className="mb-6 text-sm font-medium text-slate-500">
-          Tell us what&apos;s wrong and where. You can follow every step afterwards.
+          Tell us what&apos;s wrong. It will automatically be routed to the right team for your workplace.
         </p>
         <ul className="mb-6 flex flex-wrap gap-x-5 gap-y-3">
           {["Goes straight to the right team", "Updates as they happen", "Reply any time"].map((text) => (
@@ -123,14 +121,11 @@ export default function RegisterComplaintPage() {
   const maxFiles = attachments.max_per_complaint ?? 0;
 
   const [departments, setDepartments] = useState<PortalDepartment[] | null>(null);
-  const [tree, setTree] = useState<LocationNode[]>([]);
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [details, setDetails] = useState("");
-  // Starts at the end user's registered place.
-  const [locationId, setLocationId] = useState<number | null>(profile.location?.id ?? null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [step, setStep] = useState<Step>(1);
@@ -141,24 +136,20 @@ export default function RegisterComplaintPage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all([api.reference.departments(), api.reference.locationTree()]).then(
-      ([deps, locations]) => {
-        setDepartments(deps);
-        setTree(locations);
-      },
+    api.reference.departments().then(
+      (deps) => setDepartments(deps),
       (err: Error) => setError(err.message),
     );
   }, []);
 
   const department = departments?.find((d) => d.id === departmentId) ?? null;
   const category = department?.categories.find((c) => c.id === categoryId) ?? null;
-  const place = useMemo(() => findPath(tree, locationId), [tree, locationId]);
+
   // Previews for chosen images, released when the choice changes.
   const previews = useMemo(() => files.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : null)), [files]);
   useEffect(() => () => previews.forEach((url) => url && URL.revokeObjectURL(url)), [previews]);
 
   const detailsValid = Boolean(department && category && title.trim() && description.trim());
-  const locationValid = isLeaf(tree, locationId);
 
   const addFiles = (list: FileList | null) => {
     if (!list) return;
@@ -171,14 +162,19 @@ export default function RegisterComplaintPage() {
 
   const next = () => {
     setError(null);
-    if (step === 1 && !detailsValid)
+    if (!detailsValid)
       return setError("Choose the department and category, and fill in the title and description.");
-    if (step === 2 && !locationValid) return setError("Choose the place, down to the last level.");
-    setStep((step + 1) as Step);
+    if (!profile.location)
+      return setError("No workplace location is assigned to your employee account. Please contact an administrator.");
+    setStep(2);
   };
 
   const submit = async () => {
-    if (!department || !category || locationId === null) return;
+    if (!department || !category) return;
+    if (!profile.location) {
+      setError("No workplace location is assigned to your employee account. Please contact an administrator.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -186,14 +182,14 @@ export default function RegisterComplaintPage() {
         await api.complaints.create({
           department_id: department.id,
           category_id: category.id,
-          location_id: locationId,
+          location_id: profile.location.id,
           title,
           description,
           additional_details: details,
           files,
         }),
       );
-      setStep(4);
+      setStep(3);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -228,7 +224,7 @@ export default function RegisterComplaintPage() {
         <div className="relative flex flex-col bg-white p-4 shadow-sm md:rounded-3xl md:px-6 md:py-5">
           {/* Stepper */}
           <ol className="relative mb-4 flex w-full items-center justify-between px-2">
-            <div className="absolute left-[10%] right-[10%] top-4 z-0 h-0.5 bg-slate-100" aria-hidden="true">
+            <div className="absolute left-[15%] right-[15%] top-4 z-0 h-0.5 bg-slate-100" aria-hidden="true">
               <div
                 className="h-full bg-blue-600 transition-all duration-500 ease-in-out"
                 style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }}
@@ -237,10 +233,7 @@ export default function RegisterComplaintPage() {
             {STEPS.map((s) => {
               const current = step === s.id;
               const done = step > s.id;
-              const reachable =
-                step !== 4 &&
-                s.id < 4 &&
-                (s.id <= step || (s.id === 2 && detailsValid) || (s.id === 3 && detailsValid && locationValid));
+              const reachable = step !== 3 && s.id < 3 && (s.id <= step || (s.id === 2 && detailsValid));
               return (
                 <li key={s.id} className="relative z-10">
                   <button
@@ -380,6 +373,44 @@ export default function RegisterComplaintPage() {
                 <Counter value={description} max={limits.description} />
               </div>
 
+              {/* Assigned Location Badge */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-900">Workplace / Location</label>
+                <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs">
+                  <MapPin size={16} className="text-blue-600 shrink-0" aria-hidden="true" />
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-800">
+                      {profile.location?.label || profile.location?.name || "No location assigned"}
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Complaints are automatically routed based on your employee profile location.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Optional Room / Desk / Landmark */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="details" className="text-xs font-bold text-slate-900">
+                  Room / Desk / Landmark <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <div className="relative">
+                  <FieldIcon top>
+                    <Building size={14} aria-hidden="true" />
+                  </FieldIcon>
+                  <textarea
+                    id="details"
+                    rows={2}
+                    maxLength={limits.additional_details}
+                    value={details}
+                    onChange={(e) => setDetails(e.target.value)}
+                    placeholder="e.g. Room 204, 2nd floor desk near printer, or any specific spot"
+                    className={`${fieldBox} resize-none`}
+                  />
+                </div>
+                <Counter value={details} max={limits.additional_details} />
+              </div>
+
               {canAttach && (
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
@@ -468,41 +499,7 @@ export default function RegisterComplaintPage() {
             </div>
           )}
 
-          {step === 2 && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-[15px] font-bold text-slate-900">Where is the problem?</h2>
-                <p className="text-[12px] text-slate-500">
-                  {profile.location
-                    ? "We started from your registered place; change it if the problem is elsewhere."
-                    : "Choose the place, level by level."}
-                </p>
-              </div>
-              <LocationSelect tree={tree} value={locationId} onChange={setLocationId} />
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="details" className="text-xs font-bold text-slate-900">
-                  More about the place <span className="font-normal text-slate-400">(optional)</span>
-                </label>
-                <div className="relative">
-                  <FieldIcon top>
-                    <Building size={14} aria-hidden="true" />
-                  </FieldIcon>
-                  <textarea
-                    id="details"
-                    rows={2}
-                    maxLength={limits.additional_details}
-                    value={details}
-                    onChange={(e) => setDetails(e.target.value)}
-                    placeholder="A landmark, building or anything that helps find the exact spot"
-                    className={`${fieldBox} resize-none`}
-                  />
-                </div>
-                <Counter value={details} max={limits.additional_details} />
-              </div>
-            </div>
-          )}
-
-          {step === 3 && department && category && (
+          {step === 2 && department && category && (
             <div className="flex flex-col gap-3 text-sm text-slate-700">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div>
@@ -510,7 +507,7 @@ export default function RegisterComplaintPage() {
                   <p className="text-[12px] text-slate-500">Edit anything that isn&apos;t right, then send it.</p>
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
-                  <Clock size={11} aria-hidden="true" /> Step 3 of 4
+                  <Clock size={11} aria-hidden="true" /> Step 2 of 2
                 </span>
               </div>
               {[
@@ -528,10 +525,10 @@ export default function RegisterComplaintPage() {
                 {
                   title: "Location",
                   icon: MapPin,
-                  goTo: 2 as Step,
+                  goTo: 1 as Step,
                   rows: [
-                    ["Place", place.map((n) => n.name).join(" > ")],
-                    ...(details.trim() ? [["More about the place", details]] : []),
+                    ["Assigned Workplace", profile.location?.label || profile.location?.name || "Assigned location"],
+                    ...(details.trim() ? [["Room / Desk / Landmark", details]] : []),
                   ],
                 },
               ].map((card) => (
@@ -571,7 +568,7 @@ export default function RegisterComplaintPage() {
             </div>
           )}
 
-          {step === 4 && created && (
+          {step === 3 && created && (
             <div className="flex flex-col items-center gap-5 py-4 text-center">
               <span className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-emerald-500 shadow-xl shadow-emerald-500/30">
                 <Check size={40} className="text-white" strokeWidth={4} aria-hidden="true" />
@@ -633,21 +630,21 @@ export default function RegisterComplaintPage() {
             </p>
           )}
 
-          {step < 4 && (
+          {step < 3 && (
             <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-3">
               {step > 1 && (
                 <button
                   type="button"
                   onClick={() => {
                     setError(null);
-                    setStep((step - 1) as Step);
+                    setStep(1);
                   }}
                   className="flex flex-[0.8] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-bold text-blue-600 hover:bg-slate-100"
                 >
                   <ArrowLeft size={16} className="mr-2" aria-hidden="true" /> Back
                 </button>
               )}
-              {step < 3 ? (
+              {step === 1 ? (
                 <button
                   type="button"
                   onClick={next}

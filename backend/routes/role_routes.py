@@ -142,7 +142,8 @@ def list_permissions(ctx: AccessContext = Depends(require_permission("role.view"
     ]
 
 
-@router.get("")
+@router.get("", include_in_schema=False)
+@router.get("/")
 def list_roles(ctx: AccessContext = Depends(require_permission("role.view"))):
     return _serialize(ctx, list(ctx.roles_by_id.values()))
 

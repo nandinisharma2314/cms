@@ -33,7 +33,7 @@ class ComplaintCreateJSON(BaseModel):
     additional_details: str | None = None
     department_id: int
     category_id: int
-    location_id: int
+    location_id: int | None = None
     # The category's default priority applies. Choosing another one needs complaint.reclassify
     # and a reason, as changing it later does.
     priority_id: int | None = None
@@ -260,14 +260,6 @@ def quick_create_complaint(
     db = ctx.db
     title, description, additional_details = clean_complaint_text(data.title, data.description,
                                                                   data.additional_details)
-    department, category, location = resolve_classification(db, data.department_id, data.category_id, data.location_id)
-    ctx.require_covers(department.id, location.path)
-    priority, priority_reason = category.default_priority, None
-    if data.priority_id is not None and data.priority_id != priority.id:
-        ctx.require("complaint.reclassify")
-        priority = priority_service.get_active(db, data.priority_id)
-        priority_reason = multi_line(data.priority_reason, "The reason for the priority", NOTE_MAX_LENGTH)
-
     end_user = None
     contact_name = contact_phone = None
     if data.end_user_id is not None:
@@ -284,6 +276,20 @@ def quick_create_complaint(
             contact_phone = fmt.normalize(data.end_user_phone)
             if contact_phone is None:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Mobile must be {fmt.describe()}")
+
+    resolved_location_id = data.location_id if data.location_id is not None else (end_user.location_id if end_user else None)
+    if resolved_location_id is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No location is assigned to this employee. Please assign a location first.",
+        )
+    department, category, location = resolve_classification(db, data.department_id, data.category_id, resolved_location_id)
+    ctx.require_covers(department.id, location.path)
+    priority, priority_reason = category.default_priority, None
+    if data.priority_id is not None and data.priority_id != priority.id:
+        ctx.require("complaint.reclassify")
+        priority = priority_service.get_active(db, data.priority_id)
+        priority_reason = multi_line(data.priority_reason, "The reason for the priority", NOTE_MAX_LENGTH)
 
     complaint = register_complaint(
         db, department=department, category=category, location=location, priority=priority, title=title,

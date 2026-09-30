@@ -98,6 +98,15 @@ def test_end_user_sees_only_own_complaints_and_can_file_one(client, login, end_u
     complaint = created.json()
     assert complaint["attachments"][0]["file_name"] == "photo.jpg"
 
+    # Registering a complaint without location_id automatically uses the employee's assigned location
+    auto_loc = client.post("/portal/complaints", headers=end_user, data={
+        "department_id": electricity["id"], "category_id": electricity["categories"][0]["id"],
+        "title": "Broken switchboard", "description": "At my assigned location",
+    })
+    assert auto_loc.status_code == 201, auto_loc.text
+    auto_comp = auto_loc.json()
+    assert auto_comp["location"] == me["location"]["name"]
+
     svg = client.post("/portal/complaints", headers=end_user, data={
         "department_id": electricity["id"], "category_id": electricity["categories"][0]["id"],
         "location_id": me["location"]["id"], "title": "x", "description": "y",
@@ -110,7 +119,7 @@ def test_end_user_sees_only_own_complaints_and_can_file_one(client, login, end_u
     assert fake.status_code == 400  # not really a JPEG
 
     stats = client.get("/portal/complaints/stats", headers=end_user).json()
-    assert stats["total"] == mine["total"] + 1
+    assert stats["total"] == mine["total"] + 2
     assert stats["open"] + stats["in_progress"] + stats["resolved"] + stats["rejected"] == stats["total"]
 
     detail = client.get(f"/complaints/{complaint['id']}", headers=login(ELEC_AGENT)).json()
