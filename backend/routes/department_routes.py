@@ -108,7 +108,8 @@ def _open_complaints(ctx: AccessContext) -> dict[int, int]:
     return dict(ctx.apply_scope(query, Complaint.department_id).group_by(Complaint.department_id).all())
 
 
-@router.get("")
+@router.get("", include_in_schema=False)
+@router.get("/")
 def list_departments(include_inactive: bool = True,
                      ctx: AccessContext = Depends(require_permission("department.view"))):
     query = ctx.db.query(Department)
