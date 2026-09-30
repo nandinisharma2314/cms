@@ -148,7 +148,7 @@ def _int_list(raw: str | None, label: str) -> list[int]:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{label} must be a comma-separated list of ids") from None
 
 
-@router.get("/")
+@router.get("")
 def list_complaints(
     status_filter: str | None = None,
     group: str | None = None,

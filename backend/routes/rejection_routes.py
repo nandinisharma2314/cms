@@ -41,7 +41,7 @@ def reasons(ctx: AccessContext = Depends(get_access_context)):
     return [rejection_service.serialize_reason(r) for r in rejection_service.list_reasons(ctx.db)]
 
 
-@router.get("/")
+@router.get("")
 def list_requests(
     view: str,
     status_filter: str | None = None,

@@ -844,7 +844,9 @@ async function errorMessage(res: Response): Promise<string> {
 type Query = Record<string, string | number | boolean | null | undefined>;
 
 function buildUrl(path: string, query: Query = {}): URL {
-  const url = new URL(`${API_URL}${path}`);
+  const base = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3001");
+  const fullPath = API_URL.startsWith('http') ? `${API_URL}${path}` : `${API_URL}${path}`;
+  const url = new URL(fullPath, API_URL.startsWith('http') ? undefined : base);
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
   }

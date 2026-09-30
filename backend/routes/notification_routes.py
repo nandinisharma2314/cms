@@ -9,7 +9,7 @@ from utils.auth_middleware import get_access_context
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 def my_notifications(unread_only: bool = False, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
                      ctx: AccessContext = Depends(get_access_context)):
     return notification_service.list_for(ctx.db, "staff", ctx.user.id, unread_only, max(page, 1),

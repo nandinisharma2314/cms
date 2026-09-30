@@ -56,7 +56,7 @@ def _get(ctx: AccessContext, batch_id: int) -> ImportBatch:
     return batch
 
 
-@router.get("/")
+@router.get("")
 def list_imports(kind: str | None = None, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE,
                  ctx: AccessContext = Depends(get_access_context)):
     page, page_size = max(page, 1), min(max(page_size, 1), MAX_PAGE_SIZE)

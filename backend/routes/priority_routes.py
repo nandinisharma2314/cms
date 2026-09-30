@@ -29,7 +29,7 @@ class PriorityOrder(BaseModel):
     ids: list[int]
 
 
-@router.get("/")
+@router.get("")
 def list_priorities(include_inactive: bool = False, ctx: AccessContext = Depends(get_access_context)):
     return [priority_service.serialize(p) for p in priority_service.list_priorities(ctx.db, include_inactive)]
 

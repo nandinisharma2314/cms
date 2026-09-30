@@ -95,7 +95,7 @@ def _location(ctx: AccessContext, location_id: int) -> Location:
     return location
 
 
-@router.get("/")
+@router.get("")
 def list_end_users(
     search: str | None = None,
     location_id: int | None = None,

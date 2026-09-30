@@ -8,7 +8,7 @@ from database import get_db
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 def health_check(db: Session = Depends(get_db)):
     """Liveness and database connectivity, for load balancers and monitoring."""
     try:
