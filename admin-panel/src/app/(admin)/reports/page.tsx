@@ -183,39 +183,43 @@ function Reports() {
   const trend = overview.data?.trend;
 
   return (
-    <>
+    <div className="space-y-4 -mt-5 sm:-mt-2">
       <PageHeader
         title="Reports"
         description="Complaints submitted in the chosen period, inside your department and location scope."
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        {ui.report_preset_days.map((d) => (
-          <button
-            key={d}
-            onClick={() => setRange({ date_from: isoDay(d - 1), date_to: isoDay(0) })}
-            className={tabClass(activePreset === d)}
-          >
-            Last {d} days
-          </button>
-        ))}
-        <input
-          type="date"
-          aria-label="From"
-          className={`${inputClass} max-w-38`}
-          value={range.date_from}
-          max={range.date_to}
-          onChange={(e) => e.target.value && setRange({ ...range, date_from: e.target.value })}
-        />
-        <span className="text-xs text-slate-400">to</span>
-        <input
-          type="date"
-          aria-label="To"
-          className={`${inputClass} max-w-38`}
-          value={range.date_to}
-          min={range.date_from}
-          onChange={(e) => e.target.value && setRange({ ...range, date_to: e.target.value })}
-        />
+        <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] max-w-full">
+          {ui.report_preset_days.map((d) => (
+            <button
+              key={d}
+              onClick={() => setRange({ date_from: isoDay(d - 1), date_to: isoDay(0) })}
+              className={tabClass(activePreset === d) + " shrink-0"}
+            >
+              Last {d} days
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+          <input
+            type="date"
+            aria-label="From"
+            className={`${inputClass} !px-1.5 sm:!px-3 !text-[10px] sm:!text-sm max-w-38 w-full sm:w-auto`}
+            value={range.date_from}
+            max={range.date_to}
+            onChange={(e) => e.target.value && setRange({ ...range, date_from: e.target.value })}
+          />
+          <span className="text-[10px] sm:text-xs text-slate-400">to</span>
+          <input
+            type="date"
+            aria-label="To"
+            className={`${inputClass} !px-1.5 sm:!px-3 !text-[10px] sm:!text-sm max-w-38 w-full sm:w-auto`}
+            value={range.date_to}
+            min={range.date_from}
+            onChange={(e) => e.target.value && setRange({ ...range, date_to: e.target.value })}
+          />
+        </div>
         {departments.length > 0 && (
           <select
             aria-label="Department"
@@ -248,7 +252,7 @@ function Reports() {
       <ErrorBanner message={overview.error ?? table.error ?? exporter.error} />
 
       {/* On refetch the previous numbers stay, dimmed, until the new ones arrive. */}
-      <div className={`transition-opacity ${overview.refreshing ? "opacity-60" : ""}`}>
+      <div className={`hidden sm:block transition-opacity ${overview.refreshing ? "opacity-60" : ""}`}>
         {overview.data ? (
           <Tiles m={overview.data.metrics} prev={overview.data.previous} periodLabel={`previous ${days} days`} />
         ) : (
@@ -256,7 +260,7 @@ function Reports() {
         )}
       </div>
 
-      <Card className={`p-5 transition-opacity ${overview.refreshing ? "opacity-60" : ""}`}>
+      <Card className={`hidden sm:block p-5 transition-opacity ${overview.refreshing ? "opacity-60" : ""}`}>
         <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
           <div>
             <h2 className="text-sm font-bold text-slate-800">Complaints over time</h2>
@@ -306,15 +310,15 @@ function Reports() {
       </Card>
 
       <Card className={`transition-opacity ${table.refreshing ? "opacity-60" : ""}`}>
-        <div className="flex flex-wrap items-center gap-2 px-5 pt-4 pb-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={tabClass(tab === t)}>
+            <button key={t} onClick={() => setTab(t)} className={tabClass(tab === t) + " shrink-0"}>
               {TAB_LABELS[t]}
             </button>
           ))}
           {tab === "locations" && levels.length > 0 && (
             <select
-              className={`${inputClass} max-w-40`}
+              className={`${inputClass} max-w-32 sm:max-w-40 shrink-0`}
               value={activeLevel ?? ""}
               onChange={(e) => setLevel(e.target.value)}
               aria-label="Group by level"
@@ -327,11 +331,11 @@ function Reports() {
             </select>
           )}
           <button
-            className={`${secondaryButtonClass} ml-auto`}
+            className={`${secondaryButtonClass} ml-auto shrink-0 !px-2.5 sm:!px-3`}
             disabled={exporter.busy}
             onClick={() => exporter.run(() => api.reports.exportTable(tab, tableQuery))}
           >
-            <Download className="w-3.5 h-3.5" /> Export CSV
+            <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export CSV</span>
           </button>
         </div>
         {tab === "locations" && levelList?.length === 0 ? (
@@ -346,7 +350,7 @@ function Reports() {
           !table.error && <Spinner />
         )}
       </Card>
-    </>
+    </div>
   );
 }
 

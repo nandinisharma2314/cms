@@ -12,7 +12,7 @@ const SERIES = [
 export function DashboardTrend({ trend, loading }: { trend: DashboardStats["trend"] | undefined; loading: boolean }) {
   const { ui } = useConfig();
   return (
-    <div className="flex flex-col p-5 sm:p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
       <h2 className="text-base font-bold text-slate-800 mb-3">Last {ui.dashboard_trend_days} days</h2>
       {loading || !trend ? (
         <div className="flex-1 min-h-40 bg-slate-50 rounded-xl animate-pulse" />

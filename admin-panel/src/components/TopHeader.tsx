@@ -59,9 +59,16 @@ function Notifications() {
 
   const unread = inbox?.unread_count ?? 0;
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="static sm:relative" ref={menuRef}>
       <button
-        onClick={() => setMenuOpen(!menuOpen)}
+        onClick={async () => {
+          const opening = !menuOpen;
+          setMenuOpen(opening);
+          if (opening && unread > 0) {
+            await api.notifications.markAllRead().catch(() => undefined);
+            window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+          }
+        }}
         className="relative p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={menuOpen}
@@ -75,7 +82,7 @@ function Notifications() {
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 mt-3 w-[min(24rem,calc(100vw-2rem))] bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-50">
+        <div className="absolute left-4 right-4 top-16 sm:top-auto sm:left-auto sm:right-0 sm:mt-3 sm:w-[24rem] bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 z-50">
           <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100">
             <span className="text-xs font-bold text-slate-800">Notifications</span>
             {unread > 0 && (

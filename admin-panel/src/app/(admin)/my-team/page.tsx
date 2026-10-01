@@ -68,16 +68,16 @@ function KpiTile({
   };
 
   return (
-    <Card className="p-4 flex flex-col justify-between">
-      <div className="flex items-start justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</span>
-        <div className={`p-2 rounded-lg border ${tones[tone]}`}>
-          <Icon className={`w-4 h-4 ${iconTones[tone]}`} />
+    <Card className="p-2.5 sm:p-4 flex flex-col justify-between">
+      <div className="flex items-start justify-between gap-1.5 sm:gap-2">
+        <span className="text-[9px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500 mt-0.5 leading-tight">{label}</span>
+        <div className={`p-1.5 sm:p-2 shrink-0 rounded-lg border ${tones[tone]}`}>
+          <Icon className={`w-3.5 sm:w-4 h-3.5 sm:h-4 ${iconTones[tone]}`} />
         </div>
       </div>
-      <div className="mt-3">
-        <div className="text-2xl font-bold text-slate-900">{value}</div>
-        {subtext && <div className="text-[11px] text-slate-500 mt-0.5">{subtext}</div>}
+      <div className="mt-2 sm:mt-3">
+        <div className="text-lg sm:text-2xl font-bold text-slate-900 leading-none sm:leading-normal">{value}</div>
+        {subtext && <div className="text-[9px] sm:text-[11px] text-slate-500 mt-1 sm:mt-0.5 leading-tight">{subtext}</div>}
       </div>
     </Card>
   );
@@ -303,13 +303,13 @@ export default function MyTeamPage() {
 
   return (
     <RequirePermission anyOf={["team.view"]}>
-      <div className="space-y-4">
+      <div className="space-y-4 -mt-5 sm:-mt-2">
         <PageHeader
           title="My Team"
           description="Live supervision portal: monitor team performance, workload distribution, and SLA adherence."
           actions={
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-semibold">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] max-w-[calc(100vw-2rem)] sm:max-w-none">
+              <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-semibold shrink-0">
                 <button
                   type="button"
                   className={`px-3 py-1.5 rounded-lg transition-colors ${periodPreset === "7" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
@@ -333,7 +333,7 @@ export default function MyTeamPage() {
                 </button>
               </div>
 
-              <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-xl cursor-pointer select-none">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-xl cursor-pointer select-none shrink-0 whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={directOnly}
@@ -345,11 +345,12 @@ export default function MyTeamPage() {
 
               <button
                 type="button"
-                className={secondaryButtonClass}
+                className={secondaryButtonClass + " !px-2.5 sm:!px-3 shrink-0"}
                 onClick={() => reload()}
                 title="Refresh Team Data"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Refresh</span>
               </button>
             </div>
           }
@@ -360,7 +361,7 @@ export default function MyTeamPage() {
 
         {/* Aggregated KPI Cards */}
         {agg ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
             <KpiTile
               label="Team Size"
               value={data.team_size}
@@ -423,7 +424,7 @@ export default function MyTeamPage() {
         ) : null}
 
         {/* Team Members Workload Table */}
-        <Card className="overflow-x-auto">
+        <Card>
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-800">Team Workload & Performance Breakdown</h3>
@@ -432,7 +433,8 @@ export default function MyTeamPage() {
               </p>
             </div>
           </div>
-          <table className="w-full min-w-215 text-left text-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-215 text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider bg-slate-50/50">
                 <th className="px-5 py-3 font-semibold">Team Member</th>
@@ -571,6 +573,7 @@ export default function MyTeamPage() {
               )}
             </tbody>
           </table>
+          </div>
         </Card>
 
         {selectedMember && data && (

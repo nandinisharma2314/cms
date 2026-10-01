@@ -66,7 +66,7 @@ export function PendingActionsList({
   const metrics = stats?.metrics;
 
   return (
-    <div className="flex flex-col p-5 sm:p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
       <h2 className="text-base font-bold text-slate-800 mb-4">Waiting for you</h2>
       {loading || !summary || !metrics ? (
         <div className="flex flex-col gap-2.5 animate-pulse">

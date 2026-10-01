@@ -37,14 +37,14 @@ function ChangeLine({ change, days }: { change: Change | null; days: number }) {
 export function MetricCards({ metrics, loading, days }: { metrics: MetricCardData[]; loading: boolean; days: number }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-4 gap-2 sm:gap-4 xl:gap-5">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 animate-pulse">
-            <div className="w-14 h-14 rounded-xl bg-slate-100 shrink-0" />
-            <div className="flex flex-col gap-2 flex-1">
-              <div className="w-20 h-3 bg-slate-100 rounded" />
-              <div className="w-16 h-6 bg-slate-200 rounded" />
-              <div className="w-24 h-3 bg-slate-100 rounded" />
+          <div key={i} className="flex flex-col xl:flex-row items-center gap-2 xl:gap-4 p-2 xl:p-5 bg-white border border-slate-100 animate-pulse">
+            <div className="w-8 h-8 xl:w-14 xl:h-14 rounded-lg xl:rounded-xl bg-slate-100 shrink-0" />
+            <div className="flex flex-col items-center xl:items-start gap-1 xl:gap-2 flex-1 w-full">
+              <div className="w-full xl:w-20 h-2 xl:h-3 bg-slate-100 rounded" />
+              <div className="w-8 xl:w-16 h-4 xl:h-6 bg-slate-200 rounded" />
+              <div className="hidden xl:block w-24 h-3 bg-slate-100 rounded" />
             </div>
           </div>
         ))}
@@ -52,21 +52,23 @@ export function MetricCards({ metrics, loading, days }: { metrics: MetricCardDat
     );
   }
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
+    <div className="grid grid-cols-4 gap-2 sm:gap-4 xl:gap-5">
       {metrics.map((card) => {
         const Icon = card.icon;
         return (
           <div
             key={card.id}
-            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
+            className="flex flex-col xl:flex-row items-center xl:items-start gap-1.5 xl:gap-4 p-2 xl:p-5 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] text-center xl:text-left"
           >
-            <div className={`w-14 h-14 rounded-xl ${card.tint} flex items-center justify-center shrink-0`}>
-              <Icon className="w-7 h-7" />
+            <div className={`w-8 h-8 xl:w-14 xl:h-14 rounded-lg xl:rounded-xl ${card.tint} flex items-center justify-center shrink-0`}>
+              <Icon className="w-4 h-4 xl:w-7 xl:h-7" />
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-slate-500">{card.title}</span>
-              <span className="text-2xl font-bold text-slate-800 tracking-tight my-0.5">{card.value.toLocaleString()}</span>
-              <ChangeLine change={card.change} days={days} />
+            <div className="flex flex-col min-w-0 items-center xl:items-start w-full">
+              <span className="text-[10px] xl:text-xs font-semibold text-slate-500 leading-tight truncate w-full">{card.title}</span>
+              <span className="text-sm xl:text-2xl font-bold text-slate-800 tracking-tight my-0.5">{card.value.toLocaleString()}</span>
+              <div className="hidden xl:block">
+                <ChangeLine change={card.change} days={days} />
+              </div>
             </div>
           </div>
         );

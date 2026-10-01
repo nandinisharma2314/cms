@@ -25,7 +25,7 @@ export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardSt
   }));
 
   return (
-    <div className="flex flex-col p-5 sm:p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
       <h2 className="text-base font-bold text-slate-800 mb-4">Complaints by status</h2>
       {loading ? (
         <div className="flex items-center justify-center flex-1 py-10">

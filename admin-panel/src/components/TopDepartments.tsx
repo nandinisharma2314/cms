@@ -5,7 +5,7 @@ import { CHART_PALETTE } from "@/lib/status";
 export function TopDepartments({ departments, loading }: { departments: { name: string; count: number }[]; loading: boolean }) {
   const max = Math.max(1, ...departments.map((d) => d.count));
   return (
-    <div className="flex flex-col p-5 sm:p-6 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
+    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
       <h2 className="text-base font-bold text-slate-800 mb-5">Complaints by department</h2>
       {loading ? (
         <div className="flex flex-col flex-1 gap-4 py-2 animate-pulse">

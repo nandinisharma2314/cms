@@ -564,24 +564,17 @@ function UsersList() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-130px)] -mt-2">
+    <div className="flex flex-col h-[calc(100vh-130px)] -mt-5 sm:-mt-2">
       <div className="shrink-0">
         <PageHeader
           title="Staff users"
           description="People below you in the role hierarchy whose scope sits inside yours."
-          actions={
-            can("user.create") && (
-              <button className={primaryButtonClass} onClick={() => setCreating(true)}>
-                <UserPlus className="w-3.5 h-3.5" /> Add staff user
-              </button>
-            )
-          }
         />
       </div>
-      <div className="flex flex-wrap gap-3 shrink-0 mt-7">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 mt-2 sm:mt-7 w-full">
         <input
           type="search"
-          className={`${inputClass} sm:max-w-xs`}
+          className={`${inputClass} flex-[2] min-w-0 sm:max-w-xs !px-1.5 sm:!px-3 !text-[10px] sm:!text-sm`}
           placeholder="Search name, email or mobile"
           aria-label="Search staff"
           value={search}
@@ -592,7 +585,7 @@ function UsersList() {
         />
         {roles.length > 0 && (
           <select
-            className={`${inputClass} sm:max-w-50`}
+            className={`${inputClass} flex-1 min-w-0 sm:flex-none sm:w-auto sm:max-w-50 !px-1 sm:!px-3 !text-[10px] sm:!text-sm`}
             aria-label="Role"
             value={roleFilter ?? ""}
             onChange={(e) => {
@@ -607,6 +600,12 @@ function UsersList() {
               </option>
             ))}
           </select>
+        )}
+        {can("user.create") && (
+          <button className={`${primaryButtonClass} shrink-0 ml-auto !px-2.5 sm:!px-4 h-10`} onClick={() => setCreating(true)}>
+            <UserPlus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+            <span className="hidden sm:inline">Add staff user</span>
+          </button>
         )}
       </div>
       <div className="shrink-0 mt-2">

@@ -108,7 +108,7 @@ def get_options(ctx: AccessContext = Depends(require_permission("grievance.file"
     }
 
 
-@router.get("/")
+@router.get("")
 def list_grievances(
     view: str = "my_filed",  # "my_filed" | "investigations" | "all"
     status_filter: str | None = None,

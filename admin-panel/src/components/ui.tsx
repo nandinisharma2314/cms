@@ -259,13 +259,13 @@ export function Modal({
   // otherwise become the box that "fixed" positions against, and the dialog would be cut off.
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`relative w-full ${wide ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl border border-slate-100 focus:outline-none`}
+        className={`relative w-full ${wide ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92vh] overflow-y-auto bg-white rounded-2xl p-5 sm:p-6 shadow-2xl border border-slate-100 focus:outline-none`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

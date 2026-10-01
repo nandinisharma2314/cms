@@ -139,8 +139,7 @@ def _build_custom_permissions(db: Session, ctx: AccessContext, user: User, reque
     return result
 
 
-@router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_users(
     search: str | None = None,
     role_id: int | None = None,

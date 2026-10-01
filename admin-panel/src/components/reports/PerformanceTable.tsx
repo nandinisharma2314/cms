@@ -70,10 +70,10 @@ export function PerformanceTable({
     return sort.desc ? -cmp : cmp;
   });
 
-  const header = (key: SortKey, label: string, title?: string, align = "text-right") => (
+  const header = (key: SortKey, label: string, title?: string, align = "text-center px-1.5 sm:px-3") => (
     <th
       key={key}
-      className={`px-3 py-2.5 font-semibold ${align}`}
+      className={`py-2.5 font-semibold whitespace-nowrap ${align}`}
       title={title}
       aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : "none"}
     >
@@ -93,20 +93,20 @@ export function PerformanceTable({
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] tracking-wider">
-            {header("name", nameLabel, undefined, "text-left pl-5")}
+            {header("name", nameLabel, undefined, "text-left pl-2 sm:pl-5 pr-1.5 sm:pr-3")}
             {COLUMNS.map((c) => header(c.key, c.label, c.title))}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50" style={{ fontVariantNumeric: "tabular-nums" }}>
           {sorted.map((row) => (
             <tr key={`${row.id}-${row.name}`} className="hover:bg-slate-50/70">
-              <td className="pl-5 pr-3 py-2.5">
-                <div className={`font-semibold ${row.id === null ? "text-slate-500 italic" : "text-slate-800"}`}>{row.name}</div>
-                {showRole && row.role && <div className="text-[10px] text-slate-400">{row.role}</div>}
-                {row.path && row.path !== row.name && <div className="text-[10px] text-slate-400">{row.path}</div>}
+              <td className="pl-2 sm:pl-5 pr-1.5 sm:pr-3 py-2.5">
+                <div className={`font-semibold whitespace-nowrap ${row.id === null ? "text-slate-500 italic" : "text-slate-800"}`}>{row.name}</div>
+                {showRole && row.role && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.role}</div>}
+                {row.path && row.path !== row.name && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.path}</div>}
               </td>
               {COLUMNS.map((c) => (
-                <td key={c.key} className="px-3 py-2.5 text-right text-slate-700 whitespace-nowrap">
+                <td key={c.key} className="px-1.5 sm:px-3 py-2.5 text-center text-slate-700 whitespace-nowrap">
                   {c.render ? c.render(row) : (row[c.key] as number).toLocaleString()}
                 </td>
               ))}
