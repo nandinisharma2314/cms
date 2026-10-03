@@ -11,7 +11,6 @@ import {
   FileText,
   MessageSquare,
   RefreshCw,
-  Trash2,
   UserCog,
 } from "lucide-react";
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/api";
@@ -87,46 +86,39 @@ export default function NotificationsPage() {
     <div className="flex flex-1 flex-col items-center overflow-y-auto bg-white p-0 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
       <div className="flex w-full max-w-5xl flex-col overflow-hidden bg-white md:rounded-b-3xl md:border-x md:border-b md:border-slate-100 md:shadow-sm mb-20 md:mb-20">
         <div className="overflow-hidden bg-white">
-          <div className="flex items-center justify-between">
-          
-            <div className="flex items-center gap-2">
-              {unread > 0 && (
+          <div className="flex items-center justify-between border-b border-slate-100 px-4">
+            <div className="flex text-[13px] font-bold" role="tablist">
+              {[false, true].map((value) => (
                 <button
+                  key={String(value)}
                   type="button"
-                  onClick={() => act(api.notifications.markAllRead)}
-                  className="flex items-center gap-1.5 rounded-none border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-700 hover:bg-slate-50"
+                  role="tab"
+                  aria-selected={unreadOnly === value}
+                  onClick={() => {
+                    setUnreadOnly(value);
+                    setPage(1);
+                  }}
+                  className={`border-b-2 px-3 sm:px-4 py-3 transition-all cursor-pointer ${
+                    unreadOnly === value
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-slate-400 hover:text-slate-700"
+                  }`}
                 >
-                  <CheckCheck size={14} /> Mark all read
+                  {value ? `Unread (${unread})` : "All"}
                 </button>
-              )}
-              {total > 0 && (
-                <button
-                  type="button"
-                  onClick={() => confirm("Delete all your notifications?") && act(api.notifications.clear)}
-                  className="flex items-center gap-1.5 rounded-none border border-red-100 bg-red-50/50 px-3 py-1.5 text-[12px] font-bold text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 size={13} /> Clear all
-                </button>
-              )}
+              ))}
             </div>
-          </div>
 
-          <div className="flex border-b border-slate-100 px-4 text-[13px] font-bold" role="tablist">
-            {[false, true].map((value) => (
+            {unread > 0 && (
               <button
-                key={String(value)}
                 type="button"
-                role="tab"
-                aria-selected={unreadOnly === value}
-                onClick={() => {
-                  setUnreadOnly(value);
-                  setPage(1);
-                }}
-                className={`border-b-2 px-4 py-3 transition-all ${unreadOnly === value ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-700"}`}
+                onClick={() => act(api.notifications.markAllRead)}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] sm:text-[12px] font-bold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-xs transition-colors shrink-0"
               >
-                {value ? `Unread (${unread})` : "All"}
+                <CheckCheck size={14} className="text-blue-600" />
+                <span>Mark all read</span>
               </button>
-            ))}
+            )}
           </div>
 
           {error && (
