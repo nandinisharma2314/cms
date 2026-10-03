@@ -217,7 +217,7 @@ export default function RegisterComplaintPage() {
   }
 
   return (
-    <div className="relative flex flex-1 flex-col bg-[#f4f7fe] pb-10 font-sans md:py-2">
+    <div className="relative flex flex-1 flex-col bg-[#f4f7fe] pb-0 font-sans md:py-2">
       <div className="relative z-10 mx-auto grid w-full max-w-350 flex-1 grid-cols-1 gap-8 md:px-4 lg:grid-cols-[1fr_1.4fr] xl:gap-12">
         <Aside />
 
