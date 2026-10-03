@@ -478,6 +478,7 @@ export interface ComplaintFacets {
   departments: { id: number; name: string }[];
   priorities: Priority[];
   statuses: { key: ComplaintStatus; label: string }[];
+  locations?: LocationNode[];
 }
 
 export interface PasswordResetTicket {
@@ -1053,6 +1054,9 @@ export const api = {
         assigned?: "me" | "unassigned" | "";
         priority_ids?: string;
         department_id?: number;
+        location_id?: number;
+        date_from?: string;
+        date_to?: string;
         search?: string;
         sla?: "breached" | "at_risk" | "";
         escalated?: "me" | "any" | "";

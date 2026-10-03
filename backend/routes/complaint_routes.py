@@ -1,6 +1,7 @@
 """Complaint endpoints for staff. Every query goes through `_scoped`, so a user
 only ever sees complaints inside their department/location scopes. End users
 use /portal/complaints instead."""
+from datetime import date, datetime, time
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
@@ -136,6 +137,7 @@ def facets(ctx: AccessContext = Depends(require_permission("complaint.view"))):
         "priorities": [priority_service.serialize(p)
                        for p in priority_service.list_priorities(ctx.db, include_inactive=True)],
         "statuses": [{"key": k, "label": v} for k, v in STATUS_LABELS.items()],
+        "locations": build_tree(ctx.db),
     }
 
 
@@ -156,6 +158,9 @@ def list_complaints(
     assigned: str | None = None,
     priority_ids: str | None = None,
     department_id: int | None = None,
+    location_id: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     search: str | None = None,
     sla: str | None = None,
     escalated: str | None = None,
@@ -191,6 +196,30 @@ def list_complaints(
         query = query.filter(Complaint.priority_id.in_(priorities))
     if department_id is not None:
         query = query.filter(Complaint.department_id == department_id)
+    if location_id is not None:
+        loc = ctx.db.get(Location, location_id)
+        if loc is not None:
+            query = query.filter(Location.path.startswith(loc.path))
+    if date_from and date_from.strip():
+        val = date_from.strip()
+        try:
+            if "T" in val:
+                dt_from = datetime.fromisoformat(val)
+            else:
+                dt_from = datetime.combine(date.fromisoformat(val), time.min)
+            query = query.filter(Complaint.created_at >= dt_from)
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "date_from must be YYYY-MM-DD or ISO datetime")
+    if date_to and date_to.strip():
+        val = date_to.strip()
+        try:
+            if "T" in val:
+                dt_to = datetime.fromisoformat(val)
+            else:
+                dt_to = datetime.combine(date.fromisoformat(val), time.max)
+            query = query.filter(Complaint.created_at <= dt_to)
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "date_to must be YYYY-MM-DD or ISO datetime")
     if sla == "breached":
         query = query.filter(sla_breached_clause(utcnow()))
     elif sla == "at_risk":
