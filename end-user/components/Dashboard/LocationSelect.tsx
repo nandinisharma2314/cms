@@ -50,32 +50,36 @@ export function LocationSelect({
         return (
           <div
             key={depth}
-            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-1 pr-3 shadow-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100"
+            className="relative flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-1 pr-3 shadow-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100"
           >
             <span className="rounded-lg bg-blue-50 p-1.5 text-blue-500">
               <MapPin size={18} aria-hidden="true" />
             </span>
-            <span className="flex-1">
-              <label htmlFor={id} className="block text-[11px] font-bold text-slate-500">
+            <span className="flex-1 pointer-events-none">
+              <span className="block text-[11px] font-bold text-slate-500">
                 {levelName} <span className="text-red-500">*</span>
-              </label>
-              <select
-                id={id}
-                value={level.selected?.id ?? ""}
-                onChange={(e) => onChange(e.target.value ? Number(e.target.value) : (level.parent?.id ?? null))}
-                className="w-full appearance-none bg-transparent text-sm font-semibold text-slate-900 outline-none"
-              >
-                <option value="" disabled>
-                  Choose {levelName.toLowerCase()}
-                </option>
-                {level.options.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {node.name}
-                  </option>
-                ))}
-              </select>
+              </span>
+              <span className="block truncate text-sm font-semibold text-slate-900">
+                {level.selected ? level.selected.name : `Choose ${levelName.toLowerCase()}`}
+              </span>
             </span>
-            <ChevronDown size={16} className="text-slate-400" aria-hidden="true" />
+            <ChevronDown size={16} className="text-slate-400 pointer-events-none" aria-hidden="true" />
+            <select
+              id={id}
+              value={level.selected?.id ?? ""}
+              onChange={(e) => onChange(e.target.value ? Number(e.target.value) : (level.parent?.id ?? null))}
+              className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 outline-none"
+              aria-label={levelName}
+            >
+              <option value="" disabled>
+                Choose {levelName.toLowerCase()}
+              </option>
+              {level.options.map((node) => (
+                <option key={node.id} value={node.id}>
+                  {node.name}
+                </option>
+              ))}
+            </select>
           </div>
         );
       })}

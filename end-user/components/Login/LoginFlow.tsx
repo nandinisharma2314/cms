@@ -364,7 +364,15 @@ export function LoginFlow() {
                       inputMode={channel === "sms" ? "tel" : "email"}
                       autoComplete={channel === "sms" ? "tel-national" : "email"}
                       value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
+                      onChange={(e) => {
+                        if (channel === "sms") {
+                          const val = e.target.value.replace(/\D/g, "");
+                          if (val.length <= 10) setIdentifier(val);
+                        } else {
+                          setIdentifier(e.target.value);
+                        }
+                      }}
+                      maxLength={channel === "sms" ? 10 : undefined}
                       placeholder={channel === "sms" ? "Mobile number" : "Email address"}
                       className="min-w-0 flex-1 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
                     />
