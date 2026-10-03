@@ -182,14 +182,11 @@ export default function ProfilePage() {
   const changes = (): Parameters<typeof api.profile.update>[0] => {
     const data: Parameters<typeof api.profile.update>[0] = {};
     if (tab === "personal") {
-      if (name.trim() !== profile.name) data.name = name;
       if (dob !== (profile.dob ?? "")) {
         if (dob) data.dob = dob;
         else data.clear_dob = true;
       }
 
-    } else if (tab === "contact") {
-      if (address.trim() !== (profile.address ?? "")) data.address = address;
     } else if (tab === "notifications") {
       if (notifySms !== profile.notify_sms) data.notify_sms = notifySms;
       if (notifyEmail !== profile.notify_email) data.notify_email = notifyEmail;
@@ -313,7 +310,7 @@ export default function ProfilePage() {
                         id="name"
                         required
                         maxLength={limits.person_name}
-                        disabled={!canEdit}
+                        disabled={true}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className={fieldClass}
@@ -374,15 +371,15 @@ export default function ProfilePage() {
                     ))}
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="address">Address (optional)</Label>
+                    <Label htmlFor="address">Address</Label>
                     <div className="relative">
                       <MapPin size={16} className="pointer-events-none absolute left-4 top-3.5 text-slate-400" />
                       <textarea
                         id="address"
                         rows={3}
                         maxLength={limits.address}
-                        disabled={!canEdit}
-                        value={address}
+                        disabled={true}
+                        value={profile.location?.label || profile.location?.name || address}
                         onChange={(e) => setAddress(e.target.value)}
                         className={`${fieldClass} resize-none`}
                       />

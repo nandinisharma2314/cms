@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Building,
   Check,
+  ChevronDown,
   Clock,
   Copy,
   Edit3,
@@ -221,7 +222,7 @@ export default function RegisterComplaintPage() {
       <div className="relative z-10 mx-auto grid w-full max-w-350 flex-1 grid-cols-1 gap-8 md:px-4 lg:grid-cols-[1fr_1.4fr] xl:gap-12">
         <Aside />
 
-        <div className="relative flex flex-col bg-white p-4 shadow-sm md:rounded-3xl md:px-6 md:py-5">
+        <div className="relative flex h-fit flex-col bg-white p-4 shadow-sm md:rounded-3xl md:px-6 md:py-5">
           {/* Stepper */}
           <ol className="relative mb-4 flex w-full items-center justify-between px-2">
             <div className="absolute left-[15%] right-[15%] top-4 z-0 h-0.5 bg-slate-100" aria-hidden="true">
@@ -248,14 +249,16 @@ export default function RegisterComplaintPage() {
                   >
                     <span
                       className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                        current
+                        current && s.id !== 3
                           ? "bg-blue-600 text-white shadow-md shadow-blue-200 ring-4 ring-blue-50"
-                          : done
-                            ? "bg-emerald-500 text-white"
-                            : "bg-slate-100 text-slate-400"
+                          : current && s.id === 3
+                            ? "bg-emerald-500 text-white shadow-md shadow-emerald-200 ring-4 ring-emerald-50"
+                            : done
+                              ? "bg-emerald-500 text-white"
+                              : "bg-slate-100 text-slate-400"
                       }`}
                     >
-                      {done ? <Check size={14} strokeWidth={3} aria-hidden="true" /> : s.id}
+                      {done || (current && s.id === 3) ? <Check size={14} strokeWidth={3} aria-hidden="true" /> : s.id}
                     </span>
                     <span
                       className={`text-[11px] ${current ? "font-bold text-slate-900" : done ? "font-semibold text-slate-700" : "font-semibold text-slate-400"}`}
@@ -286,7 +289,7 @@ export default function RegisterComplaintPage() {
                       setDepartmentId(e.target.value ? Number(e.target.value) : null);
                       setCategoryId(null);
                     }}
-                    className={`${fieldBox} appearance-none`}
+                    className={`${fieldBox} appearance-none pr-10`}
                   >
                     <option value="" disabled>
                       {departments ? "Choose a department" : "Loading…"}
@@ -297,6 +300,9 @@ export default function RegisterComplaintPage() {
                       </option>
                     ))}
                   </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </div>
                 </div>
               </div>
 
@@ -313,7 +319,7 @@ export default function RegisterComplaintPage() {
                     value={categoryId ?? ""}
                     disabled={!department}
                     onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
-                    className={`${fieldBox} appearance-none`}
+                    className={`${fieldBox} appearance-none pr-10`}
                   >
                     <option value="" disabled>
                       Choose a category
@@ -324,6 +330,9 @@ export default function RegisterComplaintPage() {
                       </option>
                     ))}
                   </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </div>
                 </div>
                 {category && (
                   <p className="text-[12px] text-slate-500">
@@ -570,9 +579,6 @@ export default function RegisterComplaintPage() {
 
           {step === 3 && created && (
             <div className="flex flex-col items-center gap-5 py-4 text-center">
-              <span className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-emerald-500 shadow-xl shadow-emerald-500/30">
-                <Check size={40} className="text-white" strokeWidth={4} aria-hidden="true" />
-              </span>
               <div>
                 <h2 className="text-2xl font-black text-slate-900 md:text-3xl">Complaint registered</h2>
                 <p className="mt-2 text-sm text-slate-500">
