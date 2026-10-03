@@ -151,7 +151,7 @@ def _int_list(raw: str | None, label: str) -> list[int]:
 
 
 @router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_complaints(
     status_filter: str | None = None,
     group: str | None = None,

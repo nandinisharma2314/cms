@@ -96,7 +96,7 @@ def _location(ctx: AccessContext, location_id: int) -> Location:
 
 
 @router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_end_users(
     search: str | None = None,
     location_id: int | None = None,
@@ -120,7 +120,7 @@ def list_end_users(
     return {"items": serialize_end_users(ctx.db, items), "total": total, "page": page, "page_size": page_size}
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_end_user(payload: CreateEndUserRequest, request: Request,
                     ctx: AccessContext = Depends(require_permission("end_user.create"))):
     db = ctx.db

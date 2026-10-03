@@ -109,7 +109,7 @@ def _open_complaints(ctx: AccessContext) -> dict[int, int]:
 
 
 @router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_departments(include_inactive: bool = True,
                      ctx: AccessContext = Depends(require_permission("department.view"))):
     query = ctx.db.query(Department)
@@ -119,7 +119,7 @@ def list_departments(include_inactive: bool = True,
     return [serialize_department(d, counts.get(d.id, 0)) for d in query.order_by(Department.name).all()]
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_department(payload: CreateDepartmentRequest, request: Request,
                       ctx: AccessContext = Depends(require_permission("department.create"))):
     db = ctx.db

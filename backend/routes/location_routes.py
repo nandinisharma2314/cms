@@ -99,9 +99,9 @@ def location_tree(include_inactive: bool = False, ctx: AccessContext = Depends(r
     return build_tree(ctx.db, include_inactive=include_inactive)
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def add_location(payload: CreateLocationRequest, request: Request,
-                 ctx: AccessContext = Depends(require_permission("location.create"))):
+                 ctx: AccessContext = Depends(require_permission("location.update"))):
     db = ctx.db
     parent = None
     if payload.parent_id is not None:

@@ -6,7 +6,7 @@ from config import COOKIE_DOMAIN, COOKIE_SAMESITE, COOKIE_SECURE, REFRESH_TOKEN_
 from utils.security import PRINCIPAL_END_USER, PRINCIPAL_STAFF
 
 COOKIE_NAMES = {PRINCIPAL_STAFF: "cms_refresh_staff", PRINCIPAL_END_USER: "cms_refresh_end_user"}
-COOKIE_PATH = "/auth"  # only sent to /auth/refresh and /auth/logout
+COOKIE_PATH = "/"
 
 
 def set_refresh_cookie(response: Response, principal_type: str, raw_refresh: str) -> None:

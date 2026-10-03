@@ -143,12 +143,12 @@ def list_permissions(ctx: AccessContext = Depends(require_permission("role.view"
 
 
 @router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_roles(ctx: AccessContext = Depends(require_permission("role.view"))):
     return _serialize(ctx, list(ctx.roles_by_id.values()))
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_role(payload: CreateRoleRequest, request: Request,
                 ctx: AccessContext = Depends(require_permission("role.manage"))):
     db = ctx.db

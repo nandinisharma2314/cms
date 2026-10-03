@@ -30,12 +30,12 @@ class PriorityOrder(BaseModel):
 
 
 @router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_priorities(include_inactive: bool = False, ctx: AccessContext = Depends(get_access_context)):
     return [priority_service.serialize(p) for p in priority_service.list_priorities(ctx.db, include_inactive)]
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_priority(payload: CreatePriorityRequest, request: Request,
                     ctx: AccessContext = Depends(require_permission("sla.manage"))):
     ctx.require_covers(None, None)

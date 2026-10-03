@@ -66,7 +66,7 @@ def _serialize(r: AuditLog) -> dict:
 
 
 @router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_audit_logs(
     action: str | None = None,
     entity_type: str | None = None,

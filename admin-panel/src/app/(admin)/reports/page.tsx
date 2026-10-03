@@ -13,6 +13,7 @@ import { PerformanceTable } from "@/components/reports/PerformanceTable";
 import { StaffReportCard } from "@/components/reports/StaffReportCard";
 import { StatTile } from "@/components/reports/StatTile";
 import { TREND_COLORS, TrendLineChart } from "@/components/reports/TrendLineChart";
+import { CascadingLocationSelects, findNodePath } from "@/components/CascadingLocationSelects";
 import { Card, ErrorBanner, inputClass, PageHeader, secondaryButtonClass, Spinner, tabClass } from "@/components/ui";
 
 const TREND_SERIES = [
@@ -157,10 +158,10 @@ function Reports() {
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [priorityId, setPriorityId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("agents");
-  const [level, setLevel] = useState<string | null>(null);
   const [showTable, setShowTable] = useState(false);
   const [printStaffId, setPrintStaffId] = useState<number | null>(null);
   const [printAllStaff, setPrintAllStaff] = useState(false);
+  const [locationId, setLocationId] = useState<number | null>(null);
   const exporter = useAction();
 
   const handlePrintStaff = (id: number) => {
@@ -173,13 +174,22 @@ function Reports() {
     setTimeout(() => window.print(), 100);
   };
 
-  const query: ReportQuery = { ...range, department_id: departmentId ?? undefined, priority_id: priorityId ?? undefined };
-  const deps = [range.date_from, range.date_to, departmentId, priorityId];
+  const query: ReportQuery = { 
+    ...range, 
+    department_id: departmentId ?? undefined, 
+    priority_id: priorityId ?? undefined,
+    location_id: locationId ?? undefined,
+  };
+  const deps = [range.date_from, range.date_to, departmentId, priorityId, locationId];
   const overview = useApiData(() => api.reports.overview(query), deps);
   const { data: levelList } = useApiData(() => api.reports.levels(), []);
   const levels = levelList ?? [];
-  // Grouping by the top level is rarely useful, so the second level is the default.
-  const activeLevel = level ?? levels[Math.min(1, levels.length - 1)]?.key ?? null;
+  const { data: locations = [] } = useApiData(() => api.locations.tree(), []);
+  const selectedPath = locationId ? findNodePath(locations, locationId) : null;
+  const currentDepth = selectedPath ? selectedPath.length : 0;
+  // Group by the level immediately below the selected location (or level 1, usually State, by default).
+  const targetDepth = Math.max(1, currentDepth);
+  const activeLevel = levels.find((l) => l.depth === targetDepth)?.key ?? levels[levels.length - 1]?.key ?? null;
   const tableQuery = tab === "locations" && activeLevel ? { ...query, level: activeLevel } : query;
   const table = useApiData(
     () => (tab === "locations" && !activeLevel ? Promise.resolve([]) : api.reports.table(tab, tableQuery)),
@@ -262,7 +272,13 @@ function Reports() {
             </option>
           ))}
         </select>
+        <CascadingLocationSelects
+          tree={locations}
+          locationId={locationId}
+          onChange={setLocationId}
+        />
       </div>
+
       <ErrorBanner message={overview.error ?? table.error ?? exporter.error} />
 
       {/* On refetch the previous numbers stay, dimmed, until the new ones arrive. */}
@@ -330,20 +346,6 @@ function Reports() {
               {TAB_LABELS[t]}
             </button>
           ))}
-          {tab === "locations" && levels.length > 0 && (
-            <select
-              className={`${inputClass} max-w-32 sm:max-w-40 shrink-0`}
-              value={activeLevel ?? ""}
-              onChange={(e) => setLevel(e.target.value)}
-              aria-label="Group by level"
-            >
-              {levels.map((l) => (
-                <option key={l.key} value={l.key}>
-                  By {l.name.toLowerCase()}
-                </option>
-              ))}
-            </select>
-          )}
           {/* Bulk PDF Button for all tabs */}
           <button
             onClick={handlePrintAll}

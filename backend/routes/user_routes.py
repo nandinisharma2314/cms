@@ -193,7 +193,7 @@ def reports_to_options(role_id: int, ctx: AccessContext = Depends(require_permis
     ]
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_user(payload: CreateUserRequest, request: Request,
                 ctx: AccessContext = Depends(require_permission("user.create"))):
     db = ctx.db

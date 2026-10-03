@@ -173,7 +173,7 @@ def list_grievances(
     }
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def file_grievance(
     request: Request,
     subject: Annotated[str, Form()],

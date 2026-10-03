@@ -42,7 +42,7 @@ def reasons(ctx: AccessContext = Depends(get_access_context)):
 
 
 @router.get("", include_in_schema=False)
-@router.get("/")
+@router.get("")
 def list_requests(
     view: str,
     status_filter: str | None = None,
