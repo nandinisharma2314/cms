@@ -542,6 +542,12 @@ export interface PerformanceRow {
   id: number | null;
   name: string;
   role?: string | null;
+  email?: string | null;
+  mobile?: string | null;
+  department?: string | null;
+  location?: string | null;
+  emp_id?: string | null;
+  superior_name?: string | null;
   path?: string;
   type?: string;
   total: number;

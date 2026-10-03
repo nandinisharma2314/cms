@@ -306,13 +306,35 @@ def by_agent(db: Session, rows: list[Row]) -> list[dict]:
     """Per current handler. Unassigned complaints are grouped separately."""
     groups = _grouped(rows, lambda r: r.assignee_id)
     users = {u.id: u for u in db.query(User).filter(User.id.in_([k for k in groups if k is not None])).all()}
+    
+    loc_objs = []
+    for user in users.values():
+        loc_obj = user.primary_location if user.primary_location else (user.scopes[0].location if user.scopes and user.scopes[0].location else None)
+        if loc_obj:
+            loc_objs.append(loc_obj)
+            
+    names_by_id = path_names(db, loc_objs)
+    
     result = []
     for user_id, group in groups.items():
         if user_id is None:
             result.append(_performance_row("Unassigned (department queue)", group, {"id": None, "role": None}))
         else:
             user = users[user_id]
-            result.append(_performance_row(user.name, group, {"id": user.id, "role": user.role.name}))
+            dept = user.primary_department.name if user.primary_department else (user.scopes[0].department.name if user.scopes and user.scopes[0].department else None)
+            loc_obj = user.primary_location if user.primary_location else (user.scopes[0].location if user.scopes and user.scopes[0].location else None)
+            loc_str = " > ".join(names_by_id[loc_obj.id]) if loc_obj else None
+            
+            result.append(_performance_row(user.name, group, {
+                "id": user.id, 
+                "role": user.role.name,
+                "email": user.email,
+                "mobile": user.mobile,
+                "department": dept,
+                "location": loc_str,
+                "emp_id": f"Emp_{user.id}",
+                "superior_name": user.reports_to.name if user.reports_to else None,
+            }))
     return sorted(result, key=lambda r: (r["id"] is None, -r["total"]))
 
 

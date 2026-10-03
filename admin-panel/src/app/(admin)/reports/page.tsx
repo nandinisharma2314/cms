@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { Download, LineChart, Table2 } from "lucide-react";
 import { api, ReportMetrics, ReportQuery } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
@@ -9,6 +10,7 @@ import { useAction, useApiData } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { RequirePermission } from "@/components/RequirePermission";
 import { PerformanceTable } from "@/components/reports/PerformanceTable";
+import { StaffReportCard } from "@/components/reports/StaffReportCard";
 import { StatTile } from "@/components/reports/StatTile";
 import { TREND_COLORS, TrendLineChart } from "@/components/reports/TrendLineChart";
 import { Card, ErrorBanner, inputClass, PageHeader, secondaryButtonClass, Spinner, tabClass } from "@/components/ui";
@@ -150,14 +152,26 @@ function Tiles({ m, prev, periodLabel }: { m: ReportMetrics; prev: ReportMetrics
 function Reports() {
   useDocumentTitle("Reports");
   const { can } = useSession();
-  const { ui } = useConfig();
+  const { ui, ...config } = useConfig();
   const [range, setRange] = useState(() => ({ date_from: isoDay(ui.report_default_days - 1), date_to: isoDay(0) }));
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [priorityId, setPriorityId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("agents");
   const [level, setLevel] = useState<string | null>(null);
   const [showTable, setShowTable] = useState(false);
+  const [printStaffId, setPrintStaffId] = useState<number | null>(null);
+  const [printAllStaff, setPrintAllStaff] = useState(false);
   const exporter = useAction();
+
+  const handlePrintStaff = (id: number) => {
+    setPrintStaffId(id);
+    setTimeout(() => window.print(), 100);
+  };
+
+  const handlePrintAll = () => {
+    setPrintAllStaff(true);
+    setTimeout(() => window.print(), 100);
+  };
 
   const query: ReportQuery = { ...range, department_id: departmentId ?? undefined, priority_id: priorityId ?? undefined };
   const deps = [range.date_from, range.date_to, departmentId, priorityId];
@@ -330,8 +344,16 @@ function Reports() {
               ))}
             </select>
           )}
+          {/* Bulk PDF Button for all tabs */}
           <button
-            className={`${secondaryButtonClass} ml-auto shrink-0 !px-2.5 sm:!px-3`}
+            onClick={handlePrintAll}
+              className={`${secondaryButtonClass} ml-auto shrink-0 !px-2.5 sm:!px-3`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span className="hidden sm:inline">Bulk PDF</span>
+            </button>
+          <button
+            className={`${secondaryButtonClass} ${tab !== "agents" ? "ml-auto" : ""} shrink-0 !px-2.5 sm:!px-3`}
             disabled={exporter.busy}
             onClick={() => exporter.run(() => api.reports.exportTable(tab, tableQuery))}
           >
@@ -345,11 +367,37 @@ function Reports() {
             rows={table.data}
             nameLabel={tab === "agents" ? "Current handler" : tab === "departments" ? "Department" : "Location"}
             showRole={tab === "agents"}
+            onPrintStaffId={handlePrintStaff}
           />
         ) : (
           !table.error && <Spinner />
         )}
       </Card>
+
+      {/* Print-only layout */}
+      {(printStaffId !== null || printAllStaff) && table.data && (
+        <div className="hidden print:block absolute top-0 left-0 w-full bg-white z-50">
+          {printAllStaff ? (
+            table.data.filter((r) => r.id !== null).map((staff) => (
+              <StaffReportCard key={staff.id} staff={staff} config={config} type={tab} />
+            ))
+          ) : (
+            table.data.find(r => r.id === printStaffId) && <StaffReportCard staff={table.data.find(r => r.id === printStaffId)!} config={config} type={tab} />
+          )}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @page { margin: 0; }
+            @media print {
+              body * { visibility: hidden; }
+              .print\\:block, .print\\:block * { visibility: visible; }
+              .print\\:block { position: absolute; left: 0; top: 0; width: 100%; padding: 1cm; }
+              .page-break { page-break-after: always; break-after: page; }
+              .page-break:last-child { page-break-after: auto; break-after: auto; }
+              /* Hide Next.js dev overlay just in case */
+              #nextjs-portal { display: none !important; }
+            }
+          `}} />
+        </div>
+      )}
     </div>
   );
 }

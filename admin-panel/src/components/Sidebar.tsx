@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -102,6 +103,50 @@ function SupportCard({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+function SidebarItem({ item, active, narrow }: { item: NavItem; active: boolean; narrow: boolean }) {
+  const [hovered, setHovered] = React.useState(false);
+  const [pos, setPos] = React.useState({ top: 0, left: 0 });
+  const Icon = item.icon;
+
+  return (
+    <>
+      <Link
+        href={item.href}
+        onMouseEnter={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          // Tooltip height is roughly 24px, Link height is 38px. Offset to center: ~7px
+          setPos({ top: rect.top + 7, left: rect.right + 12 });
+          setHovered(true);
+        }}
+        onMouseLeave={() => setHovered(false)}
+        aria-current={active ? "page" : undefined}
+        className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          active
+            ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
+            : "text-slate-300 hover:bg-[#1a274c] hover:text-white"
+        } ${narrow ? "justify-center" : ""}`}
+      >
+        <Icon className={`w-4.5 h-4.5 shrink-0 ${narrow ? "" : "mr-3"} ${active ? "" : "text-slate-400"}`} />
+        {!narrow && <span>{item.label}</span>}
+      </Link>
+      
+      {narrow && hovered && typeof document !== "undefined" && createPortal(
+        <div
+          style={{ 
+            top: pos.top, 
+            left: pos.left,
+            animation: "tooltipFade 0.15s ease-out forwards" 
+          }}
+          className="fixed px-2.5 py-1 bg-[#1b284e] text-white text-[11px] font-medium rounded shadow-xl border border-[#2a3f72] pointer-events-none z-[100] whitespace-nowrap leading-tight"
+        >
+          {item.label}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 export function Sidebar({
   collapsed,
   onToggleCollapse,
@@ -121,6 +166,12 @@ export function Sidebar({
 
   return (
     <>
+      <style>{`
+        @keyframes tooltipFade {
+          from { opacity: 0; transform: translateX(-8px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-slate-900/60 lg:hidden" onClick={onCloseMobile} aria-hidden="true" />}
       <aside
         className={`fixed lg:sticky inset-y-0 left-0 top-0 z-50 lg:z-30 flex flex-col bg-[#111c38] text-slate-300 transition-all duration-300 shrink-0 h-screen border-r border-[#1e2d54] ${
@@ -150,24 +201,10 @@ export function Sidebar({
 
         <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-1">
           {items.map((item) => {
-            const Icon = item.icon;
             const itemPath = item.href.split("?")[0];
             const active = itemPath === "/" ? pathname === "/" : pathname === itemPath || pathname.startsWith(itemPath + "/");
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={narrow ? item.label : undefined}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  active
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
-                    : "text-slate-300 hover:bg-[#1a274c] hover:text-white"
-                } ${narrow ? "justify-center" : ""}`}
-              >
-                <Icon className={`w-4.5 h-4.5 shrink-0 ${narrow ? "" : "mr-3"} ${active ? "" : "text-slate-400"}`} />
-                {!narrow && <span>{item.label}</span>}
-              </Link>
+              <SidebarItem key={item.href} item={item} active={active} narrow={narrow} />
             );
           })}
         </nav>

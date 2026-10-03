@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle } from "lucide-react";
 import { PerformanceRow } from "@/lib/api";
 import { useConfig } from "@/lib/config";
@@ -57,10 +58,12 @@ export function PerformanceTable({
   rows,
   nameLabel,
   showRole = false,
+  onPrintStaffId,
 }: {
   rows: PerformanceRow[];
   nameLabel: string;
   showRole?: boolean;
+  onPrintStaffId?: (id: number) => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "total", desc: true });
   const sorted = [...rows].sort((a, b) => {
@@ -99,11 +102,24 @@ export function PerformanceTable({
         </thead>
         <tbody className="divide-y divide-slate-50" style={{ fontVariantNumeric: "tabular-nums" }}>
           {sorted.map((row) => (
-            <tr key={`${row.id}-${row.name}`} className="hover:bg-slate-50/70">
+            <tr key={`${row.id}-${row.name}`} className="hover:bg-slate-50/70 group">
               <td className="pl-2 sm:pl-5 pr-1.5 sm:pr-3 py-2.5">
-                <div className={`font-semibold whitespace-nowrap ${row.id === null ? "text-slate-500 italic" : "text-slate-800"}`}>{row.name}</div>
-                {showRole && row.role && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.role}</div>}
-                {row.path && row.path !== row.name && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.path}</div>}
+                <div className="flex items-center gap-2">
+                  <div>
+                    <div className={`font-semibold whitespace-nowrap ${row.id === null ? "text-slate-500 italic" : "text-slate-800"}`}>{row.name}</div>
+                    {showRole && row.role && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.role}</div>}
+                    {row.path && row.path !== row.name && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.path}</div>}
+                  </div>
+                  {row.id !== null && onPrintStaffId && (
+                    <button 
+                      onClick={() => onPrintStaffId(row.id!)}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all ml-2"
+                      title="Generate PDF Report"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </button>
+                  )}
+                </div>
               </td>
               {COLUMNS.map((c) => (
                 <td key={c.key} className="px-1.5 sm:px-3 py-2.5 text-center text-slate-700 whitespace-nowrap">

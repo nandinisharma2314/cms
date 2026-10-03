@@ -102,7 +102,7 @@ export function DashboardView() {
 
   return (
     <>
-      <div>
+      <div className="-mt-5 sm:-mt-2">
         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Welcome, {me.name}</h1>
         <p className="text-xs text-slate-500 font-medium mt-1">
           <span className="font-semibold text-slate-700">{me.role.name}</span> · {scopeText}

@@ -64,7 +64,7 @@ export function MetricCards({ metrics, loading, days }: { metrics: MetricCardDat
               <Icon className="w-4 h-4 xl:w-7 xl:h-7" />
             </div>
             <div className="flex flex-col min-w-0 items-center xl:items-start w-full">
-              <span className="text-[10px] xl:text-xs font-semibold text-slate-500 leading-tight truncate w-full">{card.title}</span>
+              <span className="text-[8.5px] sm:text-[10px] xl:text-xs font-semibold text-slate-500 leading-[1.1] sm:leading-tight break-words whitespace-normal text-center xl:text-left">{card.title}</span>
               <span className="text-sm xl:text-2xl font-bold text-slate-800 tracking-tight my-0.5">{card.value.toLocaleString()}</span>
               <div className="hidden xl:block">
                 <ChangeLine change={card.change} days={days} />
