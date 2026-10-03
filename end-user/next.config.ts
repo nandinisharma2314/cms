@@ -14,6 +14,15 @@ const nextConfig: NextConfig = {
     "*.pinggy.link", "*.pinggy.net", "*.loca.lt", "*.devtunnels.ms",
     "*.free.pinggy.net", "*.run.pinggy-free.link", "*.serveo.net"
   ],
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/login",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
