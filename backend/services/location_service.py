@@ -93,11 +93,41 @@ def serialize_location(location: Location | None, names_by_id: dict[int, list[st
     }
 
 
-def build_tree(db: Session, include_inactive: bool = False) -> list[dict]:
+def get_nodes(db: Session, parent_id: int | None = None, include_inactive: bool = False) -> list[dict]:
     query = db.query(Location)
     if not include_inactive:
         query = query.filter(Location.is_active.is_(True))
-    nodes = {
+    
+    if parent_id is None:
+        query = query.filter(Location.parent_id.is_(None))
+    else:
+        query = query.filter(Location.parent_id == parent_id)
+        
+    locations = query.order_by(Location.name).all()
+    
+    return [
+        {
+            "id": loc.id,
+            "name": loc.name,
+            "parent_id": loc.parent_id,
+            "type": loc.type.key,
+            "type_name": loc.type.name,
+            "is_active": loc.is_active,
+            "path_ids": path_ids(loc.path),
+            "children": [],
+        }
+        for loc in locations
+    ]
+
+
+def get_path(db: Session, location_id: int) -> list[dict]:
+    """Returns the nodes forming the path from root to this location."""
+    target = db.get(Location, location_id)
+    if not target:
+        return []
+    
+    p_ids = path_ids(target.path)
+    nodes_by_id = {
         loc.id: {
             "id": loc.id,
             "name": loc.name,
@@ -105,19 +135,14 @@ def build_tree(db: Session, include_inactive: bool = False) -> list[dict]:
             "type": loc.type.key,
             "type_name": loc.type.name,
             "is_active": loc.is_active,
+            "path_ids": path_ids(loc.path),
             "children": [],
         }
-        for loc in query.order_by(Location.name).all()
+        for loc in db.query(Location).filter(Location.id.in_(p_ids)).all()
     }
-    roots = []
-    for node in nodes.values():
-        parent = nodes.get(node["parent_id"])
-        if parent is not None:
-            parent["children"].append(node)
-        elif node["parent_id"] is None:
-            roots.append(node)
-        # nodes under an inactive (filtered-out) parent are hidden with it
-    return roots
+    
+    # Return ordered path
+    return [nodes_by_id[pid] for pid in p_ids if pid in nodes_by_id]
 
 
 # ---------------------------------------------------------------------------

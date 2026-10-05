@@ -23,7 +23,7 @@ from services.complaint_service import (
     DETAIL_OPTIONS, LIST_OPTIONS, clean_complaint_text, end_user_detail, group_counts, register_complaint,
     resolve_classification, serialize_complaints,
 )
-from services.location_service import build_tree, path_names, serialize_location
+from services.location_service import get_nodes, get_path, path_names, serialize_location
 from services.statuses import CLOSED, RESOLVED, STATUS_GROUPS
 from utils.auth_middleware import (
     client_ip, end_user_permissions, end_user_role, get_current_end_user, require_portal_permission,
@@ -299,9 +299,14 @@ def departments(_: EndUser = Depends(get_current_end_user), db: Session = Depend
     return result
 
 
-@router.get("/locations/tree")
-def locations_tree(_: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
-    return build_tree(db)
+@router.get("/locations/nodes")
+def locations_nodes(parent_id: int | None = None, _: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
+    return get_nodes(db, parent_id=parent_id)
+
+
+@router.get("/locations/path/{location_id}")
+def locations_path(location_id: int, _: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
+    return get_path(db, location_id=location_id)
 
 
 # ---------------------------------------------------------------------------

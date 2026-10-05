@@ -30,12 +30,10 @@ import {
 
 function EndUserForm({
   editing,
-  tree,
   onClose,
   onSaved,
 }: {
   editing: EndUserRow | null;
-  tree: LocationNode[];
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -49,7 +47,6 @@ function EndUserForm({
   const [locationId, setLocationId] = useState<number | null>(editing?.location?.id ?? null);
   const { busy, error, run } = useAction();
   // End users are placed by location only; any department scope covers them.
-  const scopedTree = useMemo(() => treeInScope(tree, me, null), [tree, me]);
   const identityChanged = editing !== null && (mobile !== editing.mobile || email !== editing.email);
 
   const submit = (e: React.FormEvent) => {
@@ -125,7 +122,7 @@ function EndUserForm({
           </p>
         )}
         <Field label="Assigned Location">
-          <LocationPicker tree={scopedTree} value={locationId} onChange={setLocationId} />
+          <LocationPicker value={locationId} onChange={setLocationId} />
         </Field>
         <div className="pt-2 flex justify-end gap-2">
           <button type="button" className={secondaryButtonClass} onClick={onClose}>
@@ -168,8 +165,8 @@ function EndUsersList() {
   );
   const { data: reference, error: referenceError } = useApiData(async () => {
     if (!needsLevels) return null;
-    const [levels, tree] = await Promise.all([api.locations.levels(), api.locations.tree()]);
-    return { levels, tree };
+    const levels = await api.locations.levels();
+    return { levels };
   }, [needsLevels]);
 
   useEffect(() => {
@@ -294,7 +291,7 @@ function EndUsersList() {
       {form && reference && (
         <EndUserForm
           editing={form.editing}
-          tree={reference.tree}
+          
           onClose={() => setForm(null)}
           onSaved={(message) => {
             setForm(null);

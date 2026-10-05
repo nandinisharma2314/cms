@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
       }
     ];
   },
+  // Raise the proxy timeout so large CSV exports (600k rows) don't time out
+  experimental: {
+    proxyTimeout: 300_000, // 5 minutes
+  },
 };
 
 export default nextConfig;

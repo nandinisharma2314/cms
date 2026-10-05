@@ -13,10 +13,13 @@ def upload(client, headers, path, body, dry_run=False, name="data.csv"):
 
 
 def area_names(client, headers, *path):
-    nodes = client.get("/locations/tree", headers=headers).json()
+    parent_id = None
     for name in path:
-        nodes = next(n for n in nodes if n["name"] == name)["children"]
-    return {n["name"] for n in nodes}
+        url = f"/locations/nodes?parent_id={parent_id}" if parent_id else "/locations/nodes"
+        nodes = client.get(url, headers=headers).json()
+        parent_id = next(n["id"] for n in nodes if n["name"] == name)
+    url = f"/locations/nodes?parent_id={parent_id}" if parent_id else "/locations/nodes"
+    return {n["name"] for n in client.get(url, headers=headers).json()}
 
 
 def test_dry_run_reports_without_saving(client, login):

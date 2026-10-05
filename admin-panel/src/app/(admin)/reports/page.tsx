@@ -13,7 +13,7 @@ import { PerformanceTable } from "@/components/reports/PerformanceTable";
 import { StaffReportCard } from "@/components/reports/StaffReportCard";
 import { StatTile } from "@/components/reports/StatTile";
 import { TREND_COLORS, TrendLineChart } from "@/components/reports/TrendLineChart";
-import { CascadingLocationSelects, findNodePath } from "@/components/CascadingLocationSelects";
+import { LocationPicker } from "@/components/LocationPicker";
 import { Card, ErrorBanner, inputClass, PageHeader, secondaryButtonClass, Spinner, tabClass } from "@/components/ui";
 
 const TREND_SERIES = [
@@ -202,8 +202,10 @@ function Reports() {
   const overview = useApiData(() => api.reports.overview(query), deps);
   const { data: levelList } = useApiData(() => api.reports.levels(), []);
   const levels = levelList ?? [];
-  const { data: locations = [] } = useApiData(() => api.locations.tree(), []);
-  const selectedPath = locationId ? findNodePath(locations, locationId) : null;
+  const { data: selectedPath } = useApiData(
+    () => locationId ? api.locations.path(locationId) : Promise.resolve([]),
+    [locationId]
+  );
   const currentDepth = selectedPath ? selectedPath.length : 0;
   // Group by the level immediately below the selected location (or level 1, usually State, by default).
   const targetDepth = Math.max(1, currentDepth);
@@ -457,12 +459,13 @@ function Reports() {
         {tab === "locations" && (
           <div className="px-2 sm:px-5 pb-3">
             <div className="flex flex-wrap items-center gap-3">
-              <CascadingLocationSelects
-                tree={locations}
-                locationId={locationId}
-                onChange={setLocationId}
-                className="w-full sm:w-auto min-w-[140px] max-w-[200px]"
-              />
+              <div className="w-full sm:w-auto min-w-[140px]">
+                <LocationPicker
+                  value={locationId}
+                  onChange={setLocationId}
+                  allowAny
+                />
+              </div>
               {locationId !== null && (
                 <button
                   type="button"

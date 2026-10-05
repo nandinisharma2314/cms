@@ -415,8 +415,9 @@ def test_deactivating_a_location_closes_everything_below(client, login, end_user
         assert client.post("/locations/", headers=root, json={"name": "Paota", "parent_id": ratanada}).status_code == 400
         # a child can't be switched back on while its parent is off
         assert client.patch(f"/locations/{ratanada}", headers=root, json={"is_active": True}).status_code == 409
-        tree_names = {n["name"] for n in client.get("/portal/locations/tree",
-                                                    headers=end_user_login()).json()[0]["children"][0]["children"]}
+        rajasthan_id = location_id(client, end_user_login(), "India", "Rajasthan")
+        tree_names = {n["name"] for n in client.get(f"/portal/locations/nodes?parent_id={rajasthan_id}",
+                                                    headers=end_user_login()).json()}
         assert "Jodhpur" not in tree_names
         exported = client.get("/locations/export", headers=root).text
         assert "Ratanada" not in exported

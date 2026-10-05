@@ -215,8 +215,9 @@ def test_location_csv_import_builds_tree_and_reports_errors(client, login):
     assert result["unchanged"] == 1
     assert result["failed"] == 1 and result["errors"][0]["row"] == 5
 
-    tree = client.get("/locations/tree", headers=admin).json()
-    assert "Gujarat" in {s["name"] for s in tree[0]["children"]}
+    india_id = next(n["id"] for n in client.get("/locations/nodes", headers=admin).json() if n["name"] == "India")
+    states = client.get(f"/locations/nodes?parent_id={india_id}", headers=admin).json()
+    assert "Gujarat" in {s["name"] for s in states}
 
 
 def test_location_import_respects_scope(client, login):

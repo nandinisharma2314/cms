@@ -243,7 +243,7 @@ def test_user_management_with_primary_workplace_and_custom_permissions(client, l
     agent_role = next(r for r in roles if r["key"] == "agent")
 
     # Look up location
-    loc_tree = client.get("/locations/tree", headers=admin_headers).json()
+    loc_tree = client.get("/locations/nodes", headers=admin_headers).json()
     test_loc = loc_tree[0]
 
     unique_email = "custom.perms.agent@example.test"

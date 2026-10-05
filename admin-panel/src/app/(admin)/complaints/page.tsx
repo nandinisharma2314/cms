@@ -116,10 +116,11 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
   const activeCount = countActiveFilters(filters);
 
   // Active filter chip labels
-  const selectedLocation = useMemo(() => {
-    if (!filters.location_id || !facets?.locations) return null;
-    return findLocationNode(facets.locations, Number(filters.location_id));
-  }, [facets?.locations, filters.location_id]);
+  const { data: _locPath } = useApiData(
+    () => filters.location_id ? api.locations.path(Number(filters.location_id)) : Promise.resolve([]),
+    [filters.location_id]
+  );
+  const selectedLocation = _locPath && _locPath.length > 0 ? _locPath[_locPath.length - 1] : null;
 
   const selectedDepartment = useMemo(() => {
     if (!filters.department_id || !facets?.departments) return null;

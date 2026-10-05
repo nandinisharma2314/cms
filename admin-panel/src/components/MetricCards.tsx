@@ -39,7 +39,7 @@ function ChangeLine({ change, days }: { change: Change | null; days: number }) {
 export function MetricCards({ metrics, loading, days }: { metrics: MetricCardData[]; loading: boolean; days: number }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-4 gap-2 sm:gap-4 xl:gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 xl:gap-5">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex flex-col xl:flex-row items-center gap-2 xl:gap-4 p-2 xl:p-5 bg-white border border-slate-100 animate-pulse">
             <div className="w-8 h-8 xl:w-14 xl:h-14 rounded-lg xl:rounded-xl bg-slate-100 shrink-0" />
@@ -54,7 +54,7 @@ export function MetricCards({ metrics, loading, days }: { metrics: MetricCardDat
     );
   }
   return (
-    <div className="grid grid-cols-4 gap-2 sm:gap-4 xl:gap-5">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 xl:gap-5">
       {metrics.map((card) => {
         const Icon = card.icon;
         const innerContent = (

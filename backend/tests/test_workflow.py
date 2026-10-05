@@ -8,11 +8,14 @@ def departments(client, end_user):
 
 
 def location_id(client, headers, *names, portal=True):
-    nodes = client.get("/portal/locations/tree" if portal else "/locations/tree", headers=headers).json()
+    base_url = "/portal/locations/nodes" if portal else "/locations/nodes"
+    parent_id = None
     node = None
     for name in names:
+        url = f"{base_url}?parent_id={parent_id}" if parent_id else base_url
+        nodes = client.get(url, headers=headers).json()
         node = next(n for n in nodes if n["name"] == name)
-        nodes = node["children"]
+        parent_id = node["id"]
     return node["id"]
 
 

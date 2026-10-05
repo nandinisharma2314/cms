@@ -139,6 +139,7 @@ export interface LocationNode {
   type: string;
   type_name: string;
   is_active: boolean;
+  path_ids: number[];
   children: LocationNode[];
 }
 
@@ -1193,6 +1194,9 @@ export const api = {
     removeLevel: (levelId: number) => request(`/locations/types/${levelId}`, { method: "DELETE" }),
     tree: (includeInactive = false) =>
       request<LocationNode[]>("/locations/tree", { query: { include_inactive: includeInactive } }),
+    nodes: (parentId: number | null, includeInactive = false) =>
+      request<LocationNode[]>("/locations/nodes", { query: { parent_id: parentId, include_inactive: includeInactive } }),
+    path: (id: number) => request<LocationNode[]>(`/locations/path/${id}`),
     create: (name: string, parent_id: number | null) =>
       request<LocationRef>("/locations/", { method: "POST", body: { name, parent_id } }),
     update: (locationId: number, data: { name?: string; is_active?: boolean }) =>

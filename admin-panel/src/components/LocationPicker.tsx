@@ -1,15 +1,28 @@
 "use client";
 
-import React, { useMemo } from "react";
-import { LocationNode } from "@/lib/api";
+import React, { useEffect, useState, useMemo } from "react";
+import { LocationNode, api } from "@/lib/api";
 import { inputClass } from "./ui";
+
+const nodeCache = new Map<number | null, LocationNode[]>();
+
+async function fetchNodes(parentId: number | null): Promise<LocationNode[]> {
+  if (nodeCache.has(parentId)) return nodeCache.get(parentId)!;
+  try {
+    const nodes = await api.locations.nodes(parentId);
+    nodeCache.set(parentId, nodes);
+    return nodes;
+  } catch {
+    return [];
+  }
+}
 
 /** Path of nodes from the root to `id`, or [] when not found. */
 export function findPath(nodes: LocationNode[], id: number | null): LocationNode[] {
   if (id === null) return [];
   for (const node of nodes) {
     if (node.id === id) return [node];
-    const below = findPath(node.children, id);
+    const below = findPath(node.children || [], id);
     if (below.length) return [node, ...below];
   }
   return [];
@@ -21,33 +34,62 @@ export function findPath(nodes: LocationNode[], id: number | null): LocationNode
  * level (including none, meaning "all locations") is allowed.
  */
 export function LocationPicker({
-  tree,
+  tree, // Deprecated prop
   value,
   onChange,
   allowAny = false,
   anyLabel = "All locations",
   disabled = false,
+  isSelectable,
 }: {
-  tree: LocationNode[];
+  tree?: LocationNode[];
   value: number | null;
   onChange: (id: number | null) => void;
   allowAny?: boolean;
   anyLabel?: string;
   disabled?: boolean;
+  isSelectable?: (node: LocationNode | null) => boolean;
 }) {
-  const path = useMemo(() => findPath(tree, value), [tree, value]);
+  const [levels, setLevels] = useState<{ options: LocationNode[]; selected: LocationNode | null; parent: LocationNode | null }[]>([]);
 
-  // One select per level: the selected node's siblings, plus one for its children.
-  const levels: { options: LocationNode[]; selected: LocationNode | null; parent: LocationNode | null }[] = [];
-  let options = tree;
-  let parent: LocationNode | null = null;
-  for (let depth = 0; options.length > 0; depth++) {
-    const selected: LocationNode | null = path[depth] ?? null;
-    levels.push({ options, selected, parent });
-    if (!selected) break;
-    parent = selected;
-    options = selected.children;
-  }
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      // 1. Resolve the path
+      let pathNodes: LocationNode[] = [];
+      if (value) {
+        try {
+          pathNodes = await api.locations.path(value);
+        } catch {
+          pathNodes = [];
+        }
+      }
+
+      // 2. Fetch options for each dropdown
+      const parentIds = [null, ...pathNodes.map((n) => n.id)];
+      const optionsArrays = await Promise.all(parentIds.map((id) => fetchNodes(id)));
+      
+      if (!active) return;
+
+      // 3. Build levels
+      const newLevels = optionsArrays.map((options, i) => {
+        const parent = i === 0 ? null : pathNodes[i - 1];
+        const selected = i < pathNodes.length ? pathNodes[i] : null;
+        return { options, selected, parent };
+      });
+
+      // Remove the last level if it's empty (leaf node selected)
+      if (newLevels.length > 0 && newLevels[newLevels.length - 1].options.length === 0) {
+        newLevels.pop();
+      }
+      
+      setLevels(newLevels);
+    }
+    load();
+    return () => {
+      active = false;
+    };
+  }, [value]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -74,11 +116,14 @@ export function LocationPicker({
                     ? `All of ${level.parent?.name}`
                     : `Select ${levelName.toLowerCase()}`}
             </option>
-            {level.options.map((node) => (
-              <option key={node.id} value={node.id}>
-                {node.name}
-              </option>
-            ))}
+            {level.options.map((node) => {
+              const selectable = isSelectable ? isSelectable(node) : true;
+              return (
+                <option key={node.id} value={node.id} disabled={!selectable}>
+                  {node.name} {!selectable ? "(Outside your scope)" : ""}
+                </option>
+              );
+            })}
           </select>
         );
       })}

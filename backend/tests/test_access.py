@@ -67,11 +67,13 @@ def test_out_of_scope_complaint_is_invisible_and_immutable(client, login):
 
 def _scope_ids(client, headers, department, *location_names):
     departments = {d["name"]: d["id"] for d in client.get("/departments/", headers=headers).json()}
-    nodes = client.get("/locations/tree", headers=headers).json()
+    parent_id = None
     node = None
     for name in location_names:
+        url = f"/locations/nodes?parent_id={parent_id}" if parent_id else "/locations/nodes"
+        nodes = client.get(url, headers=headers).json()
         node = next(n for n in nodes if n["name"] == name)
-        nodes = node["children"]
+        parent_id = node["id"]
     return {"department_id": departments[department] if department else None, "location_id": node["id"] if node else None}
 
 

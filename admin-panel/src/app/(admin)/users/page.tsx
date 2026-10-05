@@ -13,6 +13,8 @@ import {
   RoleRef,
   ScopeInput,
   StaffUser,
+  Me,
+  UserScope,
 } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
@@ -21,6 +23,7 @@ import { useSession } from "@/lib/session";
 import { passwordHint, passwordProblems } from "@/components/ChangePasswordForm";
 import { RequirePermission } from "@/components/RequirePermission";
 import { ScopeEditor, scopeLabel } from "@/components/ScopeEditor";
+import { LocationPicker } from "@/components/LocationPicker";
 import {
   Card,
   ErrorBanner,
@@ -71,32 +74,20 @@ function toForm(user: StaffUser): FormState {
   };
 }
 
-function flattenTree(nodes: LocationNode[], prefix = ""): { id: number; name: string }[] {
-  const result: { id: number; name: string }[] = [];
-  for (const n of nodes) {
-    const full = prefix ? `${prefix} / ${n.name}` : n.name;
-    result.push({ id: n.id, name: `${full} (${n.type_name})` });
-    if (n.children && n.children.length > 0) {
-      result.push(...flattenTree(n.children, full));
-    }
-  }
-  return result;
-}
-
 const sameScopes = (a: ScopeInput[], b: ScopeInput[]) => JSON.stringify(a) === JSON.stringify(b);
 
 function UserForm({
+  me,
   editing,
   roles,
   departments,
-  tree,
   onClose,
   onSaved,
 }: {
+  me: Me;
   editing: StaffUser | null;
   roles: RoleRef[];
   departments: Department[];
-  tree: LocationNode[];
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -129,7 +120,11 @@ function UserForm({
   const [saving, setSaving] = useState(false);
   const problems = !editing && form.password ? passwordProblems(form.password, rules) : [];
 
-  const locationOptions = useMemo(() => flattenTree(tree), [tree]);
+
+  const assignableDepartments = useMemo(() => {
+    if (me.is_super_admin) return departments;
+    return departments.filter(d => me.scopes.some(s => s.department === null || s.department.id === d.id));
+  }, [departments, me]);
 
   useEffect(() => {
     Promise.all([api.roles.permissions(), api.roles.list()]).then(
@@ -372,8 +367,8 @@ function UserForm({
                   setForm({ ...form, primary_department_id: e.target.value ? Number(e.target.value) : null })
                 }
               >
-                <option value="">None / Floating across all</option>
-                {departments.map((d) => (
+                <option value="" disabled={!me.is_super_admin && !me.scopes.some(s => s.department === null)}>None / Floating across all</option>
+                {assignableDepartments.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name} ({d.code})
                   </option>
@@ -381,20 +376,17 @@ function UserForm({
               </select>
             </Field>
             <Field label="Primary Location / Office" hint="Assigned base workplace/site">
-              <select
-                className={inputClass}
-                value={form.primary_location_id ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, primary_location_id: e.target.value ? Number(e.target.value) : null })
-                }
-              >
-                <option value="">None / Global across all locations</option>
-                {locationOptions.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
+              <LocationPicker
+                value={form.primary_location_id}
+                onChange={(id: number | null) => setForm({ ...form, primary_location_id: id })}
+                allowAny={me.is_super_admin || me.scopes.some(s => s.location === null)}
+                anyLabel="None / Global across all locations"
+                isSelectable={(node) => {
+                  if (me.is_super_admin) return true;
+                  if (!node) return me.scopes.some(s => s.location === null);
+                  return me.scopes.some(s => s.location === null || node.path_ids.includes(s.location.id));
+                }}
+              />
             </Field>
           </div>
         </div>
@@ -488,8 +480,8 @@ function UserForm({
           <ScopeEditor
             scopes={form.scopes}
             onChange={(scopes) => setForm({ ...form, scopes })}
-            departments={departments}
-            tree={tree}
+            departments={assignableDepartments}
+            allowAllDepartments={me.is_super_admin || me.scopes.some((s) => s.department === null)}
           />
         </div>
 
@@ -510,7 +502,7 @@ function UsersList() {
   useDocumentTitle("Staff users");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { can } = useSession();
+  const { me, can } = useSession();
   const { ui } = useConfig();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<number | null>(null);
@@ -538,11 +530,10 @@ function UsersList() {
   );
   const { data: reference, error: referenceError } = useApiData<{
     departments: Department[];
-    tree: LocationNode[];
   } | null>(async () => {
     if (!canEdit) return null;
-    const [departments, tree] = await Promise.all([api.departments.list(), api.locations.tree()]);
-    return { departments, tree };
+    const departments = await api.departments.list();
+    return { departments };
   }, [canEdit]);
 
   useEffect(() => {
@@ -726,10 +717,11 @@ function UsersList() {
 
       {(creating || editing) && reference && (
         <UserForm
+          me={me}
           editing={editing}
           roles={roles}
           departments={reference.departments}
-          tree={reference.tree}
+          
           onClose={() => {
             setCreating(false);
             setEditing(null);

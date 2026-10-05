@@ -36,22 +36,40 @@ interface RowActions {
   canCreate: boolean;
   canUpdate: boolean;
   hasChildLevel: (node: LocationNode) => boolean;
+  fetchNodes: (parentId: number | null) => Promise<LocationNode[]>;
 }
+
 
 function TreeRow({
   node,
   depth,
-  expanded,
-  toggle,
   actions,
+  forceReload,
 }: {
   node: LocationNode;
   depth: number;
-  expanded: Set<number>;
-  toggle: (id: number) => void;
   actions: RowActions;
+  forceReload: number;
 }) {
-  const open = expanded.has(node.id);
+  const [expanded, setExpanded] = useState(depth < 1); // Expand first 2 levels by default? Actually just root.
+  const [children, setChildren] = useState<LocationNode[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const hasChildren = actions.hasChildLevel(node);
+
+  useEffect(() => {
+    let active = true;
+    if (expanded) {
+      setLoading(true);
+      actions.fetchNodes(node.id).then(data => {
+        if (active) {
+          setChildren(data);
+          setLoading(false);
+        }
+      });
+    }
+    return () => { active = false; };
+  }, [expanded, forceReload, node.id, actions]);
+
   return (
     <>
       <div
@@ -60,16 +78,16 @@ function TreeRow({
       >
         <button
           type="button"
-          onClick={() => toggle(node.id)}
-          className={`w-5 h-5 flex items-center justify-center rounded text-slate-400 ${node.children.length ? "cursor-pointer hover:bg-slate-100" : "invisible"}`}
-          aria-label={open ? `Collapse ${node.name}` : `Expand ${node.name}`}
-          aria-expanded={open}
+          onClick={() => setExpanded(!expanded)}
+          className={`w-5 h-5 flex items-center justify-center rounded text-slate-400 ${hasChildren ? "cursor-pointer hover:bg-slate-100" : "invisible"}`}
+          aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
+          aria-expanded={expanded}
         >
-          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
+          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-90" : ""}`} />
         </button>
         <span className="text-xs font-semibold text-slate-800">{node.name}</span>
         <span className="text-[10px] text-slate-400 uppercase tracking-wide">{node.type_name}</span>
-        {node.children.length > 0 && <span className="text-[10px] text-slate-400">({countDescendants(node)} below)</span>}
+        {loading && <span className="text-[10px] text-slate-400">Loading...</span>}
         {!node.is_active && <span className="text-[10px] text-rose-600 font-semibold">inactive</span>}
         <div className="ml-auto flex items-center gap-0.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100">
           {actions.canCreate && actions.hasChildLevel(node) && node.is_active && (
@@ -100,23 +118,27 @@ function TreeRow({
               >
                 <Power className="w-3.5 h-3.5" />
               </button>
-              {node.children.length === 0 && (
-                <button
-                  className={`${iconButtonClass} hover:text-rose-600 hover:bg-rose-50`}
-                  aria-label={`Delete ${node.name}`}
-                  title="Delete (only if nothing uses it)"
-                  onClick={() => actions.onDelete(node)}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
+              <button
+                className={`${iconButtonClass} hover:text-rose-600 hover:bg-rose-50`}
+                aria-label={`Delete ${node.name}`}
+                title="Delete (if unused)"
+                onClick={() => actions.onDelete(node)}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </>
           )}
         </div>
       </div>
-      {open &&
-        node.children.map((child) => (
-          <TreeRow key={child.id} node={child} depth={depth + 1} expanded={expanded} toggle={toggle} actions={actions} />
+      {expanded && children &&
+        children.map((child) => (
+          <TreeRow
+            key={child.id}
+            node={child}
+            depth={depth + 1}
+            actions={actions}
+            forceReload={forceReload}
+          />
         ))}
     </>
   );
@@ -322,67 +344,56 @@ function LocationsTree() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { can } = useSession();
-  // null = not touched yet: the first two levels start open
-  const [expandedState, setExpanded] = useState<Set<number> | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  // The "Import locations" quick action links here with ?import=1
   const [dialog, setDialog] = useState<Dialog | null>(() =>
     searchParams.get("import") === "1" && can("location.import") ? { kind: "import" } : null,
   );
   const { error: actionError, run } = useAction();
+  const [forceReload, setForceReload] = useState(0);
+
   const {
     data,
     error: loadError,
     reload,
   } = useApiData(async () => {
-    const [tree, levels] = await Promise.all([api.locations.tree(showInactive), api.locations.levels()]);
+    const [tree, levels] = await Promise.all([api.locations.nodes(null, showInactive), api.locations.levels()]);
     return { tree, levels };
-  }, [showInactive]);
+  }, [showInactive, forceReload]);
   const tree = data?.tree ?? [];
   const levels = data?.levels ?? [];
-  const expanded = expandedState ?? new Set(tree.flatMap((n) => [n.id, ...n.children.map((c) => c.id)]));
 
   useEffect(() => {
     if (searchParams.get("import")) router.replace("/locations");
   }, [searchParams, router]);
 
-  const depthOf = new Map(levels.map((l) => [l.key, l.depth]));
-  const maxDepth = levels.length ? levels[levels.length - 1].depth : -1;
   const hasChildLevel = (node: LocationNode) => {
-    const depth = depthOf.get(node.type);
-    return depth !== undefined && depth < maxDepth;
-  };
-
-  const toggle = (id: number) => {
-    const next = new Set(expanded);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setExpanded(next);
+    const currentIdx = levels.findIndex((l) => l.key === node.type);
+    return currentIdx !== -1 && currentIdx < levels.length - 1;
   };
 
   const actions: RowActions = {
     onAdd: (parent) => setDialog({ kind: "add", parent }),
     onRename: (node) => setDialog({ kind: "rename", node }),
     onToggleActive: (node) => {
-      const text = node.is_active
-        ? `Deactivate ${node.name}? Everything below it is closed too: no new complaints, staff scopes or end users there.`
-        : `Reactivate ${node.name}?`;
-      if (confirm(text))
-        run(async () => {
-          await api.locations.update(node.id, { is_active: !node.is_active });
-          reload();
-        });
+      const action = node.is_active ? "Deactivate" : "Reactivate";
+      if (!confirm(`${action} ${node.name}?
+Children will be hidden while inactive.`)) return;
+      run(async () => {
+        await api.locations.update(node.id, { is_active: !node.is_active });
+        setForceReload(prev => prev + 1);
+      });
     },
     onDelete: (node) => {
-      if (confirm(`Delete ${node.name}? Only possible when no complaint, end user or staff scope uses it.`))
-        run(async () => {
-          await api.locations.remove(node.id);
-          reload();
-        });
+      if (!confirm(`Delete ${node.name}? This cannot be undone.`)) return;
+      run(async () => {
+        await api.locations.remove(node.id);
+        setForceReload(prev => prev + 1);
+      });
     },
     canCreate: can("location.create"),
     canUpdate: can("location.update"),
     hasChildLevel,
+    fetchNodes: (parentId) => api.locations.nodes(parentId, showInactive),
   };
 
   return (
@@ -431,7 +442,7 @@ function LocationsTree() {
       <Card className="p-3">
         {!data ? (
           <p className="text-xs text-slate-400 p-6 text-center">
-            {loadError ? "The locations could not be loaded (see the message above)." : "Loading…"}
+            {loadError ? "The locations could not be loaded (see the message above)." : "Loading..."}
           </p>
         ) : tree.length === 0 ? (
           <p className="text-xs text-slate-400 p-6 text-center">
@@ -441,7 +452,7 @@ function LocationsTree() {
           </p>
         ) : (
           tree.map((node) => (
-            <TreeRow key={node.id} node={node} depth={0} expanded={expanded} toggle={toggle} actions={actions} />
+            <TreeRow key={node.id} node={node} depth={0} actions={actions} forceReload={forceReload} />
           ))
         )}
       </Card>
@@ -453,9 +464,8 @@ function LocationsTree() {
           onClose={() => setDialog(null)}
           onSubmit={async (name) => {
             await api.locations.create(name, dialog.parent?.id ?? null);
-            if (dialog.parent) setExpanded(new Set(expanded).add(dialog.parent.id));
+            setForceReload(prev => prev + 1);
             setDialog(null);
-            reload();
           }}
         />
       )}
@@ -466,13 +476,13 @@ function LocationsTree() {
           onClose={() => setDialog(null)}
           onSubmit={async (name) => {
             await api.locations.update(dialog.node.id, { name });
+            setForceReload(prev => prev + 1);
             setDialog(null);
-            reload();
           }}
         />
       )}
       {dialog?.kind === "levels" && (
-        <LevelsDialog levels={levels} canUpdate={can("location.update")} onClose={() => setDialog(null)} onChanged={reload} />
+        <LevelsDialog levels={levels} canUpdate={can("location.update")} onClose={() => setDialog(null)} onChanged={() => setForceReload(prev => prev + 1)} />
       )}
       {dialog?.kind === "import" && (
         <Modal
@@ -485,7 +495,7 @@ function LocationsTree() {
             columns={levels.map((l) => l.key)}
             templateName="locations-template.csv"
             onImport={api.locations.importCsv}
-            onDone={reload}
+            onDone={() => setForceReload(prev => prev + 1)}
           />
         </Modal>
       )}
