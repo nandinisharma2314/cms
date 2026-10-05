@@ -71,6 +71,7 @@ export function DashboardView() {
           change: m.total_change,
           icon: FileText,
           tint: "bg-blue-50 text-blue-600",
+          href: "/complaints",
         },
         {
           id: "open",
@@ -79,6 +80,7 @@ export function DashboardView() {
           change: m.open_change,
           icon: Clock,
           tint: "bg-rose-50 text-rose-500",
+          href: "/complaints?group=open",
         },
         {
           id: "in_progress",
@@ -87,6 +89,7 @@ export function DashboardView() {
           change: m.in_progress_change,
           icon: Hourglass,
           tint: "bg-violet-50 text-violet-600",
+          href: "/complaints?group=in_progress",
         },
         {
           id: "resolved",
@@ -95,6 +98,7 @@ export function DashboardView() {
           change: m.resolved_change,
           icon: CheckCircle2,
           tint: "bg-emerald-50 text-emerald-600",
+          href: "/complaints?group=resolved",
         },
       ]
     : [];

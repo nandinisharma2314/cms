@@ -2,20 +2,32 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { DashboardStats, StatusGroup } from "@/lib/api";
+import { api, DashboardStats, StatusGroup } from "@/lib/api";
 import { GROUP_COLORS, GROUP_LABELS } from "@/lib/status";
+import { useApiData } from "@/lib/hooks";
+import { CardDateFilter, DateRange } from "./CardDateFilter";
 
 const GROUPS: StatusGroup[] = ["open", "in_progress", "resolved", "rejected"];
 
 /** Donut of every status group (they always add up to the total). */
 export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardStats | undefined; loading: boolean }) {
   const [hovered, setHovered] = useState<StatusGroup | null>(null);
-  const total = stats?.metrics.total ?? 0;
+  const [dateRange, setDateRange] = useState<DateRange>(null);
+  
+  const customStats = useApiData(
+    () => (dateRange ? api.complaints.stats(dateRange) : Promise.resolve(undefined)),
+    [dateRange?.date_from, dateRange?.date_to]
+  );
+  
+  const activeStats = dateRange ? customStats.data : stats;
+  const isLoading = dateRange ? customStats.loading : loading;
+
+  const total = activeStats?.metrics.total ?? 0;
   const radius = 68;
   const strokeWidth = 26;
   const circumference = 2 * Math.PI * radius;
 
-  const counts = GROUPS.map((group) => stats?.status_breakdown[group].count ?? 0);
+  const counts = GROUPS.map((group) => activeStats?.status_breakdown[group].count ?? 0);
   const slices = GROUPS.map((group, i) => ({
     group,
     count: counts[i],
@@ -25,9 +37,12 @@ export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardSt
   }));
 
   return (
-    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
-      <h2 className="text-base font-bold text-slate-800 mb-4">Complaints by status</h2>
-      {loading ? (
+    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-200/60 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] h-full transition-shadow hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <h2 className="text-base font-bold text-slate-800">Complaints by status</h2>
+        <CardDateFilter onChange={setDateRange} />
+      </div>
+      {isLoading ? (
         <div className="flex items-center justify-center flex-1 py-10">
           <div className="w-36 h-36 rounded-full border-4 border-slate-100 border-t-blue-500 animate-spin" />
         </div>

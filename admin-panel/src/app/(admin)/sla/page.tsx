@@ -762,34 +762,36 @@ function SlaSettings() {
       <ErrorBanner message={error ?? action.error} />
       <Notice message={runResult} />
 
-      <PrioritiesCard priorities={data.priorities} onChanged={reload} />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <PrioritiesCard priorities={data.priorities} onChanged={reload} />
 
-      <Card className="p-5 relative overflow-x-auto">
-        <h2 className="text-sm font-bold text-slate-800">Default targets</h2>
-        <p className="text-xs text-slate-500 mt-1 mb-3">
-          Respond: hours for the assigned person to act. Resolve: hours from submission (paused while waiting for the end user).
-          Warn: how long before a target the &ldquo;due soon&rdquo; alert goes out.
-        </p>
-        <table className="text-left text-xs">
-          <thead className="text-[11px] uppercase tracking-wider text-slate-400">
-            <tr>
-              <th className="px-3 py-2">Priority</th>
-              <th className="px-3 py-2">Respond (h)</th>
-              <th className="px-3 py-2">Resolve (h)</th>
-              <th className="px-3 py-2">Warn (min)</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {defaults.map((r) => (
-              <SlaRuleRow key={rowKey(r)} rule={r} onSaved={reload} />
-            ))}
-            {missingDefaults.map((p) => (
-              <NewSlaDefaultRow key={`new-${p.id}`} priority={p} onSaved={reload} />
-            ))}
-          </tbody>
-        </table>
-      </Card>
+        <Card className="p-5 relative overflow-x-auto">
+          <h2 className="text-sm font-bold text-slate-800">Default targets</h2>
+          <p className="text-xs text-slate-500 mt-1 mb-3">
+            Respond: hours for the assigned person to act. Resolve: hours from submission (paused while waiting for the end user).
+            Warn: how long before a target the &ldquo;due soon&rdquo; alert goes out.
+          </p>
+          <table className="text-left text-xs w-full">
+            <thead className="text-[11px] uppercase tracking-wider text-slate-400">
+              <tr>
+                <th className="px-3 py-2">Priority</th>
+                <th className="px-3 py-2">Respond (h)</th>
+                <th className="px-3 py-2">Resolve (h)</th>
+                <th className="px-3 py-2">Warn (min)</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {defaults.map((r) => (
+                <SlaRuleRow key={rowKey(r)} rule={r} onSaved={reload} />
+              ))}
+              {missingDefaults.map((p) => (
+                <NewSlaDefaultRow key={`new-${p.id}`} priority={p} onSaved={reload} />
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      </div>
 
       <Card className="p-5 relative overflow-x-auto">
         <h2 className="text-sm font-bold text-slate-800">Department overrides</h2>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Download, LineChart, Table2 } from "lucide-react";
+import { Download, LineChart, Table2, X } from "lucide-react";
 import { api, ReportMetrics, ReportQuery } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatDay, formatHours, isoDay } from "@/lib/format";
@@ -162,7 +162,14 @@ function Reports() {
   const [printStaffId, setPrintStaffId] = useState<number | null>(null);
   const [printAllStaff, setPrintAllStaff] = useState(false);
   const [locationId, setLocationId] = useState<number | null>(null);
+  const [selectedStaffIds, setSelectedStaffIds] = useState<number[]>([]);
+  const [bulkZipIds, setBulkZipIds] = useState<number[] | null>(null);
+  const [isGeneratingZip, setIsGeneratingZip] = useState(false);
   const exporter = useAction();
+
+  useEffect(() => {
+    setSelectedStaffIds([]);
+  }, [tab]);
 
   const handlePrintStaff = (id: number) => {
     setPrintStaffId(id);
@@ -173,6 +180,17 @@ function Reports() {
     setPrintAllStaff(true);
     setTimeout(() => window.print(), 100);
   };
+
+  const handleBulkPdfZip = async () => {
+    if (selectedStaffIds.length === 0) {
+      alert("Please select at least one row to generate a PDF.");
+      return;
+    }
+    setBulkZipIds(selectedStaffIds);
+    setIsGeneratingZip(true);
+  };
+
+
 
   const query: ReportQuery = { 
     ...range, 
@@ -201,6 +219,70 @@ function Reports() {
     [canListDepartments],
   );
   const { data: priorities = [] } = useApiData(() => api.priorities.list(true), []);
+
+  useEffect(() => {
+    if (bulkZipIds && isGeneratingZip) {
+      const generateZip = async () => {
+        try {
+          const htmlToImage = await import("html-to-image");
+          const jsPDF = (await import("jspdf")).default;
+          const JSZip = (await import("jszip")).default;
+          
+          const zip = new JSZip();
+          let count = 0;
+
+          // Wait a moment for React to mount the hidden nodes
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          for (const id of bulkZipIds) {
+            const el = document.getElementById(`zip-card-${id}`);
+            if (el) {
+              const imgData = await htmlToImage.toJpeg(el, { quality: 0.95, pixelRatio: 2 });
+              
+              // We need the dimensions of the element to format the PDF correctly
+              const width = el.offsetWidth;
+              const height = el.offsetHeight;
+              
+              const pdf = new jsPDF({
+                orientation: "portrait",
+                unit: "pt",
+                format: [width, height]
+              });
+              
+              pdf.addImage(imgData, "JPEG", 0, 0, width, height);
+              
+              const pdfBlob = pdf.output("blob");
+              const staffName = table.data?.find(r => r.id === id)?.name || `report_${id}`;
+              zip.file(`${staffName.replace(/[^a-z0-9]/gi, '_')}.pdf`, pdfBlob);
+              count++;
+            }
+          }
+
+          if (count > 0) {
+            const content = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `reports_bulk_${isoDay(0)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          } else {
+            alert("No reports were generated successfully.");
+          }
+        } catch (error) {
+          console.error("Error generating ZIP:", error);
+          alert("An error occurred while generating the ZIP file.");
+        } finally {
+          setIsGeneratingZip(false);
+          setBulkZipIds(null);
+        }
+      };
+
+      generateZip();
+    }
+  }, [bulkZipIds, isGeneratingZip, table.data]);
 
   const days = Math.round((Date.parse(range.date_to) - Date.parse(range.date_from)) / 86_400_000) + 1;
   const activePreset = range.date_to === isoDay(0) ? ui.report_preset_days.find((p) => p === days) : undefined;
@@ -272,11 +354,6 @@ function Reports() {
             </option>
           ))}
         </select>
-        <CascadingLocationSelects
-          tree={locations}
-          locationId={locationId}
-          onChange={setLocationId}
-        />
       </div>
 
       <ErrorBanner message={overview.error ?? table.error ?? exporter.error} />
@@ -346,22 +423,60 @@ function Reports() {
               {TAB_LABELS[t]}
             </button>
           ))}
-          {/* Bulk PDF Button for all tabs */}
-          <button
-            onClick={handlePrintAll}
-              className={`${secondaryButtonClass} ml-auto shrink-0 !px-2.5 sm:!px-3`}
+          
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Bulk PDF Button for all tabs */}
+            <button
+              onClick={handleBulkPdfZip}
+              disabled={isGeneratingZip}
+              className={`${secondaryButtonClass} !px-2.5 sm:!px-3 ${isGeneratingZip ? "opacity-70 cursor-wait" : ""}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <span className="hidden sm:inline">Bulk PDF</span>
+              {isGeneratingZip ? (
+                <div className="w-3.5 h-3.5 flex items-center justify-center"><Spinner /></div>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+              )}
+              <span className="hidden sm:inline">
+                {isGeneratingZip 
+                  ? "Zipping..." 
+                  : selectedStaffIds.length > 0 
+                    ? `Download ${selectedStaffIds.length} PDF(s)` 
+                    : "Bulk PDF"}
+              </span>
             </button>
-          <button
-            className={`${secondaryButtonClass} ${tab !== "agents" ? "ml-auto" : ""} shrink-0 !px-2.5 sm:!px-3`}
-            disabled={exporter.busy}
-            onClick={() => exporter.run(() => api.reports.exportTable(tab, tableQuery))}
-          >
-            <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export CSV</span>
-          </button>
+            <button
+              className={`${secondaryButtonClass} !px-2.5 sm:!px-3`}
+              disabled={exporter.busy}
+              onClick={() => exporter.run(() => api.reports.exportTable(tab, tableQuery))}
+            >
+              <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export CSV</span>
+            </button>
+          </div>
         </div>
+        
+        {tab === "locations" && (
+          <div className="px-2 sm:px-5 pb-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <CascadingLocationSelects
+                tree={locations}
+                locationId={locationId}
+                onChange={setLocationId}
+                className="w-full sm:w-auto min-w-[140px] max-w-[200px]"
+              />
+              {locationId !== null && (
+                <button
+                  type="button"
+                  onClick={() => setLocationId(null)}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-full transition-colors shrink-0"
+                  title="Clear location filter"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {tab === "locations" && levelList?.length === 0 ? (
           <p className="p-6 text-center text-xs text-slate-400">No location levels are defined.</p>
         ) : table.data ? (
@@ -370,11 +485,26 @@ function Reports() {
             nameLabel={tab === "agents" ? "Current handler" : tab === "departments" ? "Department" : "Location"}
             showRole={tab === "agents"}
             onPrintStaffId={handlePrintStaff}
+            selectedRowIds={selectedStaffIds}
+            onSelectionChange={setSelectedStaffIds}
           />
         ) : (
           !table.error && <Spinner />
         )}
       </Card>
+
+      {/* Zip generation hidden layout */}
+      {isGeneratingZip && bulkZipIds && table.data && (
+        <div style={{ position: "absolute", top: "-9999px", left: 0, width: "800px", zIndex: -1, backgroundColor: "white" }}>
+          {table.data
+            .filter((r) => r.id !== null && bulkZipIds.includes(r.id))
+            .map((staff) => (
+              <div key={staff.id} id={`zip-card-${staff.id}`} className="p-4 bg-white">
+                <StaffReportCard staff={staff} config={config} type={tab} />
+              </div>
+            ))}
+        </div>
+      )}
 
       {/* Print-only layout */}
       {(printStaffId !== null || printAllStaff) && table.data && (

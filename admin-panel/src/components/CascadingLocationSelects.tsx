@@ -18,10 +18,12 @@ export function CascadingLocationSelects({
   tree,
   locationId,
   onChange,
+  className = "w-full",
 }: {
   tree: LocationNode[];
   locationId: number | null;
   onChange: (id: number | null) => void;
+  className?: string;
 }) {
   const activeLocationPath = useMemo(() => {
     if (!locationId || !tree.length) return null;
@@ -80,7 +82,7 @@ export function CascadingLocationSelects({
         <select
           key={lvl.depth}
           aria-label={lvl.label}
-          className={`${inputClass} max-w-36`}
+          className={`${inputClass} ${className}`}
           value={lvl.selectedId ? String(lvl.selectedId) : ""}
           onChange={(e) => handleLocationChange(lvl.depth, e.target.value)}
         >

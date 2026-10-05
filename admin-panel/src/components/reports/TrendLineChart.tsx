@@ -174,7 +174,7 @@ export function TrendLineChart({
           {/* end dots (or the hovered position's dots), each with a 2px surface ring */}
           {series.map((s) => {
             const i = active ?? last;
-            if (i < 0) return null;
+            if (i < 0 || !points[i]) return null;
             return (
               <circle
                 key={s.key}
@@ -193,12 +193,12 @@ export function TrendLineChart({
               <text
                 key={s.key}
                 x={x(last) + 10}
-                y={y(Number(points[last][s.key]) || 0)}
+                y={y(Number(points[last]?.[s.key]) || 0)}
                 dy="0.32em"
                 fontSize={11}
                 fill={INK.secondary}
               >
-                {s.label} {Number(points[last][s.key]).toLocaleString()}
+                {s.label} {Number(points[last]?.[s.key] || 0).toLocaleString()}
               </text>
             ))}
         </svg>

@@ -101,9 +101,13 @@ def _get_scoped(ctx: AccessContext, generated_id: str, detail: bool = True) -> C
 
 
 @router.get("/admin/stats")
-def get_admin_dashboard_stats(ctx: AccessContext = Depends(require_permission("complaint.view"))):
+def get_admin_dashboard_stats(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    ctx: AccessContext = Depends(require_permission("complaint.view"))
+):
     scoped = _scoped(ctx)
-    stats = dashboard_stats(ctx.db, scoped, DASHBOARD_TREND_DAYS, DASHBOARD_COMPARISON_DAYS)
+    stats = dashboard_stats(ctx.db, scoped, DASHBOARD_TREND_DAYS, DASHBOARD_COMPARISON_DAYS, date_from, date_to)
 
     total_users = None
     if ctx.has("user.view"):

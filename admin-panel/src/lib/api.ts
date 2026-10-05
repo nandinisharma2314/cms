@@ -1050,7 +1050,7 @@ export const api = {
     order: (ids: number[]) => request<Priority[]>("/priorities/order", { method: "PUT", body: { ids } }),
   },
   complaints: {
-    stats: () => request<DashboardStats>("/complaints/admin/stats"),
+    stats: (query?: { date_from?: string; date_to?: string }) => request<DashboardStats>("/complaints/admin/stats", { query }),
     facets: () => request<ComplaintFacets>("/complaints/facets"),
     classificationOptions: () => request<ClassificationOptions>("/complaints/classification-options"),
     list: (

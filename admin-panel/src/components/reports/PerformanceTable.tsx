@@ -59,11 +59,15 @@ export function PerformanceTable({
   nameLabel,
   showRole = false,
   onPrintStaffId,
+  selectedRowIds,
+  onSelectionChange,
 }: {
   rows: PerformanceRow[];
   nameLabel: string;
   showRole?: boolean;
   onPrintStaffId?: (id: number) => void;
+  selectedRowIds?: number[];
+  onSelectionChange?: (ids: number[]) => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "total", desc: true });
   const sorted = [...rows].sort((a, b) => {
@@ -96,14 +100,49 @@ export function PerformanceTable({
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] tracking-wider">
-            {header("name", nameLabel, undefined, "text-left pl-2 sm:pl-5 pr-1.5 sm:pr-3")}
+            {selectedRowIds && onSelectionChange && (
+              <th className="pl-3 sm:pl-4 py-2.5 w-8">
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  checked={rows.filter(r => r.id !== null).length > 0 && selectedRowIds.length === rows.filter(r => r.id !== null).length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      onSelectionChange(rows.map(r => r.id).filter(id => id !== null) as number[]);
+                    } else {
+                      onSelectionChange([]);
+                    }
+                  }}
+                  title="Select all"
+                />
+              </th>
+            )}
+            {header("name", nameLabel, undefined, `text-left ${selectedRowIds ? "pl-2 sm:pl-3" : "pl-2 sm:pl-5"} pr-1.5 sm:pr-3`)}
             {COLUMNS.map((c) => header(c.key, c.label, c.title))}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50" style={{ fontVariantNumeric: "tabular-nums" }}>
           {sorted.map((row) => (
             <tr key={`${row.id}-${row.name}`} className="hover:bg-slate-50/70 group">
-              <td className="pl-2 sm:pl-5 pr-1.5 sm:pr-3 py-2.5">
+              {selectedRowIds && onSelectionChange && (
+                <td className="pl-3 sm:pl-4 py-2.5">
+                  {row.id !== null && (
+                    <input
+                      type="checkbox"
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      checked={selectedRowIds.includes(row.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onSelectionChange([...selectedRowIds, row.id!]);
+                        } else {
+                          onSelectionChange(selectedRowIds.filter(id => id !== row.id));
+                        }
+                      }}
+                    />
+                  )}
+                </td>
+              )}
+              <td className={`${selectedRowIds ? "pl-2 sm:pl-3" : "pl-2 sm:pl-5"} pr-1.5 sm:pr-3 py-2.5`}>
                 <div className="flex items-center gap-2">
                   <div>
                     <div className={`font-semibold whitespace-nowrap ${row.id === null ? "text-slate-500 italic" : "text-slate-800"}`}>{row.name}</div>

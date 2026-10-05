@@ -442,12 +442,21 @@ def group_counts(scoped: Query) -> dict[str, int]:
     return {group: sum(counts.get(s, 0) for s in statuses) for group, statuses in STATUS_GROUPS.items()}
 
 
-def dashboard_stats(db: Session, scoped: Query, trend_days: int, comparison_days: int) -> dict:
+def dashboard_stats(db: Session, scoped: Query, trend_days: int, comparison_days: int, date_from: str = None, date_to: str = None) -> dict:
     """Counts, changes over the last `comparison_days` (vs the same span before)
     and a daily trend over an already-scoped Complaint query. Days follow the
     organisation's time zone."""
     tz = settings_service.timezone(db)
     now = utcnow()
+    
+    # Apply date filters if provided
+    if date_from:
+        d_from = datetime.fromisoformat(date_from)
+        scoped = scoped.filter(Complaint.created_at >= d_from)
+    if date_to:
+        d_to = datetime.fromisoformat(date_to) + timedelta(days=1)
+        scoped = scoped.filter(Complaint.created_at < d_to)
+        
     by_status = dict(scoped.with_entities(Complaint.status, func.count(Complaint.id)).group_by(Complaint.status).all())
     total = sum(by_status.values())
     counts = {group: sum(by_status.get(s, 0) for s in statuses) for group, statuses in STATUS_GROUPS.items()}
@@ -473,10 +482,16 @@ def dashboard_stats(db: Session, scoped: Query, trend_days: int, comparison_days
         Department, Complaint.department_id == Department.id,
     ).group_by(Department.name).order_by(func.count(Complaint.id).desc()).all()
 
-    local_today = datetime.now(tz).date()
+    # Determine the end date for the trend
+    trend_end_date = datetime.fromisoformat(date_to).date() if date_to else datetime.now(tz).date()
+    actual_trend_days = trend_days
+    if date_from and date_to:
+        d_from_date = datetime.fromisoformat(date_from).date()
+        actual_trend_days = max(1, (trend_end_date - d_from_date).days + 1)
+    
     trend = []
-    for offset in range(trend_days - 1, -1, -1):
-        day = local_today - timedelta(days=offset)
+    for offset in range(actual_trend_days - 1, -1, -1):
+        day = trend_end_date - timedelta(days=offset)
         local_start = datetime.combine(day, datetime.min.time(), tz)
         start = local_start.astimezone(dt_timezone.utc).replace(tzinfo=None)
         end = (local_start + timedelta(days=1)).astimezone(dt_timezone.utc).replace(tzinfo=None)
