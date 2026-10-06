@@ -73,6 +73,13 @@ export function StaffReportCard({ staff, config, type = "agents" }: { staff: Per
               {config.organisation_name || "Organization Name"}
             </h1>
             <div className="text-sm text-slate-500 font-medium uppercase mt-1 tracking-wider">Performance Review 2026</div>
+            {(config.support?.email || config.support?.phone) && (
+              <div className="text-xs text-slate-500 mt-2 font-medium flex items-center gap-2">
+                {config.support.email && <span>{config.support.email}</span>}
+                {config.support.email && config.support.phone && <span className="text-slate-300">•</span>}
+                {config.support.phone && <span>{config.support.phone}</span>}
+              </div>
+            )}
           </div>
         </div>
         <div className="text-right flex flex-col items-end gap-1">

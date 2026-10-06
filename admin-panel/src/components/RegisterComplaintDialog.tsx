@@ -6,6 +6,7 @@ import { useConfig } from "@/lib/config";
 import { useApiData, useDebounced } from "@/lib/hooks";
 import { coversDepartment, treeInScope } from "@/lib/scope";
 import { useSession } from "@/lib/session";
+import { validateName, validatePhone } from "@/lib/validate";
 import { LocationPicker } from "./LocationPicker";
 import { ErrorBanner, Field, inputClass, Modal, primaryButtonClass, secondaryButtonClass, textareaClass } from "./ui";
 
@@ -95,6 +96,8 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reporterNameError, setReporterNameError] = useState<string | null>(null);
+  const [reporterPhoneError, setReporterPhoneError] = useState<string | null>(null);
 
   const departments = useMemo(() => (options?.departments ?? []).filter((d) => coversDepartment(me, d.id)), [options, me]);
   const department = departments.find((d) => d.id === departmentId) ?? null;
@@ -106,6 +109,14 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate reporter contact fields
+    if (reporter.kind === "contact") {
+      const nErr = validateName(reporter.name);
+      const pErr = reporter.phone.trim() ? validatePhone(reporter.phone) : null;
+      setReporterNameError(nErr);
+      setReporterPhoneError(pErr);
+      if (nErr || pErr) return;
+    }
     const effectiveLocationId =
       reporter.kind === "registered" && reporter.endUser?.location ? reporter.endUser.location.id : locationId;
     if (!department || !category) {
@@ -312,28 +323,36 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Name">
+              <Field label="Name" error={reporterNameError}>
                 <input
                   required
                   maxLength={limits.person_name}
                   value={reporter.name}
-                  onChange={(e) => setReporter({ ...reporter, name: e.target.value })}
-                  className={inputClass}
+                  className={reporterNameError ? `${inputClass} !border-red-400` : inputClass}
+                  onChange={(e) => {
+                    setReporter({ ...reporter, name: e.target.value });
+                    setReporterNameError(validateName(e.target.value));
+                  }}
                 />
               </Field>
               <Field
                 label="Mobile (optional)"
-                hint={
-                  phone.number_length
-                    ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
-                    : undefined
-                }
+                error={reporterPhoneError}
+                hint={phone.number_length
+                  ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
+                  : undefined}
               >
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={reporter.phone}
-                  onChange={(e) => setReporter({ ...reporter, phone: e.target.value })}
-                  className={inputClass}
+                  className={reporterPhoneError ? `${inputClass} !border-red-400` : inputClass}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setReporter({ ...reporter, phone: val });
+                    setReporterPhoneError(val ? validatePhone(val) : null);
+                  }}
                 />
               </Field>
             </div>

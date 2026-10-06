@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { BellRing, KeyRound, ListChecks, UserRound } from "lucide-react";
 import { AccountChoice, api, OtpChallenge, OtpChannel } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
+import { validatePhone } from "@/lib/validate";
 import { BrandMark } from "@/components/Brand/BrandMark";
 import {
   ArrowRightIcon,
@@ -166,6 +167,14 @@ export function LoginFlow() {
   };
 
   const sendCode = async () => {
+    // Validate phone number before calling the API
+    if (channel === "sms") {
+      const phoneErr = validatePhone(identifier);
+      if (phoneErr) {
+        setError(phoneErr);
+        return;
+      }
+    }
     setBusy(true);
     setError("");
     try {

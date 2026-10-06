@@ -171,6 +171,8 @@ export function Sidebar({
           from { opacity: 0; transform: translateX(-8px); }
           to { opacity: 1; transform: translateX(0); }
         }
+        .sidebar-nav::-webkit-scrollbar { display: none; }
+        .sidebar-nav { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-slate-900/60 lg:hidden" onClick={onCloseMobile} aria-hidden="true" />}
       <aside
@@ -199,7 +201,7 @@ export function Sidebar({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-1">
+        <nav className="sidebar-nav flex-1 overflow-y-auto px-3.5 py-4 space-y-1">
           {items.map((item) => {
             const itemPath = item.href.split("?")[0];
             const active = itemPath === "/" ? pathname === "/" : pathname === itemPath || pathname.startsWith(itemPath + "/");

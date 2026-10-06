@@ -63,6 +63,9 @@ export interface Profile {
   role: { key: string; name: string };
   /** Portal permissions of the End User role, e.g. "portal.complaint.create". */
   permissions: string[];
+  /** Government-issued identity numbers (read-only, set by admin). */
+  aadhaar_number?: string | null;
+  pan_number?: string | null;
 }
 
 export interface PortalDepartment {

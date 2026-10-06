@@ -7,6 +7,7 @@ import {
   Calendar,
   CheckCircle,
   ChevronLeft,
+  CreditCard,
   HelpCircle,
   Info,
   LogOut,
@@ -16,10 +17,11 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
-import { api, OtpChallenge, OtpChannel, Profile } from "@/lib/api";
+import { api, ApiError, OtpChallenge, OtpChannel, Profile } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { initials, today } from "@/lib/format";
 import { useEndUser } from "@/lib/session";
+import { validatePhone } from "@/lib/validate";
 import { SupportContacts } from "@/components/Brand/SupportContacts";
 import { Dialog } from "@/components/ui/Dialog";
 
@@ -61,6 +63,7 @@ function ContactChangeDialog({
   const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState(false); // true when backend says number already exists
   const [busy, setBusy] = useState(false);
   const label = channel === "sms" ? "mobile number" : "email address";
 
@@ -70,7 +73,12 @@ function ContactChangeDialog({
     try {
       await action();
     } catch (err) {
-      setError((err as Error).message);
+      // 409 = the number/email already belongs to another account in this system
+      if (err instanceof ApiError && err.status === 409) {
+        setDuplicate(true);
+      } else {
+        setError((err as Error).message);
+      }
     } finally {
       setBusy(false);
     }
@@ -78,6 +86,44 @@ function ContactChangeDialog({
 
   return (
     <Dialog title={`Change your ${label}`} icon={<ShieldCheck className="h-5 w-5 text-blue-600" />} onClose={onClose}>
+      {/* ── Duplicate-number warning popup ─────────────────────────────── */}
+      {duplicate && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Number already in use"
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-white/90 backdrop-blur-sm p-6"
+        >
+          <div className="flex flex-col items-center gap-4 text-center max-w-xs">
+            {/* Warning icon circle */}
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-9 w-9 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </span>
+            <div>
+              <h3 className="text-[17px] font-bold text-slate-800">Number already in use</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
+                <strong className="text-slate-700">{value}</strong> is already registered to another account in this system.
+                Please use a different {label}.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDuplicate(false);
+                setValue("");
+              }}
+              className="w-full rounded-2xl bg-amber-500 py-2.5 text-[14px] font-bold text-white hover:bg-amber-600 active:scale-[0.98] transition-all"
+            >
+              Try a different {label}
+            </button>
+          </div>
+        </div>
+      )}
+      {/* ── Normal error (non-409) ──────────────────────────────────────── */}
       {error && (
         <p role="alert" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-700">
           {error}
@@ -88,6 +134,13 @@ function ContactChangeDialog({
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            if (channel === "sms") {
+              const phoneErr = validatePhone(value.trim());
+              if (phoneErr) {
+                setError(phoneErr);
+                return;
+              }
+            }
             run(async () => setChallenge(await api.profile.requestContactChange(channel, value.trim())));
           }}
         >
@@ -96,17 +149,46 @@ function ContactChangeDialog({
           </p>
           <label className="block text-[13px] font-semibold text-slate-700">
             New {label}
-            <input
-              required
-              type={channel === "sms" ? "tel" : "email"}
-              autoComplete={channel === "sms" ? "tel-national" : "email"}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 text-[15px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
+            {channel === "sms" ? (
+              <span className="mt-1 flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 overflow-hidden">
+                {/* +91 prefix badge */}
+                <span className="flex shrink-0 items-center gap-1.5 border-r border-slate-200 bg-slate-50 px-3 py-3 text-[15px] font-bold text-slate-600 select-none">
+                  +91
+                </span>
+                <input
+                  required
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  maxLength={10}
+                  placeholder="Mobile number"
+                  value={value}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setValue(val);
+                    setDuplicate(false);
+                    setError(null);
+                  }}
+                  className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </span>
+            ) : (
+              <input
+                required
+                type="email"
+                autoComplete="email"
+                value={value}
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  setDuplicate(false);
+                  setError(null);
+                }}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 text-[15px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            )}
             {channel === "sms" && phone.number_length && (
               <span className="mt-1 block text-[12px] font-normal text-slate-500">
-                {phone.number_length} digits{phone.country_code ? `, with or without ${phone.country_code}` : ""}
+                {phone.number_length} digits after +91
               </span>
             )}
           </label>
@@ -243,7 +325,7 @@ export default function ProfilePage() {
                     <Mail size={12} className="text-slate-400" aria-hidden="true" /> {profile.email}
                   </span>
                 </p>
-                {profile.location && <p className="mt-0.5 text-xs text-slate-400">{profile.location.label}</p>}
+
               </div>
               <button
                 type="button"
@@ -324,7 +406,7 @@ export default function ProfilePage() {
                         id="dob"
                         type="date"
                         max={today()}
-                        disabled={!canEdit}
+                        disabled={true}
                         value={dob}
                         onChange={(e) => setDob(e.target.value)}
                         className={fieldClass}
@@ -332,6 +414,34 @@ export default function ProfilePage() {
                     </IconField>
                   </div>
 
+
+                  {/* Aadhaar Card */}
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="aadhaar">Aadhaar card number</Label>
+                    <IconField icon={<CreditCard size={16} />}>
+                      <input
+                        id="aadhaar"
+                        disabled
+                        value={profile.aadhaar_number ?? "—"}
+                        className={fieldClass}
+                        readOnly
+                      />
+                    </IconField>
+                  </div>
+
+                  {/* PAN Card */}
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="pan">PAN card number</Label>
+                    <IconField icon={<CreditCard size={16} />}>
+                      <input
+                        id="pan"
+                        disabled
+                        value={profile.pan_number ?? "—"}
+                        className={fieldClass}
+                        readOnly
+                      />
+                    </IconField>
+                  </div>
                 </div>
               )}
 
@@ -370,21 +480,46 @@ export default function ProfilePage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="address">Address</Label>
-                    <div className="relative">
-                      <MapPin size={16} className="pointer-events-none absolute left-4 top-3.5 text-slate-400" />
-                      <textarea
-                        id="address"
-                        rows={3}
-                        maxLength={limits.address}
-                        disabled={true}
-                        value={profile.location?.label || profile.location?.name || address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        className={`${fieldClass} resize-none`}
-                      />
+                  {/* Address — one box per location level */}
+                  {profile.location && profile.location.path_names.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-bold text-slate-800">Address</span>
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                        {profile.location.path_names.map((part, i) => {
+                          const total = profile.location!.path_names.length;
+                          const levelLabels = ["Country", "State", "District", "City", "Area", "Locality", "Sub-locality"];
+                          const label = i === total - 1
+                            ? (profile.location!.type_name || levelLabels[i] || `Level ${i + 1}`)
+                            : (levelLabels[i] || `Level ${i + 1}`);
+                          return (
+                            <div key={i} className="flex flex-col gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
+                              <div className="flex items-center gap-2 rounded-none border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                <MapPin size={13} className="shrink-0 text-slate-400" />
+                                <span className="text-sm font-semibold text-slate-700 truncate">{part}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="address">Address</Label>
+                      <div className="relative">
+                        <MapPin size={16} className="pointer-events-none absolute left-4 top-3.5 text-slate-400" />
+                        <textarea
+                          id="address"
+                          rows={3}
+                          maxLength={limits.address}
+                          disabled={true}
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          className={`${fieldClass} resize-none`}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -438,7 +573,7 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {tab !== "help" && (
+            {tab !== "help" && tab !== "personal" && (
               <div className="mt-auto flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-4 py-3 sm:px-8 md:bg-slate-50/50 md:py-5">
                 <button
                   type="button"
@@ -453,6 +588,17 @@ export default function ProfilePage() {
                   className="flex flex-1 items-center justify-center gap-2 rounded-none bg-[#0F62FE] px-8 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-60 md:flex-none"
                 >
                   {saving ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            )}
+            {tab === "personal" && (
+              <div className="mt-auto flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-4 py-3 sm:px-8 md:bg-slate-50/50 md:py-5">
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-none border border-red-200 bg-red-50 px-6 py-2.5 text-sm font-bold text-red-600 hover:bg-red-100 md:hidden"
+                >
+                  <LogOut size={16} /> Sign out
                 </button>
               </div>
             )}

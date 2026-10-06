@@ -233,13 +233,14 @@ def request_contact_change(db: Session, end_user: EndUser, channel: str, raw_val
     current = end_user.mobile if channel == "sms" else end_user.email
     if target == current:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That is already your registered contact")
-    new_mobile = target if channel == "sms" else end_user.mobile
-    new_email = target if channel == "email" else end_user.email
-    clash = db.query(EndUser).filter(
-        EndUser.mobile == new_mobile, EndUser.email == new_email, EndUser.id != end_user.id,
-    ).first()
-    if clash is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Another account already uses this mobile number and email")
+    if channel == "sms":
+        clash = db.query(EndUser).filter(EndUser.mobile == target, EndUser.id != end_user.id).first()
+        if clash:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Another account already uses this mobile number")
+    else:
+        clash = db.query(EndUser).filter(EndUser.email == target, EndUser.id != end_user.id).first()
+        if clash:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Another account already uses this email address")
     rate_limit_service.enforce(db, "otp_request_ip", client_ip, config.OTP_REQUESTS_PER_IP_PER_HOUR, HOUR,
                                "Too many code requests from this network. Please try again later.")
     rate_limit_service.enforce(db, "otp_request_target", f"{channel}:{target}",

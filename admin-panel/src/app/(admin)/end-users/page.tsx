@@ -7,6 +7,7 @@ import { api, EndUserRow, LocationNode } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { channelNames, formatDateTime } from "@/lib/format";
 import { useAction, useApiData, useDebounced } from "@/lib/hooks";
+import { validateName, validatePhone } from "@/lib/validate";
 import { treeInScope } from "@/lib/scope";
 import { useSession } from "@/lib/session";
 import { CsvImportPanel } from "@/components/CsvImportPanel";
@@ -45,12 +46,19 @@ function EndUserForm({
   const [mobile, setMobile] = useState(editing?.mobile ?? "");
   const [email, setEmail] = useState(editing?.email ?? "");
   const [locationId, setLocationId] = useState<number | null>(editing?.location?.id ?? null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [mobileError, setMobileError] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   // End users are placed by location only; any department scope covers them.
   const identityChanged = editing !== null && (mobile !== editing.mobile || email !== editing.email);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    const nErr = validateName(name);
+    const mErr = validatePhone(mobile);
+    setNameError(nErr);
+    setMobileError(mErr);
+    if (nErr || mErr) return;
     run(async () => {
       if (locationId === null) {
         throw new Error("Please choose an assigned workplace location for this employee.");
@@ -78,13 +86,16 @@ function EndUserForm({
       <form onSubmit={submit} className="space-y-3">
         <ErrorBanner message={error} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Name">
+          <Field label="Name" error={nameError}>
             <input
               required
               maxLength={limits.person_name}
-              className={inputClass}
+              className={nameError ? `${inputClass} !border-red-400` : inputClass}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameError(validateName(e.target.value));
+              }}
             />
           </Field>
           <Field label="User ID (optional)" hint="Your own reference, e.g. from another system">
@@ -97,13 +108,24 @@ function EndUserForm({
           </Field>
           <Field
             label="Mobile"
-            hint={
-              phone.number_length
-                ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
-                : undefined
-            }
+            error={mobileError}
+            hint={phone.number_length
+              ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
+              : undefined}
           >
-            <input required type="tel" className={inputClass} value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            <input
+              required
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              className={mobileError ? `${inputClass} !border-red-400` : inputClass}
+              value={mobile}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setMobile(val);
+                setMobileError(validatePhone(val));
+              }}
+            />
           </Field>
           <Field label="Email">
             <input

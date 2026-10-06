@@ -58,10 +58,10 @@ def scope_specificity(scopes: list[Scope], department_id: int, location_path: st
 def scopes_of(user: User) -> list[Scope]:
     scopes = [
         Scope(s.department_id, s.location.path if s.location else None)
-        for s in user.scopes
+        for s in getattr(user, "scopes", [])
     ]
-    if not scopes and (getattr(user, "primary_department_id", None) or getattr(user, "primary_location_id", None)):
-        loc_path = user.primary_location.path if user.primary_location else None
+    if getattr(user, "primary_department_id", None) or getattr(user, "primary_location_id", None):
+        loc_path = user.primary_location.path if getattr(user, "primary_location", None) else None
         scopes.append(Scope(user.primary_department_id, loc_path))
     return scopes
 

@@ -22,6 +22,7 @@ import { useApiData, useDebounced } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { passwordHint, passwordProblems } from "@/components/ChangePasswordForm";
 import { RequirePermission } from "@/components/RequirePermission";
+import { validateName, validatePhone } from "@/lib/validate";
 import { ScopeEditor, scopeLabel } from "@/components/ScopeEditor";
 import { LocationPicker } from "@/components/LocationPicker";
 import {
@@ -118,6 +119,8 @@ function UserForm({
   const [showPermissions, setShowPermissions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [mobileError, setMobileError] = useState<string | null>(null);
   const problems = !editing && form.password ? passwordProblems(form.password, rules) : [];
 
 
@@ -174,6 +177,11 @@ function UserForm({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nErr = validateName(form.name);
+    const mErr = form.mobile.trim() ? validatePhone(form.mobile) : null;
+    setNameError(nErr);
+    setMobileError(mErr);
+    if (nErr || mErr) return;
     if (form.role_id === null) {
       setError("Choose a role.");
       return;
@@ -258,13 +266,16 @@ function UserForm({
       <form onSubmit={submit} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
         <ErrorBanner message={error} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Full name">
+          <Field label="Full name" error={nameError}>
             <input
               required
               maxLength={limits.staff_name}
-              className={inputClass}
+              className={nameError ? `${inputClass} !border-red-400` : inputClass}
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value });
+                setNameError(validateName(e.target.value));
+              }}
             />
           </Field>
           <Field label="Email">
@@ -279,17 +290,22 @@ function UserForm({
           </Field>
           <Field
             label="Mobile (optional)"
-            hint={
-              phone.number_length
-                ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
-                : undefined
-            }
+            error={mobileError}
+            hint={phone.number_length
+              ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
+              : undefined}
           >
             <input
               type="tel"
-              className={inputClass}
+              inputMode="numeric"
+              maxLength={10}
+              className={mobileError ? `${inputClass} !border-red-400` : inputClass}
               value={form.mobile}
-              onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setForm({ ...form, mobile: val });
+                setMobileError(val ? validatePhone(val) : null);
+              }}
             />
           </Field>
           <Field label="Role">

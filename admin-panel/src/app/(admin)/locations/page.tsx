@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, Download, FileSpreadsheet, Layers, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { api, LocationLevel, LocationNode } from "@/lib/api";
@@ -40,21 +40,40 @@ interface RowActions {
 }
 
 
+// Context that lets sibling TreeRows close each other.
+// Key = `${depth}-${parentId ?? 'root'}`, value = currently-open node id (or null).
+type AccordionCtx = {
+  openMap: Record<string, number | null>;
+  setOpen: (key: string, id: number | null) => void;
+};
+const AccordionContext = React.createContext<AccordionCtx>({
+  openMap: {},
+  setOpen: () => {},
+});
+
 function TreeRow({
   node,
   depth,
+  parentId,
   actions,
   forceReload,
 }: {
   node: LocationNode;
   depth: number;
+  parentId: number | null;
   actions: RowActions;
   forceReload: number;
 }) {
-  const [expanded, setExpanded] = useState(depth < 1); // Expand first 2 levels by default? Actually just root.
+  const { openMap, setOpen } = useContext(AccordionContext);
+  const groupKey = `${depth}-${parentId ?? 'root'}`;
+  const expanded = openMap[groupKey] === node.id;
   const [children, setChildren] = useState<LocationNode[] | null>(null);
   const [loading, setLoading] = useState(false);
   const hasChildren = actions.hasChildLevel(node);
+
+  const toggle = useCallback(() => {
+    setOpen(groupKey, expanded ? null : node.id);
+  }, [expanded, groupKey, node.id, setOpen]);
 
   useEffect(() => {
     let active = true;
@@ -78,7 +97,7 @@ function TreeRow({
       >
         <button
           type="button"
-          onClick={() => setExpanded(!expanded)}
+          onClick={toggle}
           className={`w-5 h-5 flex items-center justify-center rounded text-slate-400 ${hasChildren ? "cursor-pointer hover:bg-slate-100" : "invisible"}`}
           aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
           aria-expanded={expanded}
@@ -136,6 +155,7 @@ function TreeRow({
             key={child.id}
             node={child}
             depth={depth + 1}
+            parentId={node.id}
             actions={actions}
             forceReload={forceReload}
           />
@@ -351,6 +371,15 @@ function LocationsTree() {
   const { error: actionError, run } = useAction();
   const [forceReload, setForceReload] = useState(0);
 
+  // Accordion state: one open node per sibling group.
+  const [openMap, setOpenMap] = useState<Record<string, number | null>>({});
+  const accordionCtx: AccordionCtx = {
+    openMap,
+    setOpen: useCallback((key: string, id: number | null) => {
+      setOpenMap(prev => ({ ...prev, [key]: id }));
+    }, []),
+  };
+
   const {
     data,
     error: loadError,
@@ -451,9 +480,11 @@ Children will be hidden while inactive.`)) return;
               : "Set up the location levels (Levels) before adding locations."}
           </p>
         ) : (
-          tree.map((node) => (
-            <TreeRow key={node.id} node={node} depth={0} actions={actions} forceReload={forceReload} />
-          ))
+          <AccordionContext.Provider value={accordionCtx}>
+            {tree.map((node) => (
+              <TreeRow key={node.id} node={node} depth={0} parentId={null} actions={actions} forceReload={forceReload} />
+            ))}
+          </AccordionContext.Provider>
         )}
       </Card>
 
