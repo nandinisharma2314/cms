@@ -1,8 +1,6 @@
 """Tests for staff grievances, anti-conflict isolation, team management, and custom permissions."""
-import pytest
 from conftest import (
-    ADMIN, CITY_AGENT, ELEC_AGENT, ELEC_MANAGER, ELEC_SUPERVISOR, SUPER_ADMIN, WATER_AGENT,
-    first_login, staff_login,
+    ADMIN, CITY_AGENT, ELEC_AGENT, ELEC_MANAGER, ELEC_SUPERVISOR, first_login,
 )
 from factories import PASSWORD
 
@@ -34,7 +32,6 @@ def test_file_grievance_and_anti_conflict(client, login):
     assert res.status_code == 201, res.text
     grievance = res.json()
     tracking_id = grievance["tracking_id"]
-    grievance_id = grievance["id"]
     assert tracking_id.startswith("GRV-")
     assert grievance["status"] == "submitted"
     assert grievance["reporter"]["email"] == ELEC_AGENT
@@ -398,4 +395,3 @@ def test_input_field_validations(client, login):
         )
         assert long_reassign_res.status_code == 400
         assert "too long" in long_reassign_res.json()["detail"].lower()
-

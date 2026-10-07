@@ -239,7 +239,7 @@ def get_end_user_profile(
 
     complaints_query = db.query(Complaint).filter(Complaint.end_user_id == end_user.id)
     total_complaints = complaints_query.count()
-    
+
     # Calculate stats
     from services.statuses import RESOLVED, CLOSED, REJECTED
     resolved_count = complaints_query.filter(Complaint.status.in_([RESOLVED, CLOSED])).count()

@@ -97,14 +97,14 @@ def get_nodes(db: Session, parent_id: int | None = None, include_inactive: bool 
     query = db.query(Location)
     if not include_inactive:
         query = query.filter(Location.is_active.is_(True))
-    
+
     if parent_id is None:
         query = query.filter(Location.parent_id.is_(None))
     else:
         query = query.filter(Location.parent_id == parent_id)
-        
+
     locations = query.order_by(Location.name).all()
-    
+
     return [
         {
             "id": loc.id,
@@ -125,7 +125,7 @@ def get_path(db: Session, location_id: int) -> list[dict]:
     target = db.get(Location, location_id)
     if not target:
         return []
-    
+
     p_ids = path_ids(target.path)
     nodes_by_id = {
         loc.id: {
@@ -140,7 +140,7 @@ def get_path(db: Session, location_id: int) -> list[dict]:
         }
         for loc in db.query(Location).filter(Location.id.in_(p_ids)).all()
     }
-    
+
     # Return ordered path
     return [nodes_by_id[pid] for pid in p_ids if pid in nodes_by_id]
 

@@ -45,7 +45,12 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_staff_grievances_accused_user_id'), 'staff_grievances', ['accused_user_id'], unique=False)
-    op.create_index(op.f('ix_staff_grievances_assigned_investigator_id'), 'staff_grievances', ['assigned_investigator_id'], unique=False)
+    op.create_index(
+        op.f('ix_staff_grievances_assigned_investigator_id'),
+        'staff_grievances',
+        ['assigned_investigator_id'],
+        unique=False,
+    )
     op.create_index(op.f('ix_staff_grievances_created_at'), 'staff_grievances', ['created_at'], unique=False)
     op.create_index(op.f('ix_staff_grievances_id'), 'staff_grievances', ['id'], unique=False)
     op.create_index(op.f('ix_staff_grievances_reporter_id'), 'staff_grievances', ['reporter_id'], unique=False)
@@ -76,7 +81,12 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('storage_name')
     )
-    op.create_index(op.f('ix_staff_grievance_attachments_grievance_id'), 'staff_grievance_attachments', ['grievance_id'], unique=False)
+    op.create_index(
+        op.f('ix_staff_grievance_attachments_grievance_id'),
+        'staff_grievance_attachments',
+        ['grievance_id'],
+        unique=False,
+    )
     op.create_index(op.f('ix_staff_grievance_attachments_id'), 'staff_grievance_attachments', ['id'], unique=False)
     op.create_table('staff_grievance_events',
     sa.Column('id', sa.Integer(), nullable=False),
