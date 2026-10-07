@@ -2,7 +2,7 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import or_
@@ -15,7 +15,6 @@ from models import (
     GRIEVANCE_STATUSES,
     GRIEVANCE_STATUS_ACTION_TAKEN,
     GRIEVANCE_STATUS_DISMISSED,
-    GRIEVANCE_STATUS_INVESTIGATING,
     GRIEVANCE_STATUS_RESOLVED,
     GRIEVANCE_STATUS_SUBMITTED,
     GRIEVANCE_STATUS_UNDER_REVIEW,
@@ -28,7 +27,7 @@ from models import (
     User,
     max_length,
 )
-from services import audit_service, grievance_service, settings_service
+from services import audit_service, settings_service
 from services.access_service import AccessContext
 from services.attachment_service import StoredFiles
 from services.grievance_service import (
@@ -94,7 +93,7 @@ def get_options(ctx: AccessContext = Depends(require_permission("grievance.file"
             investigators.append({"id": u.id, "name": u.name, "role": u.role.name})
 
     departments = [{"id": d.id, "name": d.name} for d in db.query(Department).filter(Department.is_active.is_(True)).all()]
-    locations = [{"id": l.id, "name": l.name} for l in db.query(Location).filter(Location.is_active.is_(True)).all()]
+    locations = [{"id": loc.id, "name": loc.name} for loc in db.query(Location).filter(Location.is_active.is_(True)).all()]
 
     return {
         "target_types": list(GRIEVANCE_TARGET_TYPES),
@@ -214,8 +213,8 @@ def file_grievance(
     if incident_date:
         try:
             parsed_date = date.fromisoformat(incident_date)
-        except ValueError:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid incident date format (YYYY-MM-DD)")
+        except ValueError as err:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid incident date format (YYYY-MM-DD)") from err
         if parsed_date > utcnow().date():
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Incident date cannot be in the future")
 

@@ -9,7 +9,6 @@ from services.location_service import (
     get_nodes, get_path, create_location, find_child, location_types_by_depth, path_names, serialize_location,
 )
 from utils.auth_middleware import require_permission
-from utils.csv_export import csv_response
 
 router = APIRouter()
 
@@ -94,7 +93,11 @@ def delete_location_type(type_id: int, request: Request,
 # ---------------------------------------------------------------------------
 
 @router.get("/nodes")
-def location_nodes(parent_id: int | None = None, include_inactive: bool = False, ctx: AccessContext = Depends(require_permission("location.view"))):
+def location_nodes(
+    parent_id: int | None = None,
+    include_inactive: bool = False,
+    ctx: AccessContext = Depends(require_permission("location.view")),
+):
     return get_nodes(ctx.db, parent_id=parent_id, include_inactive=include_inactive)
 
 @router.get("/path/{location_id}")

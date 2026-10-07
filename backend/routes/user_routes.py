@@ -104,7 +104,12 @@ def _get_manageable(ctx: AccessContext, user_id: int) -> User:
     return user
 
 
-def _validate_primary_workplace(db: Session, ctx: AccessContext, department_id: int | None, location_id: int | None) -> tuple[Department | None, Location | None]:
+def _validate_primary_workplace(
+    db: Session,
+    ctx: AccessContext,
+    department_id: int | None,
+    location_id: int | None,
+) -> tuple[Department | None, Location | None]:
     dept = None
     if department_id is not None:
         dept = db.get(Department, department_id)
@@ -113,13 +118,17 @@ def _validate_primary_workplace(db: Session, ctx: AccessContext, department_id: 
     loc = None
     if location_id is not None:
         loc = require_usable(db, db.get(Location, location_id))
-    if department_id is not None or location_id is not None:
-        if not ctx.covers(department_id, loc.path if loc else None):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Primary workplace is outside your scope")
+    if (department_id is not None or location_id is not None) and not ctx.covers(department_id, loc.path if loc else None):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Primary workplace is outside your scope")
     return dept, loc
 
 
-def _build_custom_permissions(db: Session, ctx: AccessContext, user: User, requested: list[CustomPermissionInput]) -> list[UserPermission]:
+def _build_custom_permissions(
+    db: Session,
+    ctx: AccessContext,
+    user: User,
+    requested: list[CustomPermissionInput],
+) -> list[UserPermission]:
     result = []
     seen = set()
     for item in requested:
