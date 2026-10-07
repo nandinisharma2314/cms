@@ -1,7 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-
 import React, { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, Printer } from "lucide-react";
@@ -12,37 +11,37 @@ import { useApiData } from "@/lib/hooks";
 import { RequirePermission } from "@/components/RequirePermission";
 import { ErrorBanner, Spinner } from "@/components/ui";
 
-function Indicator({ 
-  row, 
-  label, 
-  field, 
-  desc, 
-    format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
-}: { 
-    row: any; 
-  label: string; 
-  field: string; 
+function Indicator({
+  row,
+  label,
+  field,
+  desc,
+  format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—"),
+}: {
+  row: any;
+  label: string;
+  field: string;
   desc: string;
-    format?: (v: any) => React.ReactNode;
+  format?: (v: any) => React.ReactNode;
 }) {
   const val = row[field];
-  
+
   let colorClass = "text-slate-800";
-  if (typeof val === 'number') {
-    if (field.includes('sla')) {
+  if (typeof val === "number") {
+    if (field.includes("sla")) {
       colorClass = val < 70 ? "text-red-500" : val < 90 ? "text-orange-500" : "text-green-500";
-    } else if (field === 'avg_rating') {
+    } else if (field === "avg_rating") {
       colorClass = val < 3 ? "text-red-500" : val < 4 ? "text-orange-500" : "text-green-500";
-    } else if (['pending', 'rejected', 'sla_breaches', 'escalated_now', 'reopened'].includes(field)) {
+    } else if (["pending", "rejected", "sla_breaches", "escalated_now", "reopened"].includes(field)) {
       colorClass = val === 0 ? "text-green-500" : val < 5 ? "text-orange-500" : "text-red-500";
-    } else if (field === 'resolved') {
+    } else if (field === "resolved") {
       colorClass = "text-green-600";
     } else {
       // Default for total, avg_response_hours, etc
       colorClass = "text-slate-800";
     }
   }
-  
+
   return (
     <div className="flex justify-between items-center border-b border-slate-50 pb-3">
       <div>
@@ -56,8 +55,13 @@ function Indicator({
   );
 }
 
-function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: any }) {
-  const initials = staff.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+function StaffReportCard({ staff, config }: { staff: PerformanceRow; config: any }) {
+  const initials = staff.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
   const total = staff.total;
   const solved = staff.resolved;
   const unsolved = staff.pending;
@@ -103,7 +107,7 @@ function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: any
             <CheckCircle className="w-6 h-6 text-green-500 fill-white" />
           </div>
         </div>
-          <div className="flex-1">
+        <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">{staff.name}</h2>
           <div className="text-sm font-semibold text-slate-500 tracking-wider mb-4 mt-1">
             <span className="uppercase">{staff.role || "Staff Member"}</span>
@@ -166,7 +170,9 @@ function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: any
               <div className="space-y-1 mt-4">
                 <div className="flex justify-between items-end">
                   <span className="text-sm font-bold text-slate-700">Solved Complaints</span>
-                  <span className="text-sm font-bold text-green-600">{solved} ({solvedPct.toFixed(0)}%)</span>
+                  <span className="text-sm font-bold text-green-600">
+                    {solved} ({solvedPct.toFixed(0)}%)
+                  </span>
                 </div>
                 <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                   <div className="h-full bg-green-500 rounded-full" style={{ width: `${solvedPct}%` }} />
@@ -175,7 +181,9 @@ function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: any
               <div className="space-y-1">
                 <div className="flex justify-between items-end">
                   <span className="text-sm font-bold text-slate-700">Unsolved Complaints</span>
-                  <span className="text-sm font-bold text-orange-500">{unsolved} ({unsolvedPct.toFixed(0)}%)</span>
+                  <span className="text-sm font-bold text-orange-500">
+                    {unsolved} ({unsolvedPct.toFixed(0)}%)
+                  </span>
                 </div>
                 <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                   <div className="h-full bg-orange-400 rounded-full" style={{ width: `${unsolvedPct}%` }} />
@@ -196,17 +204,47 @@ function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: any
           <Indicator row={staff} label="Pending" field="pending" desc="Currently open or in progress" />
           <Indicator row={staff} label="Resolved" field="resolved" desc="Successfully closed" />
           <Indicator row={staff} label="Rejected" field="rejected" desc="Invalid or duplicate" />
-          <Indicator row={staff} label="Avg response" field="avg_response_hours" desc="Time to first response" format={formatHours} />
-          <Indicator row={staff} label="Avg resolution" field="avg_resolution_hours" desc="Time to resolution" format={formatHours} />
-          <Indicator row={staff} label="Response SLA" field="response_sla_pct" desc="Response targets met" format={(v) => v !== null ? `${v.toFixed(0)}%` : "—"} />
-          <Indicator row={staff} label="Resolution SLA" field="resolution_sla_pct" desc="Resolution targets met" format={(v) => v !== null ? `${v.toFixed(0)}%` : "—"} />
+          <Indicator
+            row={staff}
+            label="Avg response"
+            field="avg_response_hours"
+            desc="Time to first response"
+            format={formatHours}
+          />
+          <Indicator
+            row={staff}
+            label="Avg resolution"
+            field="avg_resolution_hours"
+            desc="Time to resolution"
+            format={formatHours}
+          />
+          <Indicator
+            row={staff}
+            label="Response SLA"
+            field="response_sla_pct"
+            desc="Response targets met"
+            format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
+          />
+          <Indicator
+            row={staff}
+            label="Resolution SLA"
+            field="resolution_sla_pct"
+            desc="Resolution targets met"
+            format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
+          />
           <Indicator row={staff} label="Missed a target" field="sla_breaches" desc="SLA breaches" />
           <Indicator row={staff} label="Escalated now" field="escalated_now" desc="Currently escalated" />
-          <Indicator row={staff} label="Rating" field="avg_rating" desc="End user feedback" format={(v) => v !== null ? `${v.toFixed(1)} / 5` : "—"} />
+          <Indicator
+            row={staff}
+            label="Rating"
+            field="avg_rating"
+            desc="End user feedback"
+            format={(v) => (v !== null ? `${v.toFixed(1)} / 5` : "—")}
+          />
           <Indicator row={staff} label="Reopened" field="reopened" desc="Complaints reopened after resolution" />
         </div>
       </div>
-      
+
       <div className="mt-8 flex justify-between items-center text-[9px] font-semibold text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4">
         <div>Generated: {new Date().toLocaleString()}</div>
         <div>{config.organisation_name || "KVON TECH"} ERP • PERFORMANCE REVIEW</div>
@@ -223,10 +261,7 @@ function AllReportsContent() {
   const config = useConfig();
   useDocumentTitle("Bulk Staff Performance Review");
 
-  const { data: rows, error } = useApiData(
-    () => api.reports.table("agents", { date_from, date_to }),
-    [date_from, date_to]
-  );
+  const { data: rows, error } = useApiData(() => api.reports.table("agents", { date_from, date_to }), [date_from, date_to]);
 
   useEffect(() => {
     if (searchParams?.get("print") === "true" && rows) {
@@ -264,7 +299,9 @@ function AllReportsContent() {
         ))}
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         @media print {
           body * {
             visibility: hidden;
@@ -299,7 +336,9 @@ function AllReportsContent() {
             print-color-adjust: exact;
           }
         }
-      `}} />
+      `,
+        }}
+      />
     </div>
   );
 }

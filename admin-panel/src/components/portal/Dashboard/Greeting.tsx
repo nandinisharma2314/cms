@@ -23,7 +23,6 @@ export default function Greeting() {
         <h1 className="mt-0.5 text-[24px] font-bold leading-tight tracking-tight text-gray-800">
           {profile.name} <span aria-hidden="true">👋</span>
         </h1>
-
       </div>
       <div className="flex items-center gap-3">
         <Link

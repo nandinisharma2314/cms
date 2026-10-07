@@ -25,7 +25,6 @@ import { Dialog } from "@/components/portal/ui/Dialog";
 
 type Tab = "personal" | "contact" | "notifications" | "help";
 
-
 const fieldClass =
   "w-full rounded-none border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-800 shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500";
 
@@ -95,10 +94,19 @@ function ContactChangeDialog({
           <div className="flex flex-col items-center gap-4 text-center max-w-xs">
             {/* Warning icon circle */}
             <span className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-9 w-9 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-9 w-9 text-amber-500"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
             </span>
             <div>
@@ -185,9 +193,7 @@ function ContactChangeDialog({
               />
             )}
             {channel === "sms" && phone.number_length && (
-              <span className="mt-1 block text-[12px] font-normal text-slate-500">
-                {phone.number_length} digits after +91
-              </span>
+              <span className="mt-1 block text-[12px] font-normal text-slate-500">{phone.number_length} digits after +91</span>
             )}
           </label>
           <button
@@ -265,7 +271,6 @@ export default function ProfilePage() {
         if (dob) data.dob = dob;
         else data.clear_dob = true;
       }
-
     } else if (tab === "notifications") {
       if (notifySms !== profile.notify_sms) data.notify_sms = notifySms;
       if (notifyEmail !== profile.notify_email) data.notify_email = notifyEmail;
@@ -322,7 +327,6 @@ export default function ProfilePage() {
                     <Mail size={12} className="text-slate-400" aria-hidden="true" /> {profile.email}
                   </span>
                 </p>
-
               </div>
               <button
                 type="button"
@@ -361,7 +365,6 @@ export default function ProfilePage() {
 
         <div className="flex flex-1 flex-col">
           <form onSubmit={save} className="flex h-full flex-col">
-
             <div className="flex flex-1 flex-col gap-4 px-4 py-4 sm:px-8 md:gap-5 md:py-6">
               {message && (
                 <p
@@ -411,18 +414,11 @@ export default function ProfilePage() {
                     </IconField>
                   </div>
 
-
                   {/* Aadhaar Card */}
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="aadhaar">Aadhaar card number</Label>
                     <IconField icon={<CreditCard size={16} />}>
-                      <input
-                        id="aadhaar"
-                        disabled
-                        value={profile.aadhaar_number ?? "—"}
-                        className={fieldClass}
-                        readOnly
-                      />
+                      <input id="aadhaar" disabled value={profile.aadhaar_number ?? "—"} className={fieldClass} readOnly />
                     </IconField>
                   </div>
 
@@ -430,13 +426,7 @@ export default function ProfilePage() {
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="pan">PAN card number</Label>
                     <IconField icon={<CreditCard size={16} />}>
-                      <input
-                        id="pan"
-                        disabled
-                        value={profile.pan_number ?? "—"}
-                        className={fieldClass}
-                        readOnly
-                      />
+                      <input id="pan" disabled value={profile.pan_number ?? "—"} className={fieldClass} readOnly />
                     </IconField>
                   </div>
                 </div>
@@ -485,9 +475,10 @@ export default function ProfilePage() {
                         {profile.location.path_names.map((part: string, i: number) => {
                           const total = profile.location!.path_names.length;
                           const levelLabels = ["Country", "State", "District", "City", "Area", "Locality", "Sub-locality"];
-                          const label = i === total - 1
-                            ? (profile.location!.type_name || levelLabels[i] || `Level ${i + 1}`)
-                            : (levelLabels[i] || `Level ${i + 1}`);
+                          const label =
+                            i === total - 1
+                              ? profile.location!.type_name || levelLabels[i] || `Level ${i + 1}`
+                              : levelLabels[i] || `Level ${i + 1}`;
                           return (
                             <div key={i} className="flex flex-col gap-1">
                               <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>

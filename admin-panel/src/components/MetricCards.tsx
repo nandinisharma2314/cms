@@ -41,7 +41,10 @@ export function MetricCards({ metrics, loading, days }: { metrics: MetricCardDat
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 xl:gap-5">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex flex-col xl:flex-row items-center gap-2 xl:gap-4 p-2 xl:p-5 bg-white border border-slate-100 animate-pulse">
+          <div
+            key={i}
+            className="flex flex-col xl:flex-row items-center gap-2 xl:gap-4 p-2 xl:p-5 bg-white border border-slate-100 animate-pulse"
+          >
             <div className="w-8 h-8 xl:w-14 xl:h-14 rounded-lg xl:rounded-xl bg-slate-100 shrink-0" />
             <div className="flex flex-col items-center xl:items-start gap-1 xl:gap-2 flex-1 w-full">
               <div className="w-full xl:w-20 h-2 xl:h-3 bg-slate-100 rounded" />
@@ -59,12 +62,18 @@ export function MetricCards({ metrics, loading, days }: { metrics: MetricCardDat
         const Icon = card.icon;
         const innerContent = (
           <>
-            <div className={`w-8 h-8 xl:w-14 xl:h-14 rounded-lg xl:rounded-xl ${card.tint} flex items-center justify-center shrink-0`}>
+            <div
+              className={`w-8 h-8 xl:w-14 xl:h-14 rounded-lg xl:rounded-xl ${card.tint} flex items-center justify-center shrink-0`}
+            >
               <Icon className="w-4 h-4 xl:w-7 xl:h-7" />
             </div>
             <div className="flex flex-col min-w-0 items-center xl:items-start w-full">
-              <span className="text-[8.5px] sm:text-[10px] xl:text-xs font-semibold text-slate-500 leading-[1.1] sm:leading-tight break-words whitespace-normal text-center xl:text-left">{card.title}</span>
-              <span className="text-sm xl:text-2xl font-bold text-slate-800 tracking-tight my-0.5">{card.value.toLocaleString()}</span>
+              <span className="text-[8.5px] sm:text-[10px] xl:text-xs font-semibold text-slate-500 leading-[1.1] sm:leading-tight break-words whitespace-normal text-center xl:text-left">
+                {card.title}
+              </span>
+              <span className="text-sm xl:text-2xl font-bold text-slate-800 tracking-tight my-0.5">
+                {card.value.toLocaleString()}
+              </span>
               <div className="hidden xl:block">
                 <ChangeLine change={card.change} days={days} />
               </div>
@@ -72,7 +81,7 @@ export function MetricCards({ metrics, loading, days }: { metrics: MetricCardDat
           </>
         );
 
-        const className = `flex flex-col xl:flex-row items-center xl:items-start gap-1.5 xl:gap-4 p-2 xl:p-5 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] text-center xl:text-left ${card.href ? 'hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group block' : ''}`;
+        const className = `flex flex-col xl:flex-row items-center xl:items-start gap-1.5 xl:gap-4 p-2 xl:p-5 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] text-center xl:text-left ${card.href ? "hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group block" : ""}`;
 
         if (card.href) {
           return (

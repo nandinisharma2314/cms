@@ -56,11 +56,7 @@ export function PageHeader({
 }
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] ${className}`}>{children}</div>;
 }
 
 export function ErrorBanner({ message }: { message: string | null | undefined }) {
@@ -108,14 +104,26 @@ export function Toast({ message, onDone }: { message: string; onDone: () => void
   );
 }
 
-export function Field({ label, hint, error, children }: { label: string; hint?: React.ReactNode; error?: string | null; children: React.ReactNode }) {
+export function Field({
+  label,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  hint?: React.ReactNode;
+  error?: string | null;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block text-xs">
       <span className="block text-slate-600 mb-1 font-medium">{label}</span>
       {children}
-      {error
-        ? <span className="block text-[11px] text-red-500 mt-1 font-semibold">{error}</span>
-        : hint && <span className="block text-[11px] text-slate-400 mt-1">{hint}</span>}
+      {error ? (
+        <span className="block text-[11px] text-red-500 mt-1 font-semibold">{error}</span>
+      ) : (
+        hint && <span className="block text-[11px] text-slate-400 mt-1">{hint}</span>
+      )}
     </label>
   );
 }

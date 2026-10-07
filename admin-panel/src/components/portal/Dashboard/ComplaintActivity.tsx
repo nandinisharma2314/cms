@@ -148,7 +148,9 @@ export default function ComplaintActivity({
                     setError("Choose a star rating to send your comment with it, or clear the comment.");
                     return;
                   }
-                  run(() => api.complaints.confirm(detail.id, can("feedback") && rating ? rating : null, feedback.trim() || null));
+                  run(() =>
+                    api.complaints.confirm(detail.id, can("feedback") && rating ? rating : null, feedback.trim() || null),
+                  );
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >

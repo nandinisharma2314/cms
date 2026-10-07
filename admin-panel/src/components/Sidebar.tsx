@@ -10,7 +10,7 @@ import {
   BarChart3,
   Building2,
   ChevronLeft,
-    FileText,
+  FileText,
   Headphones,
   History,
   Home,
@@ -119,28 +119,29 @@ function SidebarItem({ item, active, narrow }: { item: NavItem; active: boolean;
         onMouseLeave={() => setHovered(false)}
         aria-current={active ? "page" : undefined}
         className={`flex items-center w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-          active
-            ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
-            : "text-slate-300 hover:bg-[#1a274c] hover:text-white"
+          active ? "bg-blue-600 text-white shadow-md shadow-blue-900/30" : "text-slate-300 hover:bg-[#1a274c] hover:text-white"
         } ${narrow ? "justify-center" : ""}`}
       >
         <Icon className={`w-4.5 h-4.5 shrink-0 ${narrow ? "" : "mr-3"} ${active ? "" : "text-slate-400"}`} />
         {!narrow && <span>{item.label}</span>}
       </Link>
-      
-      {narrow && hovered && typeof document !== "undefined" && createPortal(
-        <div
-          style={{ 
-            top: pos.top, 
-            left: pos.left,
-            animation: "tooltipFade 0.15s ease-out forwards" 
-          }}
-          className="fixed px-2.5 py-1 bg-[#1b284e] text-white text-[11px] font-medium rounded shadow-xl border border-[#2a3f72] pointer-events-none z-[100] whitespace-nowrap leading-tight"
-        >
-          {item.label}
-        </div>,
-        document.body
-      )}
+
+      {narrow &&
+        hovered &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            style={{
+              top: pos.top,
+              left: pos.left,
+              animation: "tooltipFade 0.15s ease-out forwards",
+            }}
+            className="fixed px-2.5 py-1 bg-[#1b284e] text-white text-[11px] font-medium rounded shadow-xl border border-[#2a3f72] pointer-events-none z-[100] whitespace-nowrap leading-tight"
+          >
+            {item.label}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -203,9 +204,7 @@ export function Sidebar({
           {items.map((item) => {
             const itemPath = item.href.split("?")[0];
             const active = itemPath === "/" ? pathname === "/" : pathname === itemPath || pathname.startsWith(itemPath + "/");
-            return (
-              <SidebarItem key={item.href} item={item} active={active} narrow={narrow} />
-            );
+            return <SidebarItem key={item.href} item={item} active={active} narrow={narrow} />;
           })}
         </nav>
 

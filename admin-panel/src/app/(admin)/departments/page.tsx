@@ -48,9 +48,7 @@ function PrioritySelect({
       <option value="" disabled>
         Priority…
       </option>
-      {current && !priorities.some((p) => p.id === current.id) && (
-        <option value={current.id}>{current.name} (retired)</option>
-      )}
+      {current && !priorities.some((p) => p.id === current.id) && <option value={current.id}>{current.name} (retired)</option>}
       {priorities.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}

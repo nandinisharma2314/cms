@@ -2,25 +2,14 @@
 
 import React, { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  Calendar,
-  Layers,
-  MapPin,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { Calendar, Layers, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
 import { api, StatusGroup } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { useApiData, useDebounced } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { GROUP_LABELS } from "@/lib/status";
 import { ComplaintTable } from "@/components/ComplaintTable";
-import {
-  ComplaintFilterDrawer,
-  ComplaintFilters,
-  countActiveFilters,
-} from "@/components/ComplaintFilterDrawer";
+import { ComplaintFilterDrawer, ComplaintFilters, countActiveFilters } from "@/components/ComplaintFilterDrawer";
 import { RequirePermission } from "@/components/RequirePermission";
 import { Card, ErrorBanner, PageHeader, Pagination, tabClass } from "@/components/ui";
 
@@ -32,7 +21,6 @@ const GROUP_TABS: { value: StatusGroup | ""; label: string }[] = [
 function pick<T extends string>(value: string | null, allowed: readonly T[]): T | "" {
   return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : "";
 }
-
 
 function EscalatedList({ initial }: { initial: ComplaintFilters }) {
   const { can } = useSession();
@@ -102,8 +90,8 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
 
   // Active filter chip labels
   const { data: _locPath } = useApiData(
-    () => filters.location_id ? api.locations.path(Number(filters.location_id)) : Promise.resolve([]),
-    [filters.location_id]
+    () => (filters.location_id ? api.locations.path(Number(filters.location_id)) : Promise.resolve([])),
+    [filters.location_id],
   );
   const selectedLocation = _locPath && _locPath.length > 0 ? _locPath[_locPath.length - 1] : null;
 
@@ -215,8 +203,8 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
                   {filters.date_from && filters.date_to
                     ? `${filters.date_from} → ${filters.date_to}`
                     : filters.date_from
-                    ? `From ${filters.date_from}`
-                    : `Until ${filters.date_to}`}
+                      ? `From ${filters.date_from}`
+                      : `Until ${filters.date_to}`}
                 </span>
                 <button
                   type="button"
@@ -346,21 +334,13 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
               complaints={data?.items ?? []}
               loading={loading}
               emptyText={
-                filters.escalated === "any"
-                  ? "No escalated complaints found."
-                  : "No complaints are currently escalated to you."
+                filters.escalated === "any" ? "No escalated complaints found." : "No complaints are currently escalated to you."
               }
             />
           </Card>
         )}
         {data && (
-          <Pagination
-            page={page}
-            pageSize={data.page_size}
-            total={data.total}
-            noun="escalated complaints"
-            onPage={setPage}
-          />
+          <Pagination page={page} pageSize={data.page_size} total={data.total} noun="escalated complaints" onPage={setPage} />
         )}
       </div>
 

@@ -2,25 +2,14 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Calendar,
-  Layers,
-  MapPin,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { Calendar, Layers, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
 import { api, StatusGroup } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { useApiData, useDebounced } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { GROUP_LABELS } from "@/lib/status";
 import { ComplaintTable } from "@/components/ComplaintTable";
-import {
-  ComplaintFilterDrawer,
-  ComplaintFilters,
-  countActiveFilters,
-} from "@/components/ComplaintFilterDrawer";
+import { ComplaintFilterDrawer, ComplaintFilters, countActiveFilters } from "@/components/ComplaintFilterDrawer";
 import { RequirePermission } from "@/components/RequirePermission";
 import { Card, ErrorBanner, PageHeader, Pagination, tabClass } from "@/components/ui";
 
@@ -33,17 +22,12 @@ function pick<T extends string>(value: string | null, allowed: readonly T[]): T 
   return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : "";
 }
 
-
 function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
   const { me, can } = useSession();
   const { ui } = useConfig();
   const [filters, setFilters] = useState<ComplaintFilters>(initial);
   useDocumentTitle(
-    filters.escalated === "me"
-      ? "Escalated to me"
-      : filters.escalated === "any"
-      ? "Escalated complaints"
-      : "Complaints",
+    filters.escalated === "me" ? "Escalated to me" : filters.escalated === "any" ? "Escalated complaints" : "Complaints",
   );
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -107,8 +91,8 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
 
   // Active filter chip labels
   const { data: _locPath } = useApiData(
-    () => filters.location_id ? api.locations.path(Number(filters.location_id)) : Promise.resolve([]),
-    [filters.location_id]
+    () => (filters.location_id ? api.locations.path(Number(filters.location_id)) : Promise.resolve([])),
+    [filters.location_id],
   );
   const selectedLocation = _locPath && _locPath.length > 0 ? _locPath[_locPath.length - 1] : null;
 
@@ -130,17 +114,17 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             filters.escalated === "me"
               ? "Complaints (Escalated to me)"
               : filters.escalated === "any"
-              ? "Escalated complaints"
-              : "Complaints"
+                ? "Escalated complaints"
+                : "Complaints"
           }
           description={
             filters.escalated === "me"
               ? "Complaints where an SLA target was missed and escalated to you for supervision."
               : filters.escalated === "any"
-              ? "Complaints across the system currently in an escalated state."
-              : me.is_super_admin
-              ? "All complaints in the system."
-              : "Complaints inside your department and location scope."
+                ? "Complaints across the system currently in an escalated state."
+                : me.is_super_admin
+                  ? "All complaints in the system."
+                  : "Complaints inside your department and location scope."
           }
         />
       </div>
@@ -230,8 +214,8 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
                   {filters.date_from && filters.date_to
                     ? `${filters.date_from} → ${filters.date_to}`
                     : filters.date_from
-                    ? `From ${filters.date_from}`
-                    : `Until ${filters.date_to}`}
+                      ? `From ${filters.date_from}`
+                      : `Until ${filters.date_to}`}
                 </span>
                 <button
                   type="button"
@@ -360,23 +344,11 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             <ComplaintTable
               complaints={data?.items ?? []}
               loading={loading}
-              emptyText={
-                filters.escalated === "any"
-                  ? "No escalated complaints found."
-                  : "No complaints match your filters."
-              }
+              emptyText={filters.escalated === "any" ? "No escalated complaints found." : "No complaints match your filters."}
             />
           </Card>
         )}
-        {data && (
-          <Pagination
-            page={page}
-            pageSize={data.page_size}
-            total={data.total}
-            noun="complaints"
-            onPage={setPage}
-          />
-        )}
+        {data && <Pagination page={page} pageSize={data.page_size} total={data.total} noun="complaints" onPage={setPage} />}
       </div>
 
       {/* Offcanvas Filter Drawer */}

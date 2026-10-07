@@ -11,8 +11,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   allowedDevOrigins: [
-    "*.pinggy.link", "*.pinggy.net", "*.loca.lt", "*.devtunnels.ms",
-    "*.free.pinggy.net", "*.run.pinggy-free.link", "*.serveo.net"
+    "*.pinggy.link",
+    "*.pinggy.net",
+    "*.loca.lt",
+    "*.devtunnels.ms",
+    "*.free.pinggy.net",
+    "*.run.pinggy-free.link",
+    "*.serveo.net",
   ],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
@@ -21,8 +26,8 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:5000/:path*"
-      }
+        destination: "http://localhost:5000/:path*",
+      },
     ];
   },
   // Raise the proxy timeout so large CSV exports (600k rows) don't time out

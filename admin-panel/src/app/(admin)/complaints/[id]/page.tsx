@@ -708,14 +708,12 @@ function ComplaintView() {
               <DetailRow label="Location">
                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                   <MapPin className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-                  {detail.location_detail.label.split(' > ').map((part, index, array) => (
+                  {detail.location_detail.label.split(" > ").map((part, index, array) => (
                     <React.Fragment key={index}>
                       <span className="bg-slate-50 text-slate-700 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border border-slate-200 shadow-sm">
                         {part}
                       </span>
-                      {index < array.length - 1 && (
-                        <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
-                      )}
+                      {index < array.length - 1 && <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />}
                     </React.Fragment>
                   ))}
                 </div>

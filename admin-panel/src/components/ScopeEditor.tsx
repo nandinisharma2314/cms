@@ -42,7 +42,9 @@ export function ScopeEditor({
               onChange={(e) => update(index, { department_id: e.target.value ? Number(e.target.value) : null })}
               aria-label="Department"
             >
-              <option value="" disabled={!allowAllDepartments}>All departments</option>
+              <option value="" disabled={!allowAllDepartments}>
+                All departments
+              </option>
               {departments
                 .filter((d) => d.is_active || d.id === scope.department_id)
                 .map((d) => (

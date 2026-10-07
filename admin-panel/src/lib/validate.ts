@@ -19,7 +19,6 @@ export function validateName(value: string): string | null {
   if (!stripped) return null; // empty = let `required` handle it
   // Allow unicode letters, spaces, hyphens and apostrophes
   if (/[0-9]/.test(stripped)) return "Name must not contain numbers.";
-  if (/[^a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F '\-]/.test(stripped))
-    return "Name must not contain special symbols.";
+  if (/[^a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F '\-]/.test(stripped)) return "Name must not contain special symbols.";
   return null;
 }

@@ -1,7 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-
 import React, { useEffect, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, Printer } from "lucide-react";
@@ -16,14 +15,11 @@ function ReportContent({ id }: { id: number }) {
   const searchParams = useSearchParams();
   const date_from = searchParams.get("date_from") ?? undefined;
   const date_to = searchParams.get("date_to") ?? undefined;
-  
+
   const config = useConfig();
   useDocumentTitle("Staff Performance Review");
 
-  const { data: rows, error } = useApiData(
-    () => api.reports.table("agents", { date_from, date_to }),
-    [date_from, date_to]
-  );
+  const { data: rows, error } = useApiData(() => api.reports.table("agents", { date_from, date_to }), [date_from, date_to]);
 
   useEffect(() => {
     if (searchParams?.get("print") === "true" && rows) {
@@ -47,7 +43,12 @@ function ReportContent({ id }: { id: number }) {
     window.print();
   };
 
-  const initials = staff.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
+  const initials = staff.name
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
 
   const total = staff.total;
   const solved = staff.resolved;
@@ -113,7 +114,7 @@ function ReportContent({ id }: { id: number }) {
               <span className="uppercase">{staff.role || "Staff Member"}</span>
               {staff.location && <span className="normal-case"> &bull; {staff.location}</span>}
             </div>
-            
+
             <div className="flex flex-row flex-wrap gap-x-12 gap-y-4 mt-2">
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Workplace</div>
@@ -163,9 +164,11 @@ function ReportContent({ id }: { id: number }) {
 
           {/* Velocity Metrics */}
           <div className="col-span-2 border border-slate-200 rounded-lg p-5 bg-slate-50 relative shadow-sm h-40">
-            <div className="absolute top-4 left-4 text-xs font-bold text-slate-500 tracking-wider uppercase">Velocity Metrics</div>
+            <div className="absolute top-4 left-4 text-xs font-bold text-slate-500 tracking-wider uppercase">
+              Velocity Metrics
+            </div>
             <div className="absolute top-4 right-4 text-xs font-bold text-slate-500 tracking-wider uppercase">Current Period</div>
-            
+
             <div className="mt-8 grid grid-cols-5 gap-6 h-full">
               <div className="col-span-2 flex flex-col items-center justify-center border-r border-slate-200 pr-4 mt-2">
                 <div className="text-6xl font-black text-slate-800 leading-none">{total}</div>
@@ -175,7 +178,9 @@ function ReportContent({ id }: { id: number }) {
                 <div className="space-y-1 mt-4">
                   <div className="flex justify-between items-end">
                     <span className="text-sm font-bold text-slate-700">Solved Complaints</span>
-                    <span className="text-sm font-bold text-green-600">{solved} ({solvedPct.toFixed(0)}%)</span>
+                    <span className="text-sm font-bold text-green-600">
+                      {solved} ({solvedPct.toFixed(0)}%)
+                    </span>
                   </div>
                   <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                     <div className="h-full bg-green-500 rounded-full" style={{ width: `${solvedPct}%` }} />
@@ -184,7 +189,9 @@ function ReportContent({ id }: { id: number }) {
                 <div className="space-y-1">
                   <div className="flex justify-between items-end">
                     <span className="text-sm font-bold text-slate-700">Unsolved Complaints</span>
-                    <span className="text-sm font-bold text-orange-500">{unsolved} ({unsolvedPct.toFixed(0)}%)</span>
+                    <span className="text-sm font-bold text-orange-500">
+                      {unsolved} ({unsolvedPct.toFixed(0)}%)
+                    </span>
                   </div>
                   <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                     <div className="h-full bg-orange-400 rounded-full" style={{ width: `${unsolvedPct}%` }} />
@@ -201,32 +208,64 @@ function ReportContent({ id }: { id: number }) {
             <h3 className="text-sm font-bold text-slate-700 tracking-wider uppercase">Performance Indicators</h3>
             <div className="text-xs font-bold text-slate-400 tracking-wider uppercase">{ratingOutOf5.toFixed(1)}/5 AVG</div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             <Indicator row={staff} label="Complaints" field="total" desc="Total complaints handled" />
             <Indicator row={staff} label="Pending" field="pending" desc="Currently open or in progress" />
             <Indicator row={staff} label="Resolved" field="resolved" desc="Successfully closed" />
             <Indicator row={staff} label="Rejected" field="rejected" desc="Invalid or duplicate" />
-            <Indicator row={staff} label="Avg response" field="avg_response_hours" desc="Time to first response" format={formatHours} />
-            <Indicator row={staff} label="Avg resolution" field="avg_resolution_hours" desc="Time to resolution" format={formatHours} />
-            <Indicator row={staff} label="Response SLA" field="response_sla_pct" desc="Response targets met" format={(v) => v !== null ? `${v.toFixed(0)}%` : "—"} />
-            <Indicator row={staff} label="Resolution SLA" field="resolution_sla_pct" desc="Resolution targets met" format={(v) => v !== null ? `${v.toFixed(0)}%` : "—"} />
+            <Indicator
+              row={staff}
+              label="Avg response"
+              field="avg_response_hours"
+              desc="Time to first response"
+              format={formatHours}
+            />
+            <Indicator
+              row={staff}
+              label="Avg resolution"
+              field="avg_resolution_hours"
+              desc="Time to resolution"
+              format={formatHours}
+            />
+            <Indicator
+              row={staff}
+              label="Response SLA"
+              field="response_sla_pct"
+              desc="Response targets met"
+              format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
+            />
+            <Indicator
+              row={staff}
+              label="Resolution SLA"
+              field="resolution_sla_pct"
+              desc="Resolution targets met"
+              format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
+            />
             <Indicator row={staff} label="Missed a target" field="sla_breaches" desc="SLA breaches" />
             <Indicator row={staff} label="Escalated now" field="escalated_now" desc="Currently escalated" />
-            <Indicator row={staff} label="Rating" field="avg_rating" desc="End user feedback" format={(v) => v !== null ? `${v.toFixed(1)} / 5` : "—"} />
+            <Indicator
+              row={staff}
+              label="Rating"
+              field="avg_rating"
+              desc="End user feedback"
+              format={(v) => (v !== null ? `${v.toFixed(1)} / 5` : "—")}
+            />
             <Indicator row={staff} label="Reopened" field="reopened" desc="Complaints reopened after resolution" />
           </div>
         </div>
-        
+
         {/* Footer */}
         <div className="mt-6 flex justify-between items-center text-[9px] font-semibold text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4">
           <div>Generated: {new Date().toLocaleString()}</div>
           <div>{config.organisation_name || "KVON TECH"} ERP • PERFORMANCE REVIEW</div>
         </div>
       </div>
-      
+
       {/* Print specific styles */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         @media print {
           body * {
             visibility: hidden;
@@ -252,42 +291,44 @@ function ReportContent({ id }: { id: number }) {
             print-color-adjust: exact;
           }
         }
-      `}} />
+      `,
+        }}
+      />
     </div>
   );
 }
 
-function Indicator({ 
-  row, 
-  label, 
-  field, 
-  desc, 
-    format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
-}: { 
-    row: any; 
-  label: string; 
-  field: string; 
+function Indicator({
+  row,
+  label,
+  field,
+  desc,
+  format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—"),
+}: {
+  row: any;
+  label: string;
+  field: string;
   desc: string;
-    format?: (v: any) => React.ReactNode;
+  format?: (v: any) => React.ReactNode;
 }) {
   const val = row[field];
-  
+
   let colorClass = "text-slate-800";
-  if (typeof val === 'number') {
-    if (field.includes('sla')) {
+  if (typeof val === "number") {
+    if (field.includes("sla")) {
       colorClass = val < 70 ? "text-red-500" : val < 90 ? "text-orange-500" : "text-green-500";
-    } else if (field === 'avg_rating') {
+    } else if (field === "avg_rating") {
       colorClass = val < 3 ? "text-red-500" : val < 4 ? "text-orange-500" : "text-green-500";
-    } else if (['pending', 'rejected', 'sla_breaches', 'escalated_now', 'reopened'].includes(field)) {
+    } else if (["pending", "rejected", "sla_breaches", "escalated_now", "reopened"].includes(field)) {
       colorClass = val === 0 ? "text-green-500" : val < 5 ? "text-orange-500" : "text-red-500";
-    } else if (field === 'resolved') {
+    } else if (field === "resolved") {
       colorClass = "text-green-600";
     } else {
       // Default for total, avg_response_hours, etc
       colorClass = "text-slate-800";
     }
   }
-  
+
   return (
     <div className="flex justify-between items-center border-b border-slate-50 pb-3">
       <div>
@@ -304,7 +345,7 @@ function Indicator({
 export default function StaffReportPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = parseInt(resolvedParams.id, 10);
-  
+
   return (
     <RequirePermission anyOf={["reports.view"]}>
       <ReportContent id={id} />

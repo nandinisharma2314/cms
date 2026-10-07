@@ -3,7 +3,6 @@ import { MapPin, SlidersHorizontal, X } from "lucide-react";
 import { Department, LocationNode, Priority } from "@/lib/api";
 import { inputClass } from "@/components/ui";
 
-
 function findNodePath(nodes: LocationNode[], targetId: number, currentPath: LocationNode[] = []): LocationNode[] | null {
   for (const node of nodes) {
     const path = [...currentPath, node];
@@ -38,13 +37,7 @@ export interface ReportFilterDrawerProps {
   facets?: ReportFacets | null;
 }
 
-export function ReportFilterDrawer({
-  open,
-  onClose,
-  filters,
-  onChange,
-  facets,
-}: ReportFilterDrawerProps) {
+export function ReportFilterDrawer({ open, onClose, filters, onChange, facets }: ReportFilterDrawerProps) {
   // Close on Escape key press
   useEffect(() => {
     if (!open) return;
@@ -89,7 +82,9 @@ export function ReportFilterDrawer({
 
     while (currentNodes && currentNodes.length > 0) {
       const selectedNode = activeLocationPath && activeLocationPath[depth] ? activeLocationPath[depth] : null;
-      const typeLabel = currentNodes[0]?.type_name || (depth === 0 ? "Country" : depth === 1 ? "State" : depth === 2 ? "District" : depth === 3 ? "City" : "Area / Zone");
+      const typeLabel =
+        currentNodes[0]?.type_name ||
+        (depth === 0 ? "Country" : depth === 1 ? "State" : depth === 2 ? "District" : depth === 3 ? "City" : "Area / Zone");
 
       levels.push({
         depth,
@@ -166,7 +161,6 @@ export function ReportFilterDrawer({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-5 space-y-6">
-            
             {/* Section: Location Selection */}
             <div>
               <div className="flex items-center gap-2 font-bold text-slate-900 mb-2">
@@ -191,9 +185,7 @@ export function ReportFilterDrawer({
             {activeLocationPath && (
               <div className="flex items-center gap-2 p-2.5 rounded-xl border border-blue-200 bg-blue-50/80 text-blue-900 text-xs mt-1">
                 <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span className="font-semibold truncate">
-                  {activeLocationPath.map((n) => n.name).join(" > ")}
-                </span>
+                <span className="font-semibold truncate">{activeLocationPath.map((n) => n.name).join(" > ")}</span>
                 <button
                   type="button"
                   onClick={() => onChange({ location_id: "" })}
@@ -229,7 +221,6 @@ export function ReportFilterDrawer({
             ) : (
               <p className="text-[11px] text-slate-400 italic mt-1">No locations configured.</p>
             )}
-
           </div>
         </div>
 

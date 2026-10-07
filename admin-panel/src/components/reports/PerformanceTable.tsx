@@ -104,10 +104,13 @@ export function PerformanceTable({
                 <input
                   type="checkbox"
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  checked={rows.filter(r => r.id !== null).length > 0 && selectedRowIds.length === rows.filter(r => r.id !== null).length}
+                  checked={
+                    rows.filter((r) => r.id !== null).length > 0 &&
+                    selectedRowIds.length === rows.filter((r) => r.id !== null).length
+                  }
                   onChange={(e) => {
                     if (e.target.checked) {
-                      onSelectionChange(rows.map(r => r.id).filter(id => id !== null) as number[]);
+                      onSelectionChange(rows.map((r) => r.id).filter((id) => id !== null) as number[]);
                     } else {
                       onSelectionChange([]);
                     }
@@ -134,7 +137,7 @@ export function PerformanceTable({
                         if (e.target.checked) {
                           onSelectionChange([...selectedRowIds, row.id!]);
                         } else {
-                          onSelectionChange(selectedRowIds.filter(id => id !== row.id));
+                          onSelectionChange(selectedRowIds.filter((id) => id !== row.id));
                         }
                       }}
                     />
@@ -144,17 +147,36 @@ export function PerformanceTable({
               <td className={`${selectedRowIds ? "pl-2 sm:pl-3" : "pl-2 sm:pl-5"} pr-1.5 sm:pr-3 py-2.5`}>
                 <div className="flex items-center gap-2">
                   <div>
-                    <div className={`font-semibold whitespace-nowrap ${row.id === null ? "text-slate-500 italic" : "text-slate-800"}`}>{row.name}</div>
+                    <div
+                      className={`font-semibold whitespace-nowrap ${row.id === null ? "text-slate-500 italic" : "text-slate-800"}`}
+                    >
+                      {row.name}
+                    </div>
                     {showRole && row.role && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.role}</div>}
-                    {row.path && row.path !== row.name && <div className="text-[10px] whitespace-nowrap text-slate-400">{row.path}</div>}
+                    {row.path && row.path !== row.name && (
+                      <div className="text-[10px] whitespace-nowrap text-slate-400">{row.path}</div>
+                    )}
                   </div>
                   {row.id !== null && onPrintStaffId && (
-                    <button 
+                    <button
                       onClick={() => onPrintStaffId(row.id!)}
                       className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all ml-2"
                       title="Generate PDF Report"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
                     </button>
                   )}
                 </div>

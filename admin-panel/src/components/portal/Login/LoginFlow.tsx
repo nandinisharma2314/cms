@@ -465,13 +465,8 @@ export function LoginFlow() {
                   <KeyRound size={28} className="text-blue-600" />
                 </div>
               </div>
-              <Heading title="Enter your password">
-                Welcome back! Please enter your password to sign in.
-              </Heading>
-              <form
-                className="flex flex-col gap-4 mt-2"
-                onSubmit={loginWithPassword}
-              >
+              <Heading title="Enter your password">Welcome back! Please enter your password to sign in.</Heading>
+              <form className="flex flex-col gap-4 mt-2" onSubmit={loginWithPassword}>
                 <label className="block">
                   <span className="sr-only">Password</span>
                   <span className="flex h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
@@ -528,7 +523,11 @@ export function LoginFlow() {
                 </button>
               )}
               <form onSubmit={verify} className="flex flex-1 flex-col">
-                <div className="mb-8 flex w-full items-center justify-center gap-1.5 sm:gap-2" role="group" aria-label="One-time code">
+                <div
+                  className="mb-8 flex w-full items-center justify-center gap-1.5 sm:gap-2"
+                  role="group"
+                  aria-label="One-time code"
+                >
                   {digits.map((digit, index) => (
                     <input
                       key={index}

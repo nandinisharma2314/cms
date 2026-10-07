@@ -14,18 +14,19 @@ const SERIES = [
 export function DashboardTrend({ trend, loading }: { trend: DashboardStats["trend"] | undefined; loading: boolean }) {
   const { ui } = useConfig();
   const [dateRange, setDateRange] = useState<DateRange>(null);
-  
+
   const customStats = useApiData(
     () => (dateRange ? api.complaints.stats(dateRange) : Promise.resolve(undefined)),
-    [dateRange?.date_from, dateRange?.date_to]
+    [dateRange?.date_from, dateRange?.date_to],
   );
-  
+
   const activeTrend = dateRange ? customStats.data?.trend : trend;
   const isLoading = dateRange ? customStats.loading : loading;
-  
-  const title = dateRange && dateRange.date_from && dateRange.date_to
-    ? `${formatDay(dateRange.date_from)} - ${formatDay(dateRange.date_to)}`
-    : `Last ${ui.dashboard_trend_days} days`;
+
+  const title =
+    dateRange && dateRange.date_from && dateRange.date_to
+      ? `${formatDay(dateRange.date_from)} - ${formatDay(dateRange.date_to)}`
+      : `Last ${ui.dashboard_trend_days} days`;
 
   return (
     <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-200/60 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] h-full transition-shadow hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">

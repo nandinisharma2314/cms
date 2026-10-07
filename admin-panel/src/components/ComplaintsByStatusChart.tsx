@@ -13,12 +13,12 @@ const GROUPS: StatusGroup[] = ["open", "in_progress", "resolved", "rejected"];
 export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardStats | undefined; loading: boolean }) {
   const [hovered, setHovered] = useState<StatusGroup | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>(null);
-  
+
   const customStats = useApiData(
     () => (dateRange ? api.complaints.stats(dateRange) : Promise.resolve(undefined)),
-    [dateRange?.date_from, dateRange?.date_to]
+    [dateRange?.date_from, dateRange?.date_to],
   );
-  
+
   const activeStats = dateRange ? customStats.data : stats;
   const isLoading = dateRange ? customStats.loading : loading;
 

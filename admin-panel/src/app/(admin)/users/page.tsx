@@ -5,17 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Power, Shield, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { EndUsersList } from "./EndUsersList";
-import {
-  api,
-  CustomPermissionInput,
-  Department,
-  PermissionDef,
-  RoleDetail,
-  RoleRef,
-  ScopeInput,
-  StaffUser,
-  Me,
-} from "@/lib/api";
+import { api, CustomPermissionInput, Department, PermissionDef, RoleDetail, RoleRef, ScopeInput, StaffUser, Me } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { useApiData, useDebounced } from "@/lib/hooks";
@@ -123,10 +113,9 @@ function UserForm({
   const [mobileError, setMobileError] = useState<string | null>(null);
   const problems = !editing && form.password ? passwordProblems(form.password, rules) : [];
 
-
   const assignableDepartments = useMemo(() => {
     if (me.is_super_admin) return departments;
-    return departments.filter(d => me.scopes.some(s => s.department === null || s.department.id === d.id));
+    return departments.filter((d) => me.scopes.some((s) => s.department === null || s.department.id === d.id));
   }, [departments, me]);
 
   useEffect(() => {
@@ -165,7 +154,8 @@ function UserForm({
   }, [allPermissions]);
 
   const togglePermission = (key: string) => {
-    const isCurrentlyGranted = form.custom_permissions[key] !== undefined ? form.custom_permissions[key] : roleDefaultKeys.has(key);
+    const isCurrentlyGranted =
+      form.custom_permissions[key] !== undefined ? form.custom_permissions[key] : roleDefaultKeys.has(key);
     setForm({
       ...form,
       custom_permissions: {
@@ -291,9 +281,11 @@ function UserForm({
           <Field
             label="Mobile (optional)"
             error={mobileError}
-            hint={phone.number_length
-              ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
-              : undefined}
+            hint={
+              phone.number_length
+                ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
+                : undefined
+            }
           >
             <input
               type="tel"
@@ -379,11 +371,11 @@ function UserForm({
               <select
                 className={inputClass}
                 value={form.primary_department_id ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, primary_department_id: e.target.value ? Number(e.target.value) : null })
-                }
+                onChange={(e) => setForm({ ...form, primary_department_id: e.target.value ? Number(e.target.value) : null })}
               >
-                <option value="" disabled={!me.is_super_admin && !me.scopes.some(s => s.department === null)}>None / Floating across all</option>
+                <option value="" disabled={!me.is_super_admin && !me.scopes.some((s) => s.department === null)}>
+                  None / Floating across all
+                </option>
                 {assignableDepartments.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name} ({d.code})
@@ -395,12 +387,12 @@ function UserForm({
               <LocationPicker
                 value={form.primary_location_id}
                 onChange={(id: number | null) => setForm({ ...form, primary_location_id: id })}
-                allowAny={me.is_super_admin || me.scopes.some(s => s.location === null)}
+                allowAny={me.is_super_admin || me.scopes.some((s) => s.location === null)}
                 anyLabel="None / Global across all locations"
                 isSelectable={(node) => {
                   if (me.is_super_admin) return true;
-                  if (!node) return me.scopes.some(s => s.location === null);
-                  return me.scopes.some(s => s.location === null || node.path_ids.includes(s.location.id));
+                  if (!node) return me.scopes.some((s) => s.location === null);
+                  return me.scopes.some((s) => s.location === null || node.path_ids.includes(s.location.id));
                 }}
               />
             </Field>
@@ -419,24 +411,28 @@ function UserForm({
               Role Permissions & Custom Overrides
               {form.role_id && (
                 <span className="text-[11px] font-normal text-slate-500">
-                  ({Object.keys(form.custom_permissions).length} custom override{Object.keys(form.custom_permissions).length === 1 ? "" : "s"})
+                  ({Object.keys(form.custom_permissions).length} custom override
+                  {Object.keys(form.custom_permissions).length === 1 ? "" : "s"})
                 </span>
               )}
             </span>
-            {showPermissions ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            {showPermissions ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
           </button>
 
           {showPermissions && (
             <div className="pt-2 border-t border-slate-100 space-y-3">
               <p className="text-[11px] text-slate-500">
-                Permissions granted by the chosen role are checked by default. You can check additional permissions or uncheck role defaults to customize access for this specific user.
+                Permissions granted by the chosen role are checked by default. You can check additional permissions or uncheck
+                role defaults to customize access for this specific user.
               </p>
               <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                 {Object.entries(permissionsByGroup).map(([group, perms]) => (
                   <div key={group} className="space-y-1.5">
-                    <div className="text-[11px] font-semibold text-slate-700 bg-slate-50 px-2 py-1 rounded">
-                      {group}
-                    </div>
+                    <div className="text-[11px] font-semibold text-slate-700 bg-slate-50 px-2 py-1 rounded">{group}</div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-2">
                       {perms.map((p) => {
                         const inRole = roleDefaultKeys.has(p.key);
@@ -455,7 +451,9 @@ function UserForm({
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-medium text-slate-800">{p.description}</span>
                                 {isOverride ? (
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${isGranted ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                                  <span
+                                    className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${isGranted ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}
+                                  >
                                     {isGranted ? "+Custom Grant" : "-Revoked"}
                                   </span>
                                 ) : inRole ? (
@@ -573,10 +571,7 @@ function UsersList() {
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0">
-        <PageHeader
-          title="Staff users"
-          description="People below you in the role hierarchy whose scope sits inside yours."
-        />
+        <PageHeader title="Staff users" description="People below you in the role hierarchy whose scope sits inside yours." />
       </div>
       <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 mt-2 sm:mt-7 w-full">
         <input
@@ -670,9 +665,7 @@ function UsersList() {
                       <div>
                         {u.primary_department && <div className="font-medium text-slate-800">{u.primary_department.name}</div>}
                         {u.primary_location && (
-                          <div className="text-[11px] text-slate-500">
-                            {u.primary_location.label || u.primary_location.name}
-                          </div>
+                          <div className="text-[11px] text-slate-500">{u.primary_location.label || u.primary_location.name}</div>
                         )}
                       </div>
                     ) : (
@@ -739,7 +732,7 @@ function UsersList() {
           editing={editing}
           roles={roles}
           departments={reference.departments}
-          
+
           onClose={() => {
             setCreating(false);
             setEditing(null);

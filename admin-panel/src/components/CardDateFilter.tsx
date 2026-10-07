@@ -36,16 +36,13 @@ export function CardDateFilter({ onChange }: { onChange: (range: DateRange) => v
     }
   };
 
-  const inputClass = "px-3 py-1.5 bg-white border border-slate-200/80 rounded-lg text-xs font-medium text-slate-700 outline-none hover:border-blue-300 hover:shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)]";
+  const inputClass =
+    "px-3 py-1.5 bg-white border border-slate-200/80 rounded-lg text-xs font-medium text-slate-700 outline-none hover:border-blue-300 hover:shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)]";
 
   return (
     <div className="flex flex-wrap items-center gap-2 relative z-10">
       <div className="relative">
-        <select
-          className={`${inputClass} appearance-none pr-8 cursor-pointer`}
-          value={mode}
-          onChange={handleModeChange}
-        >
+        <select className={`${inputClass} appearance-none pr-8 cursor-pointer`} value={mode} onChange={handleModeChange}>
           <option value="default">Default</option>
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>

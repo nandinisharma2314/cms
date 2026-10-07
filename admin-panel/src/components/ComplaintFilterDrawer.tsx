@@ -1,17 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo } from "react";
-import {
-  Calendar,
-  Check,
-  CheckSquare,
-  Clock,
-  Layers,
-  MapPin,
-  RotateCcw,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { Calendar, Check, CheckSquare, Clock, Layers, MapPin, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { ComplaintFacets, LocationNode, StatusGroup } from "@/lib/api";
 import { GROUP_LABELS } from "@/lib/status";
 import { inputClass } from "@/components/ui";
@@ -126,7 +116,9 @@ export function ComplaintFilterDrawer({
 
     while (currentNodes && currentNodes.length > 0) {
       const selectedNode = activeLocationPath && activeLocationPath[depth] ? activeLocationPath[depth] : null;
-      const typeLabel = currentNodes[0]?.type_name || (depth === 0 ? "Country" : depth === 1 ? "State" : depth === 2 ? "District" : depth === 3 ? "City" : "Area / Zone");
+      const typeLabel =
+        currentNodes[0]?.type_name ||
+        (depth === 0 ? "Country" : depth === 1 ? "State" : depth === 2 ? "District" : depth === 3 ? "City" : "Area / Zone");
 
       levels.push({
         depth,
@@ -357,17 +349,13 @@ export function ComplaintFilterDrawer({
                 </button>
               )}
             </div>
-            <p className="text-[11px] text-slate-500">
-              Filter by entire state/city or narrow down to a specific ward or area.
-            </p>
+            <p className="text-[11px] text-slate-500">Filter by entire state/city or narrow down to a specific ward or area.</p>
 
             {/* Active Selected Location Breadcrumb */}
             {activeLocationPath && (
               <div className="flex items-center gap-2 p-2.5 rounded-xl border border-blue-200 bg-blue-50/80 text-blue-900 text-xs">
                 <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span className="font-semibold truncate">
-                  {activeLocationPath.map((n) => n.name).join(" > ")}
-                </span>
+                <span className="font-semibold truncate">{activeLocationPath.map((n) => n.name).join(" > ")}</span>
                 <button
                   type="button"
                   onClick={() => onChange({ location_id: "" })}

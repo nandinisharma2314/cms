@@ -14,14 +14,7 @@ import {
   ShieldAlert,
   UserPlus,
 } from "lucide-react";
-import {
-  api,
-  GrievanceOptions,
-  GrievanceSeverity,
-  GrievanceStatus,
-  GrievanceTargetType,
-  StaffGrievance,
-} from "@/lib/api";
+import { api, GrievanceOptions, GrievanceSeverity, GrievanceStatus, GrievanceTargetType, StaffGrievance } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
@@ -177,12 +170,7 @@ function FileGrievanceModal({
           )}
 
           <Field label="Violation Category">
-            <select
-              required
-              className={inputClass}
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
+            <select required className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="harassment">Harassment</option>
               <option value="bullying">Bullying & Intimidation</option>
               <option value="discrimination">Discrimination (Bias / Favoritism)</option>
@@ -274,19 +262,15 @@ function FileGrievanceModal({
               Submit as Anonymous Whistleblower
             </span>
             <p className="text-slate-500 mt-0.5">
-              When checked, your name and email are completely hidden from regular viewers and investigators, displayed as &quot;Anonymous Staff Member&quot;.
+              When checked, your name and email are completely hidden from regular viewers and investigators, displayed as
+              &quot;Anonymous Staff Member&quot;.
             </p>
           </div>
         </label>
 
         {/* Evidence Attachments */}
         <Field label="Confidential Attachments / Evidence (Screenshots, Emails, PDFs, Audio)">
-          <input
-            type="file"
-            multiple
-            className={inputClass}
-            onChange={(e) => setFiles(Array.from(e.target.files || []))}
-          />
+          <input type="file" multiple className={inputClass} onChange={(e) => setFiles(Array.from(e.target.files || []))} />
         </Field>
 
         <div className="pt-2 flex justify-end gap-2">
@@ -343,7 +327,9 @@ function GrievanceDetailDrawer({
   };
 
   useEffect(() => {
-    const t = setTimeout(() => { void fetchDetail(); }, 0);
+    const t = setTimeout(() => {
+      void fetchDetail();
+    }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grievanceId]);
@@ -459,7 +445,9 @@ function GrievanceDetailDrawer({
                 <div>
                   <span className="text-slate-400 block text-[11px] uppercase font-semibold">Subject / Accused</span>
                   <span className="font-semibold text-slate-800">
-                    {grievance.accused_user ? `${grievance.accused_user.name} (${grievance.accused_user.role})` : "Department / Policy"}
+                    {grievance.accused_user
+                      ? `${grievance.accused_user.name} (${grievance.accused_user.role})`
+                      : "Department / Policy"}
                   </span>
                 </div>
                 <div>
@@ -572,7 +560,10 @@ function GrievanceDetailDrawer({
                 )}
 
                 {actionTab === "status" && (
-                  <form onSubmit={handleStatusUpdate} className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3 mb-3">
+                  <form
+                    onSubmit={handleStatusUpdate}
+                    className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3 mb-3"
+                  >
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Field label="New Status">
                         <select
@@ -747,9 +738,7 @@ export default function GrievancesPage() {
           <button
             type="button"
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
-              view === "my_filed"
-                ? "border-sky-600 text-sky-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
+              view === "my_filed" ? "border-sky-600 text-sky-700" : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
             onClick={() => {
               setView("my_filed");
@@ -777,9 +766,7 @@ export default function GrievancesPage() {
               <button
                 type="button"
                 className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
-                  view === "all"
-                    ? "border-sky-600 text-sky-700"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
+                  view === "all" ? "border-sky-600 text-sky-700" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
                 onClick={() => {
                   setView("all");
@@ -823,12 +810,7 @@ export default function GrievancesPage() {
             <option value="high">High</option>
             <option value="critical">Critical</option>
           </select>
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            onClick={() => reload()}
-            title="Refresh list"
-          >
+          <button type="button" className={secondaryButtonClass} onClick={() => reload()} title="Refresh list">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
@@ -854,9 +836,7 @@ export default function GrievancesPage() {
               <TableMessage colSpan={8}>Loading grievance records…</TableMessage>
             ) : !data || data.items.length === 0 ? (
               <TableMessage colSpan={8}>
-                {view === "my_filed"
-                  ? "You have not filed any grievances."
-                  : "No grievances matching the selected filters."}
+                {view === "my_filed" ? "You have not filed any grievances." : "No grievances matching the selected filters."}
               </TableMessage>
             ) : (
               data.items.map((g) => (
@@ -866,10 +846,10 @@ export default function GrievancesPage() {
                     <div className="font-medium text-slate-800 line-clamp-1 mt-0.5">{g.subject}</div>
                   </td>
                   <td className="px-3 py-3">
-                    <span className="capitalize font-medium text-slate-700 block">
-                      {g.category.replace(/_/g, " ")}
-                    </span>
-                    <span className={`inline-block mt-0.5 text-[9px] px-1.5 py-0.2 rounded border ${SEVERITY_COLORS[g.severity]}`}>
+                    <span className="capitalize font-medium text-slate-700 block">{g.category.replace(/_/g, " ")}</span>
+                    <span
+                      className={`inline-block mt-0.5 text-[9px] px-1.5 py-0.2 rounded border ${SEVERITY_COLORS[g.severity]}`}
+                    >
                       {g.severity.toUpperCase()}
                     </span>
                   </td>
@@ -904,11 +884,7 @@ export default function GrievancesPage() {
                   </td>
                   <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{formatDateTime(g.created_at)}</td>
                   <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
-                      className={secondaryButtonClass}
-                      onClick={() => setSelectedId(g.tracking_id)}
-                    >
+                    <button type="button" className={secondaryButtonClass} onClick={() => setSelectedId(g.tracking_id)}>
                       View Details
                     </button>
                   </td>
@@ -919,15 +895,7 @@ export default function GrievancesPage() {
         </table>
       </Card>
 
-      {data && (
-        <Pagination
-          page={page}
-          pageSize={data.page_size}
-          total={data.total}
-          noun="grievances"
-          onPage={setPage}
-        />
-      )}
+      {data && <Pagination page={page} pageSize={data.page_size} total={data.total} noun="grievances" onPage={setPage} />}
 
       {creating && (
         <FileGrievanceModal

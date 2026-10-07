@@ -63,7 +63,9 @@ function KpiTile({
   return (
     <Card className="p-2.5 sm:p-4 flex flex-col justify-between">
       <div className="flex items-start justify-between gap-1.5 sm:gap-2">
-        <span className="text-[9px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500 mt-0.5 leading-tight">{label}</span>
+        <span className="text-[9px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500 mt-0.5 leading-tight">
+          {label}
+        </span>
         <div className={`p-1.5 sm:p-2 shrink-0 rounded-lg border ${tones[tone]}`}>
           <Icon className={`w-3.5 sm:w-4 h-3.5 sm:h-4 ${iconTones[tone]}`} />
         </div>
@@ -109,9 +111,11 @@ function MemberComplaintsModal({
           setError(err.message);
           setLoading(false);
         }
-      }
+      },
     );
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [member.id]);
 
   const handleReassign = async (e: React.FormEvent) => {
@@ -147,11 +151,7 @@ function MemberComplaintsModal({
               <h4 className="text-xs font-bold text-slate-800">
                 Reassign Complaint: <span className="font-mono text-sky-700">{reassigning.id}</span>
               </h4>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-slate-800"
-                onClick={() => setReassigning(null)}
-              >
+              <button type="button" className="text-xs text-slate-500 hover:text-slate-800" onClick={() => setReassigning(null)}>
                 Cancel
               </button>
             </div>
@@ -209,7 +209,9 @@ function MemberComplaintsModal({
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                       {c.status}
                     </span>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${c.priority.tone === "danger" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${c.priority.tone === "danger" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}
+                    >
                       {c.priority.name}
                     </span>
                   </div>
@@ -250,11 +252,11 @@ function MemberComplaintsModal({
 export default function TeamsPage() {
   useDocumentTitle("Teams");
   const [directOnly, setDirectOnly] = useState(false);
-  
+
   const [periodPreset, setPeriodPreset] = useState<"7" | "30" | "90" | "custom">("30");
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
-  
+
   const [locationFilter, setLocationFilter] = useState("");
   const [selectedMember, setSelectedMember] = useState<TeamMemberPerformance | null>(null);
   const [selectedManagerId, setSelectedManagerId] = useState<number | "">("");
@@ -280,9 +282,9 @@ export default function TeamsPage() {
 
   const { date_from, date_to } = React.useMemo(() => {
     if (periodPreset === "custom") {
-      return { 
-        date_from: customDateFrom || undefined, 
-        date_to: customDateTo || undefined 
+      return {
+        date_from: customDateFrom || undefined,
+        date_to: customDateTo || undefined,
       };
     }
     const to = new Date();
@@ -300,12 +302,13 @@ export default function TeamsPage() {
     loading,
     reload,
   } = useApiData<TeamDashboardResponse>(
-    () => api.team.dashboard({ 
-      date_from, 
-      date_to, 
-      direct_only: directOnly, 
-      manager_id: selectedManagerId ? Number(selectedManagerId) : undefined 
-    }),
+    () =>
+      api.team.dashboard({
+        date_from,
+        date_to,
+        direct_only: directOnly,
+        manager_id: selectedManagerId ? Number(selectedManagerId) : undefined,
+      }),
     [date_from, date_to, directOnly, selectedManagerId],
   );
 
@@ -324,19 +327,24 @@ export default function TeamsPage() {
   const agg = data?.aggregate;
 
   // Filter derivations
-  const activeLocations = Array.from(new Set(
-    viewMode === "overview" 
-      ? managers?.map(m => m.primary_location?.name).filter(Boolean) 
-      : data?.members.map(m => m.primary_location?.name).filter(Boolean)
-  )) as string[];
+  const activeLocations = Array.from(
+    new Set(
+      viewMode === "overview"
+        ? managers?.map((m) => m.primary_location?.name).filter(Boolean)
+        : data?.members.map((m) => m.primary_location?.name).filter(Boolean),
+    ),
+  ) as string[];
 
-  const filteredManagers = managers?.filter(m => !locationFilter || m.primary_location?.name === locationFilter);
-  const filteredMembers = data?.members.filter(m => !locationFilter || m.primary_location?.name === locationFilter);
+  const filteredManagers = managers?.filter((m) => !locationFilter || m.primary_location?.name === locationFilter);
+  const filteredMembers = data?.members.filter((m) => !locationFilter || m.primary_location?.name === locationFilter);
 
   // Helper to generate initials
   const getInitials = (name: string) => {
     const parts = name.split(" ").filter(Boolean);
-    return parts.slice(0, 2).map(p => p[0].toUpperCase()).join("");
+    return parts
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join("");
   };
 
   return (
@@ -347,7 +355,6 @@ export default function TeamsPage() {
           description="Live supervision portal: monitor team performance, workload distribution, and SLA adherence."
           actions={
             <div className="flex flex-wrap items-center gap-2 pb-1 sm:pb-0 justify-end w-full sm:w-auto">
-              
               {/* Custom Date Filters */}
               {periodPreset === "custom" && (
                 <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200">
@@ -391,8 +398,10 @@ export default function TeamsPage() {
                     className="rounded-xl border-slate-200 text-xs font-medium text-slate-700 py-2 pl-8 pr-8 focus:ring-sky-500 bg-white shadow-sm shrink-0 max-w-[140px]"
                   >
                     <option value="">All Locations</option>
-                    {activeLocations.map(loc => (
-                      <option key={loc} value={loc}>{loc}</option>
+                    {activeLocations.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -430,9 +439,9 @@ export default function TeamsPage() {
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-800">Teams Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredManagers?.map(manager => (
-                <Card 
-                  key={manager.id} 
+              {filteredManagers?.map((manager) => (
+                <Card
+                  key={manager.id}
                   className="p-5 flex flex-col gap-4 border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all duration-200 bg-gradient-to-br from-white to-slate-50/50"
                 >
                   <div className="flex justify-between items-start">
@@ -441,25 +450,34 @@ export default function TeamsPage() {
                         {getInitials(manager.name)}
                       </div>
                       <div>
-                        <Link href={`/users/staff/${manager.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1">
+                        <Link
+                          href={`/users/staff/${manager.id}`}
+                          className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1"
+                        >
                           {manager.primary_department?.name || manager.name}&apos;s Team
                         </Link>
                         <p className="text-xs font-medium text-slate-500 line-clamp-1">{manager.role.name}</p>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="bg-white rounded-lg border border-slate-100 p-3 text-xs text-slate-600 flex flex-col gap-2.5 mt-1">
                     <div className="flex items-center justify-between border-b border-slate-50 pb-2">
                       <span className="text-slate-400 font-medium">Team Lead:</span>
-                      <Link href={`/users/staff/${manager.id}`} className="font-semibold text-slate-800 hover:text-sky-700 hover:underline">
+                      <Link
+                        href={`/users/staff/${manager.id}`}
+                        className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
+                      >
                         {manager.name}
                       </Link>
                     </div>
                     {manager.reports_to && (
                       <div className="flex items-center justify-between border-b border-slate-50 pb-2">
                         <span className="text-slate-400 font-medium">Manager:</span>
-                        <Link href={`/users/staff/${manager.reports_to.id}`} className="font-semibold text-slate-800 hover:text-sky-700 hover:underline">
+                        <Link
+                          href={`/users/staff/${manager.reports_to.id}`}
+                          className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
+                        >
                           {manager.reports_to.name}
                         </Link>
                       </div>
@@ -481,7 +499,7 @@ export default function TeamsPage() {
                     >
                       View Members
                     </button>
-                    <Link 
+                    <Link
                       href={`/users/staff/${manager.id}`}
                       className={secondaryButtonClass + " !py-2 flex justify-center text-xs bg-white hover:bg-slate-50"}
                     >
@@ -501,12 +519,12 @@ export default function TeamsPage() {
           <div className="space-y-6 animate-in fade-in duration-300">
             {managers && managers.length > 1 && (
               <div className="flex items-center">
-                <button 
+                <button
                   onClick={() => {
                     setViewMode("overview");
                     setSelectedManagerId("");
                     setLocationFilter(""); // reset
-                  }} 
+                  }}
                   className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" /> Back to Teams Overview
@@ -518,11 +536,57 @@ export default function TeamsPage() {
             {agg ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
                 <KpiTile label="Team Size" value={data.team_size} subtext="Supervised staff" icon={Users} tone="info" />
-                <KpiTile label="Active Pending" value={agg.pending} subtext={`${agg.total_assigned} total`} icon={Clock} tone={agg.pending > 15 ? "warning" : "neutral"} />
-                <KpiTile label="Resolved" value={agg.resolved} subtext={`${agg.avg_resolution_hours ?? "—"}h avg res.`} icon={CheckCircle2} tone="success" />
-                <KpiTile label="Response SLA" value={agg.response_sla_pct !== null ? `${agg.response_sla_pct}%` : "—"} subtext={`${agg.avg_response_hours ?? "—"}h avg`} icon={Timer} tone={agg.response_sla_pct === null ? "neutral" : agg.response_sla_pct >= 90 ? "success" : agg.response_sla_pct >= 75 ? "warning" : "danger"} />
-                <KpiTile label="Resolution SLA" value={agg.resolution_sla_pct !== null ? `${agg.resolution_sla_pct}%` : "—"} subtext={`${agg.sla_breaches} breaches`} icon={ShieldCheck} tone={agg.resolution_sla_pct === null ? "neutral" : agg.resolution_sla_pct >= 90 ? "success" : agg.resolution_sla_pct >= 75 ? "warning" : "danger"} />
-                <KpiTile label="Customer Rating" value={agg.avg_rating !== null ? `${agg.avg_rating} / 5` : "—"} subtext={`${agg.reopen_pct ?? 0}% reopen`} icon={Star} tone={agg.avg_rating && agg.avg_rating >= 4 ? "success" : "neutral"} />
+                <KpiTile
+                  label="Active Pending"
+                  value={agg.pending}
+                  subtext={`${agg.total_assigned} total`}
+                  icon={Clock}
+                  tone={agg.pending > 15 ? "warning" : "neutral"}
+                />
+                <KpiTile
+                  label="Resolved"
+                  value={agg.resolved}
+                  subtext={`${agg.avg_resolution_hours ?? "—"}h avg res.`}
+                  icon={CheckCircle2}
+                  tone="success"
+                />
+                <KpiTile
+                  label="Response SLA"
+                  value={agg.response_sla_pct !== null ? `${agg.response_sla_pct}%` : "—"}
+                  subtext={`${agg.avg_response_hours ?? "—"}h avg`}
+                  icon={Timer}
+                  tone={
+                    agg.response_sla_pct === null
+                      ? "neutral"
+                      : agg.response_sla_pct >= 90
+                        ? "success"
+                        : agg.response_sla_pct >= 75
+                          ? "warning"
+                          : "danger"
+                  }
+                />
+                <KpiTile
+                  label="Resolution SLA"
+                  value={agg.resolution_sla_pct !== null ? `${agg.resolution_sla_pct}%` : "—"}
+                  subtext={`${agg.sla_breaches} breaches`}
+                  icon={ShieldCheck}
+                  tone={
+                    agg.resolution_sla_pct === null
+                      ? "neutral"
+                      : agg.resolution_sla_pct >= 90
+                        ? "success"
+                        : agg.resolution_sla_pct >= 75
+                          ? "warning"
+                          : "danger"
+                  }
+                />
+                <KpiTile
+                  label="Customer Rating"
+                  value={agg.avg_rating !== null ? `${agg.avg_rating} / 5` : "—"}
+                  subtext={`${agg.reopen_pct ?? 0}% reopen`}
+                  icon={Star}
+                  tone={agg.avg_rating && agg.avg_rating >= 4 ? "success" : "neutral"}
+                />
               </div>
             ) : null}
 
@@ -534,24 +598,32 @@ export default function TeamsPage() {
               </div>
 
               {loading ? (
-                <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">Loading team performance...</div>
+                <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
+                  Loading team performance...
+                </div>
               ) : !data || filteredMembers?.length === 0 ? (
                 <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
-                  {data?.members.length === 0 
-                    ? "No subordinates found under this management line." 
+                  {data?.members.length === 0
+                    ? "No subordinates found under this management line."
                     : "No members match the selected filters."}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {filteredMembers?.map((m) => (
-                    <Card key={m.id} className="overflow-hidden flex flex-col border border-slate-200 hover:border-slate-300 transition-colors">
+                    <Card
+                      key={m.id}
+                      className="overflow-hidden flex flex-col border border-slate-200 hover:border-slate-300 transition-colors"
+                    >
                       <div className="p-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
                         <div className="flex gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0">
                             {getInitials(m.name)}
                           </div>
                           <div>
-                            <Link href={`/users/staff/${m.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1">
+                            <Link
+                              href={`/users/staff/${m.id}`}
+                              className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1"
+                            >
                               {m.name}
                             </Link>
                             <div className="text-[10px] font-semibold text-blue-700 mt-0.5 mb-1">{m.role}</div>
@@ -574,11 +646,13 @@ export default function TeamsPage() {
                           {m.is_available ? "Online" : "Away"}
                         </button>
                       </div>
-                      
+
                       <div className="p-4 flex-1 grid grid-cols-4 gap-3 bg-white">
                         <div className="text-center">
                           <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Active</div>
-                          <div className={`font-mono text-lg font-bold rounded-md py-0.5 ${m.current_active_complaints > 8 ? "bg-rose-100 text-rose-800" : m.current_active_complaints > 4 ? "bg-amber-50 text-amber-800" : "text-slate-800"}`}>
+                          <div
+                            className={`font-mono text-lg font-bold rounded-md py-0.5 ${m.current_active_complaints > 8 ? "bg-rose-100 text-rose-800" : m.current_active_complaints > 4 ? "bg-amber-50 text-amber-800" : "text-slate-800"}`}
+                          >
                             {m.current_active_complaints}
                           </div>
                         </div>
@@ -588,7 +662,9 @@ export default function TeamsPage() {
                         </div>
                         <div className="text-center border-l border-slate-100">
                           <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">SLA %</div>
-                          <div className={`text-lg font-bold py-0.5 ${m.resolution_sla_pct === null ? "text-slate-400" : m.resolution_sla_pct >= 90 ? "text-emerald-600" : m.resolution_sla_pct >= 75 ? "text-amber-600" : "text-rose-600"}`}>
+                          <div
+                            className={`text-lg font-bold py-0.5 ${m.resolution_sla_pct === null ? "text-slate-400" : m.resolution_sla_pct >= 90 ? "text-emerald-600" : m.resolution_sla_pct >= 75 ? "text-amber-600" : "text-rose-600"}`}
+                          >
                             {m.resolution_sla_pct !== null ? `${m.resolution_sla_pct}%` : "—"}
                           </div>
                         </div>

@@ -109,9 +109,11 @@ function EndUserForm({
           <Field
             label="Mobile"
             error={mobileError}
-            hint={phone.number_length
-              ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
-              : undefined}
+            hint={
+              phone.number_length
+                ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
+                : undefined
+            }
           >
             <input
               required
@@ -315,7 +317,7 @@ export function EndUsersList() {
       {form && reference && (
         <EndUserForm
           editing={form.editing}
-          
+
           onClose={() => setForm(null)}
           onSaved={(message) => {
             setForm(null);

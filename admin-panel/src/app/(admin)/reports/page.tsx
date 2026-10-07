@@ -178,8 +178,6 @@ function Reports() {
     setTimeout(() => window.print(), 100);
   };
 
-
-
   const handleBulkPdfZip = async () => {
     if (selectedStaffIds.length === 0) {
       alert("Please select at least one row to generate a PDF.");
@@ -189,11 +187,9 @@ function Reports() {
     setIsGeneratingZip(true);
   };
 
-
-
-  const query: ReportQuery = { 
-    ...range, 
-    department_id: departmentId ?? undefined, 
+  const query: ReportQuery = {
+    ...range,
+    department_id: departmentId ?? undefined,
     priority_id: priorityId ?? undefined,
     location_id: locationId ?? undefined,
   };
@@ -202,8 +198,8 @@ function Reports() {
   const { data: levelList } = useApiData(() => api.reports.levels(), []);
   const levels = levelList ?? [];
   const { data: selectedPath } = useApiData(
-    () => locationId ? api.locations.path(locationId) : Promise.resolve([]),
-    [locationId]
+    () => (locationId ? api.locations.path(locationId) : Promise.resolve([])),
+    [locationId],
   );
   const currentDepth = selectedPath ? selectedPath.length : 0;
   // Group by the level immediately below the selected location (or level 1, usually State, by default).
@@ -228,7 +224,7 @@ function Reports() {
           const htmlToImage = await import("html-to-image");
           const jsPDF = (await import("jspdf")).default;
           const JSZip = (await import("jszip")).default;
-          
+
           const zip = new JSZip();
           let count = 0;
 
@@ -239,22 +235,22 @@ function Reports() {
             const el = document.getElementById(`zip-card-${id}`);
             if (el) {
               const imgData = await htmlToImage.toJpeg(el, { quality: 0.95, pixelRatio: 2 });
-              
+
               // We need the dimensions of the element to format the PDF correctly
               const width = el.offsetWidth;
               const height = el.offsetHeight;
-              
+
               const pdf = new jsPDF({
                 orientation: "portrait",
                 unit: "pt",
-                format: [width, height]
+                format: [width, height],
               });
-              
+
               pdf.addImage(imgData, "JPEG", 0, 0, width, height);
-              
+
               const pdfBlob = pdf.output("blob");
-              const staffName = table.data?.find(r => r.id === id)?.name || `report_${id}`;
-              zip.file(`${staffName.replace(/[^a-z0-9]/gi, '_')}.pdf`, pdfBlob);
+              const staffName = table.data?.find((r) => r.id === id)?.name || `report_${id}`;
+              zip.file(`${staffName.replace(/[^a-z0-9]/gi, "_")}.pdf`, pdfBlob);
               count++;
             }
           }
@@ -424,7 +420,7 @@ function Reports() {
               {TAB_LABELS[t]}
             </button>
           ))}
-          
+
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Bulk PDF Button for all tabs */}
             <button
@@ -433,15 +429,31 @@ function Reports() {
               className={`${secondaryButtonClass} !px-2.5 sm:!px-3 ${isGeneratingZip ? "opacity-70 cursor-wait" : ""}`}
             >
               {isGeneratingZip ? (
-                <div className="w-3.5 h-3.5 flex items-center justify-center"><Spinner /></div>
+                <div className="w-3.5 h-3.5 flex items-center justify-center">
+                  <Spinner />
+                </div>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-3.5 h-3.5"
+                >
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
               )}
               <span className="hidden sm:inline">
-                {isGeneratingZip 
-                  ? "Zipping..." 
-                  : selectedStaffIds.length > 0 
-                    ? `Download ${selectedStaffIds.length} PDF(s)` 
+                {isGeneratingZip
+                  ? "Zipping..."
+                  : selectedStaffIds.length > 0
+                    ? `Download ${selectedStaffIds.length} PDF(s)`
                     : "Bulk PDF"}
               </span>
             </button>
@@ -454,7 +466,7 @@ function Reports() {
             </button>
           </div>
         </div>
-        
+
         {tab === "locations" && (
           <div className="px-2 sm:px-5 pb-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -512,14 +524,16 @@ function Reports() {
       {/* Print-only layout */}
       {(printStaffId !== null || printAllStaff) && table.data && (
         <div className="hidden print:block absolute top-0 left-0 w-full bg-white z-50">
-          {printAllStaff ? (
-            table.data.filter((r) => r.id !== null).map((staff) => (
-              <StaffReportCard key={staff.id} staff={staff} config={config} type={tab} />
-            ))
-          ) : (
-            table.data.find(r => r.id === printStaffId) && <StaffReportCard staff={table.data.find(r => r.id === printStaffId)!} config={config} type={tab} />
-          )}
-          <style dangerouslySetInnerHTML={{ __html: `
+          {printAllStaff
+            ? table.data
+                .filter((r) => r.id !== null)
+                .map((staff) => <StaffReportCard key={staff.id} staff={staff} config={config} type={tab} />)
+            : table.data.find((r) => r.id === printStaffId) && (
+                <StaffReportCard staff={table.data.find((r) => r.id === printStaffId)!} config={config} type={tab} />
+              )}
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
             @page { margin: 0; }
             @media print {
               body * { visibility: hidden; }
@@ -530,7 +544,9 @@ function Reports() {
               /* Hide Next.js dev overlay just in case */
               #nextjs-portal { display: none !important; }
             }
-          `}} />
+          `,
+            }}
+          />
         </div>
       )}
     </div>

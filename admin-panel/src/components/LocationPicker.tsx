@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import { LocationNode, api } from "@/lib/api";
 import { inputClass } from "./ui";
 
@@ -50,7 +50,9 @@ export function LocationPicker({
   isSelectable?: (node: LocationNode | null) => boolean;
   isVisible?: (node: LocationNode) => boolean;
 }) {
-  const [levels, setLevels] = useState<{ options: LocationNode[]; selected: LocationNode | null; parent: LocationNode | null }[]>([]);
+  const [levels, setLevels] = useState<{ options: LocationNode[]; selected: LocationNode | null; parent: LocationNode | null }[]>(
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -68,7 +70,7 @@ export function LocationPicker({
       // 2. Fetch options for each dropdown
       const parentIds = [null, ...pathNodes.map((n) => n.id)];
       const optionsArrays = await Promise.all(parentIds.map((id) => fetchNodes(id)));
-      
+
       if (!active) return;
 
       // 3. Build levels
@@ -77,12 +79,12 @@ export function LocationPicker({
       const newLevels = optionsArrays.map((options, i) => {
         const parent = i === 0 ? null : pathNodes[i - 1];
         const selected = i < pathNodes.length ? pathNodes[i] : null;
-        
-        const visibleCount = options.filter(node => isVisible ? isVisible(node) : true).length;
+
+        const visibleCount = options.filter((node) => (isVisible ? isVisible(node) : true)).length;
         if (!selected && visibleCount === 1 && autoSelectId === null) {
-          autoSelectId = options.filter(node => isVisible ? isVisible(node) : true)[0].id;
+          autoSelectId = options.filter((node) => (isVisible ? isVisible(node) : true))[0].id;
         }
-        
+
         return { options, selected, parent };
       });
 
@@ -90,7 +92,7 @@ export function LocationPicker({
       if (newLevels.length > 0 && newLevels[newLevels.length - 1].options.length === 0) {
         newLevels.pop();
       }
-      
+
       setLevels(newLevels);
 
       if (autoSelectId !== null && autoSelectId !== value) {
@@ -131,13 +133,13 @@ export function LocationPicker({
             {level.options
               .filter((node) => (isVisible ? isVisible(node) : true))
               .map((node) => {
-              const selectable = isSelectable ? isSelectable(node) : true;
-              return (
-                <option key={node.id} value={node.id} disabled={!selectable}>
-                  {node.name} {!selectable ? "(Outside your scope)" : ""}
-                </option>
-              );
-            })}
+                const selectable = isSelectable ? isSelectable(node) : true;
+                return (
+                  <option key={node.id} value={node.id} disabled={!selectable}>
+                    {node.name} {!selectable ? "(Outside your scope)" : ""}
+                  </option>
+                );
+              })}
           </select>
         );
       })}

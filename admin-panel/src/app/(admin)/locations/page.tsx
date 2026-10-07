@@ -24,8 +24,6 @@ import {
 type Dialog =
   { kind: "add"; parent: LocationNode | null } | { kind: "rename"; node: LocationNode } | { kind: "import" } | { kind: "levels" };
 
-
-
 interface RowActions {
   onAdd: (parent: LocationNode) => void;
   onRename: (node: LocationNode) => void;
@@ -36,7 +34,6 @@ interface RowActions {
   hasChildLevel: (node: LocationNode) => boolean;
   fetchNodes: (parentId: number | null) => Promise<LocationNode[]>;
 }
-
 
 // Context that lets sibling TreeRows close each other.
 // Key = `${depth}-${parentId ?? 'root'}`, value = currently-open node id (or null).
@@ -63,7 +60,7 @@ function TreeRow({
   forceReload: number;
 }) {
   const { openMap, setOpen } = useContext(AccordionContext);
-  const groupKey = `${depth}-${parentId ?? 'root'}`;
+  const groupKey = `${depth}-${parentId ?? "root"}`;
   const expanded = openMap[groupKey] === node.id;
   const [children, setChildren] = useState<LocationNode[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,7 +77,7 @@ function TreeRow({
       t = setTimeout(() => {
         if (active) setLoading(true);
       }, 0);
-      actions.fetchNodes(node.id).then(data => {
+      actions.fetchNodes(node.id).then((data) => {
         if (active) {
           setChildren(data);
           setLoading(false);
@@ -153,16 +150,10 @@ function TreeRow({
           )}
         </div>
       </div>
-      {expanded && children &&
+      {expanded &&
+        children &&
         children.map((child) => (
-          <TreeRow
-            key={child.id}
-            node={child}
-            depth={depth + 1}
-            parentId={node.id}
-            actions={actions}
-            forceReload={forceReload}
-          />
+          <TreeRow key={child.id} node={child} depth={depth + 1} parentId={node.id} actions={actions} forceReload={forceReload} />
         ))}
     </>
   );
@@ -380,14 +371,11 @@ function LocationsTree() {
   const accordionCtx: AccordionCtx = {
     openMap,
     setOpen: useCallback((key: string, id: number | null) => {
-      setOpenMap(prev => ({ ...prev, [key]: id }));
+      setOpenMap((prev) => ({ ...prev, [key]: id }));
     }, []),
   };
 
-  const {
-    data,
-    error: loadError,
-  } = useApiData(async () => {
+  const { data, error: loadError } = useApiData(async () => {
     const [tree, levels] = await Promise.all([api.locations.nodes(null, showInactive), api.locations.levels()]);
     return { tree, levels };
   }, [showInactive, forceReload]);
@@ -408,18 +396,21 @@ function LocationsTree() {
     onRename: (node) => setDialog({ kind: "rename", node }),
     onToggleActive: (node) => {
       const action = node.is_active ? "Deactivate" : "Reactivate";
-      if (!confirm(`${action} ${node.name}?
-Children will be hidden while inactive.`)) return;
+      if (
+        !confirm(`${action} ${node.name}?
+Children will be hidden while inactive.`)
+      )
+        return;
       run(async () => {
         await api.locations.update(node.id, { is_active: !node.is_active });
-        setForceReload(prev => prev + 1);
+        setForceReload((prev) => prev + 1);
       });
     },
     onDelete: (node) => {
       if (!confirm(`Delete ${node.name}? This cannot be undone.`)) return;
       run(async () => {
         await api.locations.remove(node.id);
-        setForceReload(prev => prev + 1);
+        setForceReload((prev) => prev + 1);
       });
     },
     canCreate: can("location.create"),
@@ -498,7 +489,7 @@ Children will be hidden while inactive.`)) return;
           onClose={() => setDialog(null)}
           onSubmit={async (name) => {
             await api.locations.create(name, dialog.parent?.id ?? null);
-            setForceReload(prev => prev + 1);
+            setForceReload((prev) => prev + 1);
             setDialog(null);
           }}
         />
@@ -510,13 +501,18 @@ Children will be hidden while inactive.`)) return;
           onClose={() => setDialog(null)}
           onSubmit={async (name) => {
             await api.locations.update(dialog.node.id, { name });
-            setForceReload(prev => prev + 1);
+            setForceReload((prev) => prev + 1);
             setDialog(null);
           }}
         />
       )}
       {dialog?.kind === "levels" && (
-        <LevelsDialog levels={levels} canUpdate={can("location.update")} onClose={() => setDialog(null)} onChanged={() => setForceReload(prev => prev + 1)} />
+        <LevelsDialog
+          levels={levels}
+          canUpdate={can("location.update")}
+          onClose={() => setDialog(null)}
+          onChanged={() => setForceReload((prev) => prev + 1)}
+        />
       )}
       {dialog?.kind === "import" && (
         <Modal
@@ -529,7 +525,7 @@ Children will be hidden while inactive.`)) return;
             columns={levels.map((l) => l.key)}
             templateName="locations-template.csv"
             onImport={api.locations.importCsv}
-            onDone={() => setForceReload(prev => prev + 1)}
+            onDone={() => setForceReload((prev) => prev + 1)}
           />
         </Modal>
       )}

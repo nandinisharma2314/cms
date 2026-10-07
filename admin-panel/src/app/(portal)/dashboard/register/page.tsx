@@ -163,8 +163,7 @@ export default function RegisterComplaintPage() {
 
   const next = () => {
     setError(null);
-    if (!detailsValid)
-      return setError("Choose the department and category, and fill in the title and description.");
+    if (!detailsValid) return setError("Choose the department and category, and fill in the title and description.");
     if (!profile.location)
       return setError("No workplace location is assigned to your employee account. Please contact an administrator.");
     setStep(2);

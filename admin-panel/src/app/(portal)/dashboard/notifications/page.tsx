@@ -2,15 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Bell,
-  CheckCheck,
-  CheckCircle2,
-  Clock,
-  FileText,
-  MessageSquare,
-  UserCog,
-} from "lucide-react";
+import { Bell, CheckCheck, CheckCircle2, Clock, FileText, MessageSquare, UserCog } from "lucide-react";
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/portalApi";
 import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
 import { formatWhen } from "@/lib/portalFormat";
@@ -47,7 +39,6 @@ export default function NotificationsPage() {
       ),
     [unreadOnly, ui.default_page_size],
   );
-
 
   const pages = Math.max(1, Math.ceil(total / ui.default_page_size));
 
@@ -124,13 +115,13 @@ export default function NotificationsPage() {
           <ul className="divide-y divide-slate-100">
             {items === null ? (
               !error && (
-              <li className="flex animate-pulse gap-4 p-6" aria-hidden="true">
-                <div className="h-10 w-10 shrink-0 rounded-none bg-slate-100" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-1/3 rounded bg-slate-100" />
-                  <div className="h-3 w-3/4 rounded bg-slate-50" />
-                </div>
-              </li>
+                <li className="flex animate-pulse gap-4 p-6" aria-hidden="true">
+                  <div className="h-10 w-10 shrink-0 rounded-none bg-slate-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-1/3 rounded bg-slate-100" />
+                    <div className="h-3 w-3/4 rounded bg-slate-50" />
+                  </div>
+                </li>
               )
             ) : items.length === 0 ? (
               <li className="flex flex-col items-center px-6 py-16 text-center">
@@ -177,7 +168,6 @@ export default function NotificationsPage() {
                   </li>
                 );
               })
-              
             )}
           </ul>
         </div>

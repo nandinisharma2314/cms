@@ -1,7 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-
 import React, { useMemo, useState } from "react";
 import { api, EndUserRow } from "@/lib/api";
 import { useConfig } from "@/lib/config";
@@ -107,7 +106,7 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
   // Setting another priority than the category's is a reclassification: it needs the permission and a reason.
   const canSetPriority = can("complaint.reclassify");
   const priorityChanged = priorityId !== null && category !== null && priorityId !== category.default_priority.id;
-  
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Validate reporter contact fields
@@ -339,9 +338,11 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
               <Field
                 label="Mobile (optional)"
                 error={reporterPhoneError}
-                hint={phone.number_length
-                  ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
-                  : undefined}
+                hint={
+                  phone.number_length
+                    ? `${phone.number_length} digits${phone.country_code ? `, optionally with ${phone.country_code}` : ""}`
+                    : undefined
+                }
               >
                 <input
                   type="tel"
