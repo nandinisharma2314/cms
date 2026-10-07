@@ -27,7 +27,11 @@ def serialize_users(db: Session, users: list[User], ctx: AccessContext | None = 
             "mobile": u.mobile,
             "role": serialize_role(u.role),
             "reports_to": {"id": u.reports_to.id, "name": u.reports_to.name} if u.reports_to else None,
-            "primary_department": {"id": u.primary_department.id, "name": u.primary_department.name} if u.primary_department else None,
+            "primary_department": (
+                {"id": u.primary_department.id, "name": u.primary_department.name}
+                if u.primary_department
+                else None
+            ),
             "primary_location": serialize_location(u.primary_location, names) if u.primary_location else None,
             "custom_permissions": [
                 {

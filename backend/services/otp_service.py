@@ -155,7 +155,7 @@ def request_login_code(db: Session, channel: str, raw_identifier: str | None,
     rate_limit_service.enforce(db, "otp_request_target", f"{channel}:{target}",
                                config.OTP_REQUESTS_PER_TARGET_PER_HOUR, HOUR,
                                "Too many codes were requested for this address. Please try again later.")
-    
+
     column = EndUser.mobile if channel == "sms" else EndUser.email
     users = db.query(EndUser).filter(column == target).all()
     if not users:
@@ -169,9 +169,12 @@ def request_login_code(db: Session, channel: str, raw_identifier: str | None,
         channel_name = "mobile number" if channel == "sms" else "email address"
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
-            f"No registered account was found with this {channel_name}. Please contact support{contact_str} to register your account.",
+            (
+                f"No registered account was found with this {channel_name}. "
+                f"Please contact support{contact_str} to register your account."
+            ),
         )
-    
+
     active_users = [u for u in users if u.is_active]
     if not active_users:
         settings = settings_service.get_settings(db)
@@ -285,4 +288,3 @@ def prune(db: Session) -> int:
     )
     db.commit()
     return count
-

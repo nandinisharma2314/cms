@@ -210,8 +210,8 @@ def list_complaints(
             else:
                 dt_from = datetime.combine(date.fromisoformat(val), time.min)
             query = query.filter(Complaint.created_at >= dt_from)
-        except ValueError:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "date_from must be YYYY-MM-DD or ISO datetime")
+        except ValueError as err:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "date_from must be YYYY-MM-DD or ISO datetime") from err
     if date_to and date_to.strip():
         val = date_to.strip()
         try:
@@ -220,8 +220,8 @@ def list_complaints(
             else:
                 dt_to = datetime.combine(date.fromisoformat(val), time.max)
             query = query.filter(Complaint.created_at <= dt_to)
-        except ValueError:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "date_to must be YYYY-MM-DD or ISO datetime")
+        except ValueError as err:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "date_to must be YYYY-MM-DD or ISO datetime") from err
     if sla == "breached":
         query = query.filter(sla_breached_clause(utcnow()))
     elif sla == "at_risk":
@@ -482,4 +482,3 @@ def add_comment(
         stored.discard()
         raise
     return staff_detail(ctx, _get_scoped(ctx, complaint_id))
-

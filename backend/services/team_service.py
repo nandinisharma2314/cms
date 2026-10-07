@@ -11,10 +11,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
 from models import Complaint, ComplaintAssignment, ComplaintEvent, User, max_length
-from services import analytics_service, audit_service, routing_service, settings_service
+from services import settings_service
 from services.access_service import AccessContext
-from services.analytics_service import Filters, Row, _hours, _performance_row, load_rows, metrics
-from services.user_service import serialize_role, serialize_users
+from services.analytics_service import Filters, Row, _performance_row, load_rows, metrics
+from services.user_service import serialize_users
 from utils.security import utcnow
 from utils.text import single_line
 
@@ -59,12 +59,12 @@ def can_manage_member(db: Session, ctx: AccessContext, member_id: int) -> bool:
         return True
     if member_id == ctx.user.id:
         return True
-        
+
     # Is in reporting line?
     subordinates = {u.id for u in get_all_subordinates(db, ctx.user.id)}
     if member_id in subordinates:
         return True
-        
+
     # Is in scope?
     user = db.get(User, member_id)
     if not user:
@@ -86,7 +86,7 @@ def get_accessible_managers(db: Session, ctx: AccessContext) -> list[User]:
         db.query(User)
         .options(selectinload(User.scopes), selectinload(User.custom_permissions))
         .filter(User.id.in_(manager_ids))
-        .filter(User.is_active == True)
+        .filter(User.is_active.is_(True))
     )
 
     if ctx.is_super_admin:
@@ -94,22 +94,20 @@ def get_accessible_managers(db: Session, ctx: AccessContext) -> list[User]:
     else:
         candidates = query.order_by(User.name).all()
         subordinate_ids = {u.id for u in get_all_subordinates(db, ctx.user.id)}
-        
+
         managers = []
         for m in candidates:
-            if m.id == ctx.user.id:
-                managers.append(m)
-            elif m.id in subordinate_ids:
+            if m.id == ctx.user.id or m.id in subordinate_ids:
                 managers.append(m)
             else:
                 department_id = m.primary_department_id
                 location_path = m.primary_location.path if m.primary_location else None
                 if ctx.covers(department_id, location_path):
                     managers.append(m)
-                    
+
     if not any(m.id == ctx.user.id for m in managers):
         managers.append(ctx.user)
-        
+
     return sorted(managers, key=lambda m: m.name)
 
 
@@ -127,8 +125,8 @@ def get_member_profile(db: Session, ctx: AccessContext, member_id: int) -> dict[
     current = member.reports_to
     while current:
         managers_above.append({
-            "id": current.id, 
-            "name": current.name, 
+            "id": current.id,
+            "name": current.name,
             "role": current.role.name,
             "department": current.primary_department.name if current.primary_department else None,
             "location": current.primary_location.name if current.primary_location else None
@@ -139,8 +137,8 @@ def get_member_profile(db: Session, ctx: AccessContext, member_id: int) -> dict[
     # Hierarchy Down (direct reports)
     directs = get_direct_reports(db, member.id)
     subordinates_below = [{
-        "id": sub.id, 
-        "name": sub.name, 
+        "id": sub.id,
+        "name": sub.name,
         "role": sub.role.name,
         "department": sub.primary_department.name if sub.primary_department else None,
         "location": sub.primary_location.name if sub.primary_location else None
@@ -153,7 +151,7 @@ def get_member_profile(db: Session, ctx: AccessContext, member_id: int) -> dict[
     filters = get_team_filters(db)
     rows = load_rows(ctx, filters)
     member_rows = [r for r in rows if r.assignee_id == member.id]
-    
+
     # Count current active complaints for this member
     active_statuses = ("SUBMITTED", "ASSIGNED", "ACKNOWLEDGED", "IN_PROGRESS", "WAITING_FOR_INFORMATION", "REOPENED")
     active_count = db.query(Complaint.id).filter(
@@ -192,7 +190,7 @@ def get_team_dashboard(
 ) -> dict[str, Any]:
     """Produces the complete team overview: aggregated KPIs, workload summary, and member table."""
     db = ctx.db
-    
+
     if manager_id is not None and manager_id != ctx.user.id:
         if not can_manage_member(db, ctx, manager_id):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized to view this team")
@@ -231,15 +229,6 @@ def get_team_dashboard(
 
     # Count currently active complaints per member (not restricted to period)
     active_statuses = ("SUBMITTED", "ASSIGNED", "ACKNOWLEDGED", "IN_PROGRESS", "WAITING_FOR_INFORMATION", "REOPENED")
-    active_counts = {
-        row[0]: row[1]
-        for row in (
-            db.query(Complaint.assigned_to_id, db.query(Complaint.id).filter(Complaint.assigned_to_id == User.id, Complaint.status.in_(active_statuses)).count())
-            .filter(User.id.in_(member_ids))
-            .all()
-        )
-    } if False else {}
-
     # More efficient active query:
     from sqlalchemy import func
     active_grouped = (
@@ -265,8 +254,16 @@ def get_team_dashboard(
                 "current_active_complaints": active_counts.get(m.id, 0),
                 "reports_to_id": m.reports_to_id,
                 "reports_to_name": m.reports_to.name if m.reports_to else None,
-                "primary_department": {"id": m.primary_department.id, "name": m.primary_department.name} if m.primary_department else None,
-                "primary_location": {"id": m.primary_location.id, "name": m.primary_location.name} if m.primary_location else None,
+                "primary_department": (
+                    {"id": m.primary_department.id, "name": m.primary_department.name}
+                    if m.primary_department
+                    else None
+                ),
+                "primary_location": (
+                    {"id": m.primary_location.id, "name": m.primary_location.name}
+                    if m.primary_location
+                    else None
+                ),
             },
         )
         member_stats.append(perf)
@@ -314,7 +311,6 @@ def reassign_team_complaint(
     if not can_manage_member(db, ctx, new_assignee.id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Assignee is not a member of your team or within your scope")
 
-    old_assignee_id = complaint.assigned_to_id
     old_assignee_name = complaint.assigned_to.name if complaint.assigned_to else "Unassigned"
 
     # End current open assignment

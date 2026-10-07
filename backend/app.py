@@ -96,7 +96,10 @@ async def setting_not_configured_handler(request: Request, exc: settings_service
         return JSONResponse(
             status_code=503,
             content={
-                "detail": "The service is temporarily unavailable due to a configuration issue. Please contact support or try again later."
+                "detail": (
+                    "The service is temporarily unavailable due to a configuration issue. "
+                    "Please contact support or try again later."
+                )
             },
         )
     return JSONResponse(
@@ -163,4 +166,3 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "5000"))
     uvicorn.run("app:app", host=host, port=port, reload=IS_DEVELOPMENT)
-

@@ -6,40 +6,22 @@ are blocked from viewing, investigating, or being notified of complaints
 filed against them.
 """
 from datetime import datetime, timezone
-import os
 import uuid
-from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import or_
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session
 
 from config import ATTACHMENT_URL_TTL_SECONDS, UPLOAD_DIR
 from models import (
-    GRIEVANCE_CATEGORIES,
-    GRIEVANCE_SEVERITIES,
-    GRIEVANCE_STATUSES,
-    GRIEVANCE_STATUS_ACTION_TAKEN,
-    GRIEVANCE_STATUS_DISMISSED,
-    GRIEVANCE_STATUS_INVESTIGATING,
-    GRIEVANCE_STATUS_RESOLVED,
-    GRIEVANCE_STATUS_SUBMITTED,
-    GRIEVANCE_STATUS_UNDER_REVIEW,
-    GRIEVANCE_TARGET_TYPES,
-    Department,
-    Location,
-    Role,
     StaffGrievance,
     StaffGrievanceAttachment,
     StaffGrievanceEvent,
     User,
-    max_length,
 )
 from services import attachment_service, settings_service
 from services.access_service import AccessContext
 from services.attachment_service import StoredFiles, _display_name, _extension, _matches_signature
-from services.permission_catalog import SUPER_ADMIN_ROLE_KEY
-from utils.security import sign_value, utcnow
+from utils.security import sign_value
 
 
 def generate_tracking_id(db: Session) -> str:
@@ -82,7 +64,7 @@ def is_in_reporting_line(db: Session, subordinate_id: int, potential_superior_id
 
 def check_grievance_access(db: Session, grievance: StaffGrievance, ctx: AccessContext) -> None:
     """Enforces strict anti-conflict isolation.
-    
+
     1. An accused person can NEVER see a grievance naming them.
     2. Subordinates of the accused person cannot manage/investigate.
     3. Non-accused users with grievance.manage/view_all or the reporter/investigator can access.

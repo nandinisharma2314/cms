@@ -3,14 +3,13 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from models import Complaint, ComplaintAssignment, User, max_length
 from services import audit_service, team_service
 from services.access_service import AccessContext
 from services.complaint_service import serialize_complaints
 from services.user_service import serialize_users
-from utils.auth_middleware import get_access_context, require_permission
+from utils.auth_middleware import require_permission
 from utils.text import single_line
 
 router = APIRouter()
