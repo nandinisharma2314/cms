@@ -1,4 +1,6 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 import React, { useEffect, use } from "react";
 import { useSearchParams } from "next/navigation";
@@ -260,13 +262,13 @@ function Indicator({
   label, 
   field, 
   desc, 
-  format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
+    format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
 }: { 
-  row: any; 
+    row: any; 
   label: string; 
   field: string; 
   desc: string;
-  format?: (v: any) => React.ReactNode;
+    format?: (v: any) => React.ReactNode;
 }) {
   const val = row[field];
   

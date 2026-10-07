@@ -266,8 +266,6 @@ def test_user_management_with_primary_workplace_and_custom_permissions(client, l
     )
     assert create_res.status_code == 201
 
-    # Deactivate the agent so it doesn't interfere with other tests
-    client.post(f"/users/{create_res.json()['id']}/deactivate", headers=admin_headers)
     assert create_res.status_code == 201, create_res.text
     created = create_res.json()
     assert created["primary_department"]["id"] == elec_dept["id"]
@@ -299,6 +297,10 @@ def test_user_management_with_primary_workplace_and_custom_permissions(client, l
     me_updated = client.get("/auth/me", headers=new_user_headers).json()
     assert "team.view" in me_updated["permissions"]
     assert "complaint.view" not in me_updated["permissions"], "Explicitly revoked permission must be removed"
+
+
+    # Deactivate the agent so it doesn't interfere with other tests
+    client.post(f"/users/{user_id}/deactivate", headers=admin_headers)
 
 
 def test_input_field_validations(client, login):
