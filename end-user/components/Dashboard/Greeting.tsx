@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import { User, Plus } from "lucide-react";
-import { useConfig } from "@/lib/config";
 import { currentHour } from "@/lib/format";
 import { useEndUser } from "@/lib/session";
 
@@ -16,7 +15,6 @@ function greetingFor(hour: number) {
 /** Top of the home screen: a time-of-day greeting and, on phones, a profile shortcut. */
 export default function Greeting() {
   const { profile } = useEndUser();
-  const { product_name } = useConfig();
 
   return (
     <div className="flex items-start justify-between gap-4 px-2">
