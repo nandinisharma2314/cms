@@ -15,6 +15,7 @@ import { StatTile } from "@/components/reports/StatTile";
 import { TREND_COLORS, TrendLineChart } from "@/components/reports/TrendLineChart";
 import { LocationPicker } from "@/components/LocationPicker";
 import { Card, ErrorBanner, inputClass, PageHeader, secondaryButtonClass, Spinner, tabClass } from "@/components/ui";
+import { isNodeVisible } from "@/lib/scope";
 
 const TREND_SERIES = [
   { key: "received", label: "Received", color: TREND_COLORS[0] },
@@ -152,7 +153,7 @@ function Tiles({ m, prev, periodLabel }: { m: ReportMetrics; prev: ReportMetrics
 
 function Reports() {
   useDocumentTitle("Reports");
-  const { can } = useSession();
+  const { can, me } = useSession();
   const { ui, ...config } = useConfig();
   const [range, setRange] = useState(() => ({ date_from: isoDay(ui.report_default_days - 1), date_to: isoDay(0) }));
   const [departmentId, setDepartmentId] = useState<number | null>(null);
@@ -464,6 +465,7 @@ function Reports() {
                   value={locationId}
                   onChange={setLocationId}
                   allowAny
+                  isVisible={(node) => isNodeVisible(node, me, departmentId)}
                 />
               </div>
               {locationId !== null && (

@@ -26,3 +26,19 @@ export function treeInScope(tree: LocationNode[], me: Me, departmentId: number |
 export function coversDepartment(me: Me, departmentId: number): boolean {
   return me.is_super_admin || me.scopes.some((s) => s.department === null || s.department.id === departmentId);
 }
+
+/** Returns true if a node is within the user's scope or on the path to a node within the user's scope. */
+export function isNodeVisible(node: LocationNode, me: Me, departmentId: number | null = null): boolean {
+  if (me.is_super_admin) return true;
+  const relevant = me.scopes.filter((s) => s.department === null || s.department.id === departmentId);
+  if (relevant.some((s) => s.location === null)) return true;
+
+  const covered = new Set(relevant.map((s) => s.location!.id));
+  const onPath = new Set(relevant.flatMap((s) => s.location!.path_ids));
+
+  if (covered.has(node.id)) return true;
+  if (onPath.has(node.id)) return true;
+  if (node.path_ids.some((id) => covered.has(id))) return true;
+
+  return false;
+}

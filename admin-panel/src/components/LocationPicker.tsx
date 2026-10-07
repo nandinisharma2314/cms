@@ -41,6 +41,7 @@ export function LocationPicker({
   anyLabel = "All locations",
   disabled = false,
   isSelectable,
+  isVisible,
 }: {
   tree?: LocationNode[];
   value: number | null;
@@ -49,6 +50,7 @@ export function LocationPicker({
   anyLabel?: string;
   disabled?: boolean;
   isSelectable?: (node: LocationNode | null) => boolean;
+  isVisible?: (node: LocationNode) => boolean;
 }) {
   const [levels, setLevels] = useState<{ options: LocationNode[]; selected: LocationNode | null; parent: LocationNode | null }[]>([]);
 
@@ -72,9 +74,17 @@ export function LocationPicker({
       if (!active) return;
 
       // 3. Build levels
+      let autoSelectId: number | null = null;
+
       const newLevels = optionsArrays.map((options, i) => {
         const parent = i === 0 ? null : pathNodes[i - 1];
         const selected = i < pathNodes.length ? pathNodes[i] : null;
+        
+        const visibleCount = options.filter(node => isVisible ? isVisible(node) : true).length;
+        if (!selected && visibleCount === 1 && autoSelectId === null) {
+          autoSelectId = options.filter(node => isVisible ? isVisible(node) : true)[0].id;
+        }
+        
         return { options, selected, parent };
       });
 
@@ -84,6 +94,10 @@ export function LocationPicker({
       }
       
       setLevels(newLevels);
+
+      if (autoSelectId !== null && autoSelectId !== value) {
+        onChange(autoSelectId);
+      }
     }
     load();
     return () => {
@@ -116,7 +130,9 @@ export function LocationPicker({
                     ? `All of ${level.parent?.name}`
                     : `Select ${levelName.toLowerCase()}`}
             </option>
-            {level.options.map((node) => {
+            {level.options
+              .filter((node) => (isVisible ? isVisible(node) : true))
+              .map((node) => {
               const selectable = isSelectable ? isSelectable(node) : true;
               return (
                 <option key={node.id} value={node.id} disabled={!selectable}>
