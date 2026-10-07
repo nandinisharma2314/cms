@@ -11,8 +11,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   allowedDevOrigins: [
-    "*.pinggy.link", "*.pinggy.net", "*.loca.lt", "*.devtunnels.ms",
-    "*.free.pinggy.net", "*.run.pinggy-free.link", "*.serveo.net"
+    "*.pinggy.link",
+    "*.pinggy.net",
+    "*.loca.lt",
+    "*.devtunnels.ms",
+    "*.free.pinggy.net",
+    "*.run.pinggy-free.link",
+    "*.serveo.net",
   ],
   async redirects() {
     return [
@@ -30,8 +35,8 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:5000/:path*"
-      }
+        destination: "http://localhost:5000/:path*",
+      },
     ];
   },
 };

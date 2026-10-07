@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRightLeft, CheckCircle2, Clock, ExternalLink, ShieldCheck, ShieldAlert, Star, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, ExternalLink, ShieldCheck, ShieldAlert, Star, Loader2 } from "lucide-react";
 import { api, ComplaintData, MemberProfileResponse } from "@/lib/api";
 import { useApiData } from "@/lib/hooks";
 import { formatDateTime } from "@/lib/format";
@@ -49,8 +49,8 @@ export default function MemberProfilePage() {
     try {
       await api.team.memberProfile(id);
       router.push(`/users/staff/${id}`);
-    } catch (err: any) {
-      setAuthError(err.message || "Not authorized to view this member.");
+    } catch (err) {
+      setAuthError((err as Error).message || "Not authorized to view this member.");
     } finally {
       setCheckingId(null);
     }
@@ -106,7 +106,7 @@ export default function MemberProfilePage() {
             <Card className="p-6 border-slate-200">
               <h3 className="text-xs font-bold text-slate-800 mb-4 uppercase tracking-wider text-slate-500">Reporting Hierarchy</h3>
               <div className="space-y-2.5 font-mono text-xs">
-                {hierarchy.above.map((h: any, i: number) => (
+                {hierarchy.above.map((h: { id: number, name: string, role: string, department?: string }, i: number) => (
                   <div key={h.id} className="flex flex-col" style={{ paddingLeft: `${i * 12}px` }}>
                     <div className="flex items-center gap-2">
                       {i > 0 && <span className="text-slate-300">└</span>}
@@ -126,7 +126,7 @@ export default function MemberProfilePage() {
                   </div>
                 </div>
 
-                {hierarchy.below.map((h: any, i: number) => (
+                {hierarchy.below.map((h: { id: number, name: string, role: string }) => (
                   <div key={h.id} className="flex flex-col" style={{ paddingLeft: `${(hierarchy.above.length + 1) * 12}px` }}>
                     <div className="flex items-center gap-2">
                       <span className="text-slate-300">└</span>

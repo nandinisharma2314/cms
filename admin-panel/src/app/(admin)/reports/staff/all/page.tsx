@@ -15,13 +15,13 @@ function Indicator({
   label, 
   field, 
   desc, 
-  format = (v: any) => (v !== null ? v.toLocaleString() : "—") 
+  format = (v: string | number | null | undefined) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
 }: { 
-  row: any; 
+  row: Record<string, string | number | null | undefined>; 
   label: string; 
   field: string; 
   desc: string;
-  format?: (v: any) => React.ReactNode;
+  format?: (v: string | number | null | undefined) => React.ReactNode;
 }) {
   const val = row[field];
   
@@ -54,7 +54,7 @@ function Indicator({
   );
 }
 
-function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: any }) {
+function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: { organisation_name?: string; support?: { email?: string; phone?: string; } } }) {
   const initials = staff.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
   const total = staff.total;
   const solved = staff.resolved;
@@ -218,7 +218,7 @@ function AllReportsContent() {
   const date_from = searchParams.get("date_from") ?? undefined;
   const date_to = searchParams.get("date_to") ?? undefined;
 
-  const { ui, ...config } = useConfig();
+  const config = useConfig();
   useDocumentTitle("Bulk Staff Performance Review");
 
   const { data: rows, error } = useApiData(
@@ -257,7 +257,7 @@ function AllReportsContent() {
       </div>
 
       <div className="print-container">
-        {validStaff.map((staff, i) => (
+        {validStaff.map((staff) => (
           <StaffReportCard key={staff.id} staff={staff} config={config} />
         ))}
       </div>

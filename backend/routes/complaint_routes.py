@@ -11,6 +11,7 @@ from models import Complaint, ComplaintAssignment, Department, EndUser, Location
 from services import (
     attachment_service, audit_service, priority_service, rejection_service, routing_service, workflow_service,
 )
+from services.location_service import get_nodes
 from services.access_service import AccessContext
 from services.complaint_service import (
     DETAIL_OPTIONS, LIST_OPTIONS, clean_complaint_text, dashboard_stats, reclassify, register_complaint,
@@ -272,6 +273,7 @@ def classification_options(ctx: AccessContext = Depends(get_access_context)):
             }
             for d in departments if any(c.is_active for c in d.categories)
         ],
+        "locations": get_nodes(ctx.db, include_inactive=False),
         "priorities": [priority_service.serialize(p) for p in priority_service.list_priorities(ctx.db, False)],
     }
 

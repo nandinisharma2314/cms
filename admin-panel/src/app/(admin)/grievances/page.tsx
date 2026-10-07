@@ -1,39 +1,28 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowRight,
   CheckCircle,
-  Clock,
   Download,
   Eye,
   EyeOff,
-  FileText,
   Lock,
   MessageSquare,
   Paperclip,
   Plus,
   RefreshCw,
-  Search,
-  Shield,
   ShieldAlert,
-  UserCheck,
   UserPlus,
 } from "lucide-react";
 import {
   api,
-  attachmentUrl,
-  GrievanceAttachment,
-  GrievanceEvent,
   GrievanceOptions,
   GrievanceSeverity,
   GrievanceStatus,
   GrievanceTargetType,
   StaffGrievance,
 } from "@/lib/api";
-import { useConfig, useDocumentTitle } from "@/lib/config";
+import { useDocumentTitle } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
@@ -48,7 +37,6 @@ import {
   Pagination,
   primaryButtonClass,
   secondaryButtonClass,
-  StatusPill,
   TableMessage,
 } from "@/components/ui";
 
@@ -94,7 +82,7 @@ function FileGrievanceModal({
   const [severity, setSeverity] = useState<GrievanceSeverity>("medium");
   const [incidentDate, setIncidentDate] = useState("");
   const [departmentId, setDepartmentId] = useState<number | "">("");
-  const [locationId, setLocationId] = useState<number | "">("");
+  const [locationId] = useState<number | "">("");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -286,7 +274,7 @@ function FileGrievanceModal({
               Submit as Anonymous Whistleblower
             </span>
             <p className="text-slate-500 mt-0.5">
-              When checked, your name and email are completely hidden from regular viewers and investigators, displayed as "Anonymous Staff Member".
+              When checked, your name and email are completely hidden from regular viewers and investigators, displayed as &quot;Anonymous Staff Member&quot;.
             </p>
           </div>
         </label>
@@ -338,7 +326,7 @@ function GrievanceDetailDrawer({
   const [newStatus, setNewStatus] = useState<GrievanceStatus>("investigating");
   const [statusMessage, setStatusMessage] = useState("");
   const [resolutionAction, setResolutionAction] = useState("");
-  const [resolutionSummary, setResolutionSummary] = useState("");
+  const [resolutionSummary] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [isConfidentialNote, setIsConfidentialNote] = useState(true);
   const [savingAction, setSavingAction] = useState(false);
@@ -355,7 +343,9 @@ function GrievanceDetailDrawer({
   };
 
   useEffect(() => {
-    fetchDetail();
+    const t = setTimeout(() => { void fetchDetail(); }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grievanceId]);
 
   const handleAssign = async (e: React.FormEvent) => {

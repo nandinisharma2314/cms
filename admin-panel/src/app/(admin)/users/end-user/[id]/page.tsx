@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { 
   ArrowLeft, 
@@ -19,7 +19,7 @@ import { useApiData } from "@/lib/hooks";
 import { formatDateTime } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/config";
 import { RequirePermission } from "@/components/RequirePermission";
-import { ErrorBanner, StatusPill, primaryButtonClass } from "@/components/ui";
+import { ErrorBanner, StatusPill } from "@/components/ui";
 
 function KpiTile({ 
   label, 
@@ -29,7 +29,7 @@ function KpiTile({
 }: { 
   label: string; 
   value: string | number; 
-  icon: any; 
+  icon: React.ElementType; 
   tone: "success" | "warning" | "danger" | "neutral" | "brand";
 }) {
   const colors = {
@@ -66,7 +66,7 @@ function KpiTile({
 function EndUserProfileContent() {
   const params = useParams();
   const id = Number(params.id);
-  const router = useRouter();
+
 
   const { data, error, loading } = useApiData<EndUserProfileResponse>(
     () => api.endUsers.profile(id),
@@ -190,11 +190,11 @@ function EndUserProfileContent() {
             
             {recent_complaints.length === 0 ? (
               <div className="text-center py-12 bg-slate-50/50 rounded-2xl border border-slate-200 border-dashed">
-                <p className="text-slate-500 text-sm font-medium">This user hasn't filed any complaints yet.</p>
+                <p className="text-slate-500 text-sm font-medium">This user hasn&apos;t filed any complaints yet.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {recent_complaints.map((complaint: any) => (
+                {recent_complaints.map((complaint: { id: string | number, title: string, status_group: string, status_label: string, created_at: string, assigned_to?: { name: string } }) => (
                   <Link 
                     key={complaint.id} 
                     href={`/complaints/${complaint.id}`}

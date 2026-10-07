@@ -227,6 +227,9 @@ def export_locations(
     leaf_q = db.query(Location.id).filter(Location.type_id == deepest_type.id)
     if not include_inactive:
         leaf_q = leaf_q.filter(Location.is_active.is_(True))
+        inactive_paths = [p for (p,) in db.query(Location.path).filter(Location.is_active.is_(False)).all()]
+        for path in inactive_paths:
+            leaf_q = leaf_q.filter(~Location.path.startswith(path))
     leaf_ids: list[int] = [lid for (lid,) in leaf_q.all()]
 
     # ── Step 2: self-join template to resolve ancestor names ─────────────────

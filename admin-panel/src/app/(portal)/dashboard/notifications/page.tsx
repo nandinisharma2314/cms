@@ -3,14 +3,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Bell,
   CheckCheck,
   CheckCircle2,
   Clock,
   FileText,
   MessageSquare,
-  RefreshCw,
   UserCog,
 } from "lucide-react";
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/portalApi";
@@ -35,7 +33,6 @@ export default function NotificationsPage() {
   const [unread, setUnread] = useState(0);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(
     (pageNumber: number) =>
@@ -51,10 +48,7 @@ export default function NotificationsPage() {
     [unreadOnly, ui.default_page_size],
   );
 
-  const refresh = () => {
-    setRefreshing(true);
-    load(page).finally(() => setRefreshing(false));
-  };
+
   const pages = Math.max(1, Math.ceil(total / ui.default_page_size));
 
   useEffect(() => {

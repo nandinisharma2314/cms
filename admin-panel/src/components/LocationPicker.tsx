@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState} from "react";
 import { LocationNode, api } from "@/lib/api";
 import { inputClass } from "./ui";
 
@@ -34,7 +34,6 @@ export function findPath(nodes: LocationNode[], id: number | null): LocationNode
  * level (including none, meaning "all locations") is allowed.
  */
 export function LocationPicker({
-  tree, // Deprecated prop
   value,
   onChange,
   allowAny = false,
@@ -43,7 +42,6 @@ export function LocationPicker({
   isSelectable,
   isVisible,
 }: {
-  tree?: LocationNode[];
   value: number | null;
   onChange: (id: number | null) => void;
   allowAny?: boolean;
@@ -103,7 +101,7 @@ export function LocationPicker({
     return () => {
       active = false;
     };
-  }, [value]);
+  }, [value, isVisible, onChange]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

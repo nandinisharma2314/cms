@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { api, Complaint, StatusGroup } from "@/lib/portalApi";
 import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
 import { formatDateTime, shortPlace } from "@/lib/portalFormat";

@@ -9,14 +9,12 @@ import {
   api,
   CustomPermissionInput,
   Department,
-  LocationNode,
   PermissionDef,
   RoleDetail,
   RoleRef,
   ScopeInput,
   StaffUser,
   Me,
-  UserScope,
 } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";

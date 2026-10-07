@@ -24,9 +24,7 @@ import {
 type Dialog =
   { kind: "add"; parent: LocationNode | null } | { kind: "rename"; node: LocationNode } | { kind: "import" } | { kind: "levels" };
 
-function countDescendants(node: LocationNode): number {
-  return node.children.reduce((sum, child) => sum + 1 + countDescendants(child), 0);
-}
+
 
 interface RowActions {
   onAdd: (parent: LocationNode) => void;
@@ -77,8 +75,11 @@ function TreeRow({
 
   useEffect(() => {
     let active = true;
+    let t: ReturnType<typeof setTimeout>;
     if (expanded) {
-      setLoading(true);
+      t = setTimeout(() => {
+        if (active) setLoading(true);
+      }, 0);
       actions.fetchNodes(node.id).then(data => {
         if (active) {
           setChildren(data);
@@ -86,7 +87,10 @@ function TreeRow({
         }
       });
     }
-    return () => { active = false; };
+    return () => {
+      active = false;
+      if (t) clearTimeout(t);
+    };
   }, [expanded, forceReload, node.id, actions]);
 
   return (
@@ -383,7 +387,6 @@ function LocationsTree() {
   const {
     data,
     error: loadError,
-    reload,
   } = useApiData(async () => {
     const [tree, levels] = await Promise.all([api.locations.nodes(null, showInactive), api.locations.levels()]);
     return { tree, levels };

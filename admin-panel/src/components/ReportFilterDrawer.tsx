@@ -1,14 +1,8 @@
 import React, { useEffect, useMemo } from "react";
-import { AlertTriangle, Calendar, CheckCircle2, Layers, MapPin, Search, SlidersHorizontal, X } from "lucide-react";
+import { MapPin, SlidersHorizontal, X } from "lucide-react";
 import { Department, LocationNode, Priority } from "@/lib/api";
 import { inputClass } from "@/components/ui";
 
-function toYMD(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 function findNodePath(nodes: LocationNode[], targetId: number, currentPath: LocationNode[] = []): LocationNode[] | null {
   for (const node of nodes) {
@@ -72,7 +66,7 @@ export function ReportFilterDrawer({
     }
   }, [open]);
 
-  const tree = facets?.locations ?? [];
+  const tree = useMemo(() => facets?.locations ?? [], [facets?.locations]);
 
   // Find the selected location path (Country -> State -> District -> City -> Area)
   const activeLocationPath = useMemo(() => {

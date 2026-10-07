@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Calendar,
@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { api, LocationNode, StatusGroup } from "@/lib/api";
+import { api, StatusGroup } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { useApiData, useDebounced } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
@@ -33,16 +33,6 @@ function pick<T extends string>(value: string | null, allowed: readonly T[]): T 
   return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : "";
 }
 
-function findLocationNode(nodes: LocationNode[], id: number): LocationNode | null {
-  for (const n of nodes) {
-    if (n.id === id) return n;
-    if (n.children?.length) {
-      const found = findLocationNode(n.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
 
 function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
   const { me, can } = useSession();
@@ -122,15 +112,15 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
   );
   const selectedLocation = _locPath && _locPath.length > 0 ? _locPath[_locPath.length - 1] : null;
 
-  const selectedDepartment = useMemo(() => {
+  const selectedDepartment = (() => {
     if (!filters.department_id || !facets?.departments) return null;
     return facets.departments.find((d) => String(d.id) === filters.department_id);
-  }, [facets?.departments, filters.department_id]);
+  })();
 
-  const selectedPriority = useMemo(() => {
+  const selectedPriority = (() => {
     if (!filters.priority_id || !facets?.priorities) return null;
     return facets.priorities.find((p) => String(p.id) === filters.priority_id);
-  }, [facets?.priorities, filters.priority_id]);
+  })();
 
   return (
     <div className="flex flex-col h-[calc(100vh-130px)] -mt-5 sm:-mt-2">

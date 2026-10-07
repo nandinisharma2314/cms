@@ -1,4 +1,3 @@
-import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { ConfigProvider } from "@/lib/portalConfig";
 import "./globals.css";

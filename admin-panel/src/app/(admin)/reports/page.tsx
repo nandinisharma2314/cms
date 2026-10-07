@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { Download, LineChart, Table2, X } from "lucide-react";
 import { api, ReportMetrics, ReportQuery } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
@@ -159,28 +158,27 @@ function Reports() {
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [priorityId, setPriorityId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("agents");
+  const [prevTab, setPrevTab] = useState<Tab>("agents");
   const [showTable, setShowTable] = useState(false);
   const [printStaffId, setPrintStaffId] = useState<number | null>(null);
-  const [printAllStaff, setPrintAllStaff] = useState(false);
+  const [printAllStaff] = useState(false);
   const [locationId, setLocationId] = useState<number | null>(null);
   const [selectedStaffIds, setSelectedStaffIds] = useState<number[]>([]);
   const [bulkZipIds, setBulkZipIds] = useState<number[] | null>(null);
   const [isGeneratingZip, setIsGeneratingZip] = useState(false);
   const exporter = useAction();
 
-  useEffect(() => {
+  if (prevTab !== tab) {
+    setPrevTab(tab);
     setSelectedStaffIds([]);
-  }, [tab]);
+  }
 
   const handlePrintStaff = (id: number) => {
     setPrintStaffId(id);
     setTimeout(() => window.print(), 100);
   };
 
-  const handlePrintAll = () => {
-    setPrintAllStaff(true);
-    setTimeout(() => window.print(), 100);
-  };
+
 
   const handleBulkPdfZip = async () => {
     if (selectedStaffIds.length === 0) {

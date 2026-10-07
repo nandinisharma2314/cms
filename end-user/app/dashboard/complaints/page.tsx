@@ -75,7 +75,6 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
   return (
     <div className="flex-1 md:min-h-0 md:overflow-y-auto">
       <div className="flex-col gap-3 p-2 pb-2 md:px-4">
-
         <div className={`${CARD} space-y-3 p-3 md:p-4`}>
           <label className="relative block">
             <span className="sr-only">Search my complaints</span>
@@ -113,67 +112,69 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
         )}
 
         {(items !== null || !error) && (
-        <section className={`${CARD} overflow-hidden`}>
-          {items === null ? (
-            <ul className="animate-pulse divide-y divide-slate-100" aria-hidden="true">
-              {[0, 1, 2, 3].map((i) => (
-                <li key={i} className="space-y-2 p-4">
-                  <span className="block h-3.5 w-2/3 rounded bg-slate-200" />
-                  <span className="block h-3 w-1/2 rounded bg-slate-100" />
-                </li>
-              ))}
-            </ul>
-          ) : items.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-[15px] font-semibold text-[#0b1a3f]">
-                {term || group ? "Nothing matches" : "No complaints yet"}
-              </p>
-              <p className="mt-1 text-[13px] text-slate-500">
-                {term || group ? "Try another search or status." : "When you register a complaint, you can follow it here."}
-              </p>
-              {canCreate && !term && !group && (
-                <Link
-                  href="/dashboard/register"
-                  className="mt-4 inline-block  bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white"
-                >
-                  Register a complaint
-                </Link>
-              )}
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {items.map((c) => (
-                <li key={c.id}>
+          <section className={`${CARD} overflow-hidden`}>
+            {items === null ? (
+              <ul className="animate-pulse divide-y divide-slate-100" aria-hidden="true">
+                {[0, 1, 2, 3].map((i) => (
+                  <li key={i} className="space-y-2 p-4">
+                    <span className="block h-3.5 w-2/3 rounded bg-slate-200" />
+                    <span className="block h-3 w-1/2 rounded bg-slate-100" />
+                  </li>
+                ))}
+              </ul>
+            ) : items.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-[15px] font-semibold text-[#0b1a3f]">
+                  {term || group ? "Nothing matches" : "No complaints yet"}
+                </p>
+                <p className="mt-1 text-[13px] text-slate-500">
+                  {term || group ? "Try another search or status." : "When you register a complaint, you can follow it here."}
+                </p>
+                {canCreate && !term && !group && (
                   <Link
-                    href={`/dashboard/complaints/${encodeURIComponent(c.id)}`}
-                    className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-slate-50/70 md:px-5"
+                    href="/dashboard/register"
+                    className="mt-4 inline-block  bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white"
                   >
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${departmentDot(c.department)}`} aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-bold text-[#0b1a3f]">{c.title}</span>
-                      <span className="mt-1 block truncate text-[12.5px] text-slate-500">
-                        {c.id} · {c.department}
-                        {c.category ? ` · ${c.category}` : ""} · {shortPlace(c.location_detail)}
-                      </span>
-                      <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${GROUP_PILLS[c.status_group].className}`}
-                        >
-                          {c.status_label}
-                        </span>
-                        <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${TONE_PILLS[c.priority.tone]}`}>
-                          {c.priority.name}
-                        </span>
-                        <span className="text-[12px] text-slate-400">{formatDateTime(c.created_at)}</span>
-                      </span>
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
+                    Register a complaint
                   </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                )}
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {items.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      href={`/dashboard/complaints/${encodeURIComponent(c.id)}`}
+                      className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-slate-50/70 md:px-5"
+                    >
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${departmentDot(c.department)}`} aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[15px] font-bold text-[#0b1a3f]">{c.title}</span>
+                        <span className="mt-1 block truncate text-[12.5px] text-slate-500">
+                          {c.id} · {c.department}
+                          {c.category ? ` · ${c.category}` : ""} · {shortPlace(c.location_detail)}
+                        </span>
+                        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${GROUP_PILLS[c.status_group].className}`}
+                          >
+                            {c.status_label}
+                          </span>
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${TONE_PILLS[c.priority.tone]}`}
+                          >
+                            {c.priority.name}
+                          </span>
+                          <span className="text-[12px] text-slate-400">{formatDateTime(c.created_at)}</span>
+                        </span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         )}
 
         {items && items.length > 0 && (

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo } from "react";
 import {
-  AlertTriangle,
   Calendar,
   Check,
   CheckSquare,
@@ -104,7 +103,7 @@ export function ComplaintFilterDrawer({
     }
   }, [open]);
 
-  const tree = facets?.locations ?? [];
+  const tree = React.useMemo(() => facets?.locations ?? [], [facets?.locations]);
 
   // Find the selected location path (Country -> State -> District -> City -> Area)
   const activeLocationPath = useMemo(() => {

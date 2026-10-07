@@ -1,19 +1,19 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Download, FileSpreadsheet, Pencil, Power, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { api, EndUserRow, LocationNode } from "@/lib/api";
+import { api, EndUserRow } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { channelNames, formatDateTime } from "@/lib/format";
 import { useAction, useApiData, useDebounced } from "@/lib/hooks";
 import { validateName, validatePhone } from "@/lib/validate";
-import { treeInScope } from "@/lib/scope";
+
 import { useSession } from "@/lib/session";
 import { CsvImportPanel } from "@/components/CsvImportPanel";
 import { LocationPicker } from "@/components/LocationPicker";
-import { RequirePermission } from "@/components/RequirePermission";
+
 import {
   Card,
   ErrorBanner,
@@ -39,7 +39,6 @@ function EndUserForm({
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
-  const { me } = useSession();
   const { phone, limits, otp } = useConfig();
   const signInWith = channelNames(otp.channels);
   const [externalId, setExternalId] = useState(editing?.external_id ?? "");

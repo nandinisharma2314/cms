@@ -62,7 +62,7 @@ def _range(value: int | None, label: str, low: int, high: int) -> int | None:
 
 
 @router.get("", include_in_schema=False)
-@router.get("")
+@router.get("/")
 def get_settings(ctx: AccessContext = Depends(require_permission("settings.manage"))):
     data = settings_service.serialize_settings(settings_service.get_settings(ctx.db))
     data["supported_attachment_types"] = list(settings_service.SUPPORTED_ATTACHMENT_TYPES)

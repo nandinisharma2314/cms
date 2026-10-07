@@ -7,13 +7,13 @@ export function Indicator({
   label, 
   field, 
   desc, 
-  format = (v: any) => (v !== null ? v.toLocaleString() : "—") 
+  format = (v: number | string | null) => (v !== null ? v.toLocaleString() : "—") 
 }: { 
-  row: any; 
+  row: Record<string, number | string | null>; 
   label: string; 
   field: string; 
   desc: string;
-  format?: (v: any) => React.ReactNode;
+  format?: (v: number | string | null) => React.ReactNode;
 }) {
   const val = row[field];
   
@@ -46,7 +46,7 @@ export function Indicator({
   );
 }
 
-export function StaffReportCard({ staff, config, type = "agents" }: { staff: PerformanceRow, config: any, type?: string }) {
+export function StaffReportCard({ staff, config, type = "agents" }: { staff: PerformanceRow, config: { organisation_name?: string; support?: { email?: string; phone?: string; } }, type?: string }) {
   const total = staff.total;
   const solved = staff.resolved;
   const unsolved = staff.pending;

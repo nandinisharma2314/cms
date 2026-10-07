@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Bell,
   Calendar,
   CheckCircle,
-  ChevronLeft,
   CreditCard,
   HelpCircle,
   Info,
@@ -246,7 +244,6 @@ function ContactChangeDialog({
 
 export default function ProfilePage() {
   useDocumentTitle("My profile");
-  const router = useRouter();
   const { profile, setProfile, can, logout } = useEndUser();
   const { limits, notifications, otp } = useConfig();
   const canEdit = can("portal.profile.update");

@@ -264,6 +264,10 @@ def test_user_management_with_primary_workplace_and_custom_permissions(client, l
         },
         headers=admin_headers,
     )
+    assert create_res.status_code == 201
+    
+    # Deactivate the agent so it doesn't interfere with other tests
+    client.post(f"/users/{create_res.json()['id']}/deactivate", headers=admin_headers)
     assert create_res.status_code == 201, create_res.text
     created = create_res.json()
     assert created["primary_department"]["id"] == elec_dept["id"]

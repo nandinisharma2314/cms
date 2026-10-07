@@ -451,7 +451,11 @@ export function LoginFlow() {
                 </button>
               )}
               <form onSubmit={verify} className="flex flex-1 flex-col">
-                <div className="mb-8 flex w-full items-center justify-center gap-1.5 sm:gap-2" role="group" aria-label="One-time code">
+                <div
+                  className="mb-8 flex w-full items-center justify-center gap-1.5 sm:gap-2"
+                  role="group"
+                  aria-label="One-time code"
+                >
                   {digits.map((digit, index) => (
                     <input
                       key={index}

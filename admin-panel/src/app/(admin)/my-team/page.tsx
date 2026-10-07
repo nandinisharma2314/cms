@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRightLeft,
-  Calendar,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -265,7 +264,10 @@ export default function TeamsPage() {
 
   const { data: managers } = useApiData<StaffUser[]>(() => api.team.managers(), []);
 
-  React.useEffect(() => {
+  const [prevManagers, setPrevManagers] = useState<StaffUser[] | undefined>(undefined);
+
+  if (managers !== prevManagers) {
+    setPrevManagers(managers);
     if (managers && managers.length === 1) {
       setSelectedManagerId(managers[0].id);
       setViewMode("dashboard");
@@ -274,7 +276,7 @@ export default function TeamsPage() {
     } else {
       setViewMode("overview");
     }
-  }, [managers, selectedManagerId]);
+  }
 
   const { date_from, date_to } = React.useMemo(() => {
     if (periodPreset === "custom") {
@@ -370,7 +372,7 @@ export default function TeamsPage() {
               {/* Date Preset Selector */}
               <select
                 value={periodPreset}
-                onChange={(e) => setPeriodPreset(e.target.value as any)}
+                onChange={(e) => setPeriodPreset(e.target.value as "7" | "30" | "90" | "custom")}
                 className="rounded-xl border-slate-200 text-xs font-medium text-slate-700 py-2 pl-3 pr-8 focus:ring-sky-500 bg-white shadow-sm shrink-0"
               >
                 <option value="7">Last 7 Days</option>
@@ -440,7 +442,7 @@ export default function TeamsPage() {
                       </div>
                       <div>
                         <Link href={`/users/staff/${manager.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1">
-                          {manager.primary_department?.name || manager.name}'s Team
+                          {manager.primary_department?.name || manager.name}&apos;s Team
                         </Link>
                         <p className="text-xs font-medium text-slate-500 line-clamp-1">{manager.role.name}</p>
                       </div>

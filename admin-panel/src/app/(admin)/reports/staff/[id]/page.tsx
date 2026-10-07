@@ -2,7 +2,7 @@
 
 import React, { useEffect, use } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle, Download, Printer } from "lucide-react";
+import { CheckCircle, Printer } from "lucide-react";
 import { api, PerformanceRow } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatHours } from "@/lib/format";
@@ -15,10 +15,10 @@ function ReportContent({ id }: { id: number }) {
   const date_from = searchParams.get("date_from") ?? undefined;
   const date_to = searchParams.get("date_to") ?? undefined;
   
-  const { ui, ...config } = useConfig();
+  const config = useConfig();
   useDocumentTitle("Staff Performance Review");
 
-  const { data: rows, error, refreshing } = useApiData(
+  const { data: rows, error } = useApiData(
     () => api.reports.table("agents", { date_from, date_to }),
     [date_from, date_to]
   );
@@ -260,13 +260,13 @@ function Indicator({
   label, 
   field, 
   desc, 
-  format = (v: any) => (v !== null ? v.toLocaleString() : "—") 
+  format = (v: string | number | null | undefined) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
 }: { 
-  row: any; 
+  row: Record<string, string | number | null | undefined>; 
   label: string; 
   field: string; 
   desc: string;
-  format?: (v: any) => React.ReactNode;
+  format?: (v: string | number | null | undefined) => React.ReactNode;
 }) {
   const val = row[field];
   
