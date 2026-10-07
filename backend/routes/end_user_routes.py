@@ -4,9 +4,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
-from models import EndUser, Location, max_length
+from models import EndUser, Location, Complaint, max_length
 from services import audit_service, notification_service, token_service
 from services.access_service import AccessContext
+from services.complaint_service import serialize_complaints
 from services.import_service import read_upload, run_import
 from services.location_service import location_types_by_depth, path_names, require_usable, serialize_location
 from services.phone_service import phone_format
@@ -224,3 +225,38 @@ def export_end_users(
         path = names[c.location_id] if c.location_id else []
         rows.append([c.external_id or "", c.name, c.mobile, c.email] + path + [""] * (len(levels) - len(path)))
     return csv_response("end_users", ["user_id", "name", "mobile", "email"] + levels, rows)
+
+
+@router.get("/{end_user_id}/profile")
+def get_end_user_profile(
+    end_user_id: int,
+    ctx: AccessContext = Depends(require_permission("end_user.view")),
+):
+    db = ctx.db
+    end_user = _scoped_query(ctx).filter(EndUser.id == end_user_id).first()
+    if end_user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "End user not found")
+
+    complaints_query = db.query(Complaint).filter(Complaint.end_user_id == end_user.id)
+    total_complaints = complaints_query.count()
+    
+    # Calculate stats
+    from services.statuses import RESOLVED, CLOSED, REJECTED
+    resolved_count = complaints_query.filter(Complaint.status.in_([RESOLVED, CLOSED])).count()
+    rejected_count = complaints_query.filter(Complaint.status == REJECTED).count()
+    open_count = total_complaints - resolved_count - rejected_count
+
+    # Get recent complaints (last 10)
+    recent = complaints_query.order_by(Complaint.created_at.desc()).limit(10).all()
+
+    return {
+        "user": serialize_end_users(db, [end_user])[0],
+        "stats": {
+            "total_complaints": total_complaints,
+            "open_complaints": open_count,
+            "resolved_complaints": resolved_count,
+            "rejected_complaints": rejected_count,
+        },
+        "recent_complaints": serialize_complaints(db, recent)
+    }
+

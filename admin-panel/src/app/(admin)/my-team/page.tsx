@@ -3,24 +3,21 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
-  ArrowRight,
+  ArrowLeft,
   ArrowRightLeft,
+  Calendar,
   CheckCircle2,
   Clock,
   ExternalLink,
-  Filter,
+  MapPin,
   RefreshCw,
   ShieldCheck,
   Star,
   Timer,
-  UserCheck,
-  UserMinus,
   Users,
-  UserX,
 } from "lucide-react";
-import { api, ComplaintData, TeamDashboardResponse, TeamMemberPerformance } from "@/lib/api";
-import { useConfig, useDocumentTitle } from "@/lib/config";
+import { api, ComplaintData, TeamDashboardResponse, TeamMemberPerformance, StaffUser } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
 import { RequirePermission } from "@/components/RequirePermission";
@@ -34,8 +31,6 @@ import {
   PageHeader,
   primaryButtonClass,
   secondaryButtonClass,
-  StatusPill,
-  TableMessage,
 } from "@/components/ui";
 
 function KpiTile({
@@ -58,7 +53,6 @@ function KpiTile({
     danger: "bg-rose-50 text-rose-800 border-rose-200",
     info: "bg-sky-50 text-sky-800 border-sky-200",
   };
-
   const iconTones = {
     neutral: "text-slate-500",
     success: "text-emerald-600",
@@ -116,11 +110,9 @@ function MemberComplaintsModal({
           setError(err.message);
           setLoading(false);
         }
-      },
+      }
     );
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [member.id]);
 
   const handleReassign = async (e: React.FormEvent) => {
@@ -150,7 +142,6 @@ function MemberComplaintsModal({
     >
       <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
         <ErrorBanner message={error} />
-
         {reassigning ? (
           <form onSubmit={handleReassign} className="p-4 rounded-xl border border-sky-200 bg-sky-50/60 space-y-3">
             <div className="flex items-center justify-between">
@@ -244,7 +235,6 @@ function MemberComplaintsModal({
                     href={`/complaints/${c.id}`}
                     target="_blank"
                     className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
-                    title="Open Complaint Details"
                   >
                     <ExternalLink className="w-4 h-4" />
                   </Link>
@@ -258,16 +248,41 @@ function MemberComplaintsModal({
   );
 }
 
-export default function MyTeamPage() {
-  useDocumentTitle("My Team");
+export default function TeamsPage() {
+  useDocumentTitle("Teams");
   const [directOnly, setDirectOnly] = useState(false);
-  const [periodPreset, setPeriodPreset] = useState<"7" | "30" | "90">("30");
+  
+  const [periodPreset, setPeriodPreset] = useState<"7" | "30" | "90" | "custom">("30");
+  const [customDateFrom, setCustomDateFrom] = useState("");
+  const [customDateTo, setCustomDateTo] = useState("");
+  
+  const [locationFilter, setLocationFilter] = useState("");
   const [selectedMember, setSelectedMember] = useState<TeamMemberPerformance | null>(null);
+  const [selectedManagerId, setSelectedManagerId] = useState<number | "">("");
+  const [viewMode, setViewMode] = useState<"overview" | "dashboard">("overview");
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Compute dates based on preset
+  const { data: managers } = useApiData<StaffUser[]>(() => api.team.managers(), []);
+
+  React.useEffect(() => {
+    if (managers && managers.length === 1) {
+      setSelectedManagerId(managers[0].id);
+      setViewMode("dashboard");
+    } else if (managers && managers.length > 1 && selectedManagerId !== "") {
+      setViewMode("dashboard");
+    } else {
+      setViewMode("overview");
+    }
+  }, [managers, selectedManagerId]);
+
   const { date_from, date_to } = React.useMemo(() => {
+    if (periodPreset === "custom") {
+      return { 
+        date_from: customDateFrom || undefined, 
+        date_to: customDateTo || undefined 
+      };
+    }
     const to = new Date();
     const from = new Date();
     from.setDate(to.getDate() - (Number(periodPreset) - 1));
@@ -275,7 +290,7 @@ export default function MyTeamPage() {
       date_from: from.toISOString().split("T")[0],
       date_to: to.toISOString().split("T")[0],
     };
-  }, [periodPreset]);
+  }, [periodPreset, customDateFrom, customDateTo]);
 
   const {
     data,
@@ -283,8 +298,13 @@ export default function MyTeamPage() {
     loading,
     reload,
   } = useApiData<TeamDashboardResponse>(
-    () => api.team.dashboard({ date_from, date_to, direct_only: directOnly }),
-    [date_from, date_to, directOnly],
+    () => api.team.dashboard({ 
+      date_from, 
+      date_to, 
+      direct_only: directOnly, 
+      manager_id: selectedManagerId ? Number(selectedManagerId) : undefined 
+    }),
+    [date_from, date_to, directOnly, selectedManagerId],
   );
 
   const toggleAvailability = async (member: TeamMemberPerformance) => {
@@ -301,56 +321,101 @@ export default function MyTeamPage() {
 
   const agg = data?.aggregate;
 
+  // Filter derivations
+  const activeLocations = Array.from(new Set(
+    viewMode === "overview" 
+      ? managers?.map(m => m.primary_location?.name).filter(Boolean) 
+      : data?.members.map(m => m.primary_location?.name).filter(Boolean)
+  )) as string[];
+
+  const filteredManagers = managers?.filter(m => !locationFilter || m.primary_location?.name === locationFilter);
+  const filteredMembers = data?.members.filter(m => !locationFilter || m.primary_location?.name === locationFilter);
+
+  // Helper to generate initials
+  const getInitials = (name: string) => {
+    const parts = name.split(" ").filter(Boolean);
+    return parts.slice(0, 2).map(p => p[0].toUpperCase()).join("");
+  };
+
   return (
     <RequirePermission anyOf={["team.view"]}>
       <div className="space-y-4 -mt-5 sm:-mt-2">
         <PageHeader
-          title="My Team"
+          title="Teams"
           description="Live supervision portal: monitor team performance, workload distribution, and SLA adherence."
           actions={
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] max-w-[calc(100vw-2rem)] sm:max-w-none">
-              <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-semibold shrink-0">
-                <button
-                  type="button"
-                  className={`px-3 py-1.5 rounded-lg transition-colors ${periodPreset === "7" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                  onClick={() => setPeriodPreset("7")}
-                >
-                  7 Days
-                </button>
-                <button
-                  type="button"
-                  className={`px-3 py-1.5 rounded-lg transition-colors ${periodPreset === "30" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                  onClick={() => setPeriodPreset("30")}
-                >
-                  30 Days
-                </button>
-                <button
-                  type="button"
-                  className={`px-3 py-1.5 rounded-lg transition-colors ${periodPreset === "90" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                  onClick={() => setPeriodPreset("90")}
-                >
-                  90 Days
-                </button>
-              </div>
+            <div className="flex flex-wrap items-center gap-2 pb-1 sm:pb-0 justify-end w-full sm:w-auto">
+              
+              {/* Custom Date Filters */}
+              {periodPreset === "custom" && (
+                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200">
+                  <input
+                    type="date"
+                    value={customDateFrom}
+                    onChange={(e) => setCustomDateFrom(e.target.value)}
+                    className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
+                    placeholder="From"
+                  />
+                  <span className="text-slate-300">-</span>
+                  <input
+                    type="date"
+                    value={customDateTo}
+                    onChange={(e) => setCustomDateTo(e.target.value)}
+                    className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
+                    placeholder="To"
+                  />
+                </div>
+              )}
 
-              <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 px-3 py-1.5 rounded-xl cursor-pointer select-none shrink-0 whitespace-nowrap">
-                <input
-                  type="checkbox"
-                  checked={directOnly}
-                  onChange={(e) => setDirectOnly(e.target.checked)}
-                  className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                />
-                Direct Reports Only
-              </label>
+              {/* Date Preset Selector */}
+              <select
+                value={periodPreset}
+                onChange={(e) => setPeriodPreset(e.target.value as any)}
+                className="rounded-xl border-slate-200 text-xs font-medium text-slate-700 py-2 pl-3 pr-8 focus:ring-sky-500 bg-white shadow-sm shrink-0"
+              >
+                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="90">Last 90 Days</option>
+                <option value="custom">Custom Range</option>
+              </select>
+
+              {/* Location Filter */}
+              {activeLocations.length > 0 && (
+                <div className="relative">
+                  <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                    className="rounded-xl border-slate-200 text-xs font-medium text-slate-700 py-2 pl-8 pr-8 focus:ring-sky-500 bg-white shadow-sm shrink-0 max-w-[140px]"
+                  >
+                    <option value="">All Locations</option>
+                    {activeLocations.map(loc => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Direct Reports Toggle (Dashboard mode only) */}
+              {viewMode === "dashboard" && (
+                <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-xl cursor-pointer select-none shrink-0 shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={directOnly}
+                    onChange={(e) => setDirectOnly(e.target.checked)}
+                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                  />
+                  Direct Reports
+                </label>
+              )}
 
               <button
                 type="button"
-                className={secondaryButtonClass + " !px-2.5 sm:!px-3 shrink-0"}
+                className={secondaryButtonClass + " !px-2.5 sm:!px-3 !py-2 shrink-0"}
                 onClick={() => reload()}
-                title="Refresh Team Data"
+                title="Refresh Data"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-                <span className="hidden sm:inline">Refresh</span>
               </button>
             </div>
           }
@@ -359,222 +424,197 @@ export default function MyTeamPage() {
         <ErrorBanner message={actionError ?? loadError} />
         <Notice message={notice} />
 
-        {/* Aggregated KPI Cards */}
-        {agg ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-            <KpiTile
-              label="Team Size"
-              value={data.team_size}
-              subtext="Supervised staff"
-              icon={Users}
-              tone="info"
-            />
-            <KpiTile
-              label="Active Pending"
-              value={agg.pending}
-              subtext={`${agg.total_assigned} total in period`}
-              icon={Clock}
-              tone={agg.pending > 15 ? "warning" : "neutral"}
-            />
-            <KpiTile
-              label="Resolved"
-              value={agg.resolved}
-              subtext={`${agg.avg_resolution_hours ?? "—"}h avg resolution`}
-              icon={CheckCircle2}
-              tone="success"
-            />
-            <KpiTile
-              label="Response SLA"
-              value={agg.response_sla_pct !== null ? `${agg.response_sla_pct}%` : "—"}
-              subtext={`${agg.avg_response_hours ?? "—"}h avg response`}
-              icon={Timer}
-              tone={
-                agg.response_sla_pct === null
-                  ? "neutral"
-                  : agg.response_sla_pct >= 90
-                  ? "success"
-                  : agg.response_sla_pct >= 75
-                  ? "warning"
-                  : "danger"
-              }
-            />
-            <KpiTile
-              label="Resolution SLA"
-              value={agg.resolution_sla_pct !== null ? `${agg.resolution_sla_pct}%` : "—"}
-              subtext={`${agg.sla_breaches} SLA breach${agg.sla_breaches === 1 ? "" : "es"}`}
-              icon={ShieldCheck}
-              tone={
-                agg.resolution_sla_pct === null
-                  ? "neutral"
-                  : agg.resolution_sla_pct >= 90
-                  ? "success"
-                  : agg.resolution_sla_pct >= 75
-                  ? "warning"
-                  : "danger"
-              }
-            />
-            <KpiTile
-              label="Customer Rating"
-              value={agg.avg_rating !== null ? `${agg.avg_rating} / 5` : "—"}
-              subtext={`${agg.reopen_pct ?? 0}% reopen rate`}
-              icon={Star}
-              tone={agg.avg_rating && agg.avg_rating >= 4 ? "success" : "neutral"}
-            />
-          </div>
-        ) : null}
+        {viewMode === "overview" ? (
+          <div className="space-y-4">
+            <h2 className="text-lg font-bold text-slate-800">Teams Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredManagers?.map(manager => (
+                <Card 
+                  key={manager.id} 
+                  className="p-5 flex flex-col gap-4 border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all duration-200 bg-gradient-to-br from-white to-slate-50/50"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex gap-3 items-center">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
+                        {getInitials(manager.name)}
+                      </div>
+                      <div>
+                        <Link href={`/users/staff/${manager.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1">
+                          {manager.primary_department?.name || manager.name}'s Team
+                        </Link>
+                        <p className="text-xs font-medium text-slate-500 line-clamp-1">{manager.role.name}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg border border-slate-100 p-3 text-xs text-slate-600 flex flex-col gap-2.5 mt-1">
+                    <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-400 font-medium">Team Lead:</span>
+                      <Link href={`/users/staff/${manager.id}`} className="font-semibold text-slate-800 hover:text-sky-700 hover:underline">
+                        {manager.name}
+                      </Link>
+                    </div>
+                    {manager.reports_to && (
+                      <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                        <span className="text-slate-400 font-medium">Manager:</span>
+                        <Link href={`/users/staff/${manager.reports_to.id}`} className="font-semibold text-slate-800 hover:text-sky-700 hover:underline">
+                          {manager.reports_to.name}
+                        </Link>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="truncate font-medium">{manager.primary_location?.name || "Global / Multiple"}</span>
+                    </div>
+                  </div>
 
-        {/* Team Members Workload Table */}
-        <Card>
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Team Workload & Performance Breakdown</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Individual performance statistics across the selected period. Click Availability to quickly adjust staff routing.
-              </p>
+                  <div className="pt-2 mt-auto grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedManagerId(manager.id);
+                        setViewMode("dashboard");
+                        setLocationFilter(""); // reset filter on drilldown
+                      }}
+                      className={primaryButtonClass + " !py-2 flex justify-center text-xs"}
+                    >
+                      View Members
+                    </button>
+                    <Link 
+                      href={`/users/staff/${manager.id}`}
+                      className={secondaryButtonClass + " !py-2 flex justify-center text-xs bg-white hover:bg-slate-50"}
+                    >
+                      Lead Profile
+                    </Link>
+                  </div>
+                </Card>
+              ))}
+              {filteredManagers?.length === 0 && (
+                <div className="col-span-full py-12 text-center text-slate-500 bg-white border border-dashed rounded-xl">
+                  No teams found matching your filters.
+                </div>
+              )}
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-215 text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider bg-slate-50/50">
-                <th className="px-5 py-3 font-semibold">Team Member</th>
-                <th className="px-3 py-3 font-semibold">Role & Workplace</th>
-                <th className="px-3 py-3 font-semibold">Availability</th>
-                <th className="px-3 py-3 font-semibold">Active Workload</th>
-                <th className="px-3 py-3 font-semibold">Resolved</th>
-                <th className="px-3 py-3 font-semibold">Response SLA</th>
-                <th className="px-3 py-3 font-semibold">Resolution SLA</th>
-                <th className="px-3 py-3 font-semibold">Breaches</th>
-                <th className="px-3 py-3 font-semibold">Rating</th>
-                <th className="px-5 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
+        ) : (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {managers && managers.length > 1 && (
+              <div className="flex items-center">
+                <button 
+                  onClick={() => {
+                    setViewMode("overview");
+                    setSelectedManagerId("");
+                    setLocationFilter(""); // reset
+                  }} 
+                  className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to Teams Overview
+                </button>
+              </div>
+            )}
+
+            {/* Aggregated KPI Cards */}
+            {agg ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+                <KpiTile label="Team Size" value={data.team_size} subtext="Supervised staff" icon={Users} tone="info" />
+                <KpiTile label="Active Pending" value={agg.pending} subtext={`${agg.total_assigned} total`} icon={Clock} tone={agg.pending > 15 ? "warning" : "neutral"} />
+                <KpiTile label="Resolved" value={agg.resolved} subtext={`${agg.avg_resolution_hours ?? "—"}h avg res.`} icon={CheckCircle2} tone="success" />
+                <KpiTile label="Response SLA" value={agg.response_sla_pct !== null ? `${agg.response_sla_pct}%` : "—"} subtext={`${agg.avg_response_hours ?? "—"}h avg`} icon={Timer} tone={agg.response_sla_pct === null ? "neutral" : agg.response_sla_pct >= 90 ? "success" : agg.response_sla_pct >= 75 ? "warning" : "danger"} />
+                <KpiTile label="Resolution SLA" value={agg.resolution_sla_pct !== null ? `${agg.resolution_sla_pct}%` : "—"} subtext={`${agg.sla_breaches} breaches`} icon={ShieldCheck} tone={agg.resolution_sla_pct === null ? "neutral" : agg.resolution_sla_pct >= 90 ? "success" : agg.resolution_sla_pct >= 75 ? "warning" : "danger"} />
+                <KpiTile label="Customer Rating" value={agg.avg_rating !== null ? `${agg.avg_rating} / 5` : "—"} subtext={`${agg.reopen_pct ?? 0}% reopen`} icon={Star} tone={agg.avg_rating && agg.avg_rating >= 4 ? "success" : "neutral"} />
+              </div>
+            ) : null}
+
+            {/* Member Cards Grid */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Team Workload & Performance</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Individual performance statistics across the selected period.</p>
+              </div>
+
               {loading ? (
-                <TableMessage colSpan={10}>Loading team performance…</TableMessage>
-              ) : !data || data.members.length === 0 ? (
-                <TableMessage colSpan={10}>
-                  No subordinates found under your management line. When team members report to you, they will appear here.
-                </TableMessage>
+                <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">Loading team performance...</div>
+              ) : !data || filteredMembers?.length === 0 ? (
+                <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
+                  {data?.members.length === 0 
+                    ? "No subordinates found under this management line." 
+                    : "No members match the selected filters."}
+                </div>
               ) : (
-                data.members.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50/70 align-middle">
-                    <td className="px-5 py-3">
-                      <div className="font-bold text-slate-800">{m.name}</div>
-                      <div className="text-[11px] text-slate-400">{m.email}</div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded text-[10px]">
-                        {m.role}
-                      </span>
-                      {m.primary_department || m.primary_location ? (
-                        <div className="text-[11px] text-slate-500 mt-1">
-                          {m.primary_department?.name}
-                          {m.primary_location ? ` • ${m.primary_location.name}` : ""}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredMembers?.map((m) => (
+                    <Card key={m.id} className="overflow-hidden flex flex-col border border-slate-200 hover:border-slate-300 transition-colors">
+                      <div className="p-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+                        <div className="flex gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0">
+                            {getInitials(m.name)}
+                          </div>
+                          <div>
+                            <Link href={`/users/staff/${m.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1">
+                              {m.name}
+                            </Link>
+                            <div className="text-[10px] font-semibold text-blue-700 mt-0.5 mb-1">{m.role}</div>
+                            <div className="text-[10px] text-slate-500 truncate max-w-[180px]" title={m.email}>
+                              {m.primary_location?.name || "Unassigned Location"}
+                            </div>
+                          </div>
                         </div>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-3">
-                      <button
-                        type="button"
-                        onClick={() => toggleAvailability(m)}
-                        title="Click to toggle availability"
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors border ${
-                          m.is_available
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                            : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${m.is_available ? "bg-emerald-500" : "bg-amber-500"}`} />
-                        {m.is_available ? "Available" : "On Leave"}
-                      </button>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`font-mono font-bold text-xs px-2 py-0.5 rounded ${
-                            m.current_active_complaints > 8
-                              ? "bg-rose-100 text-rose-800 font-extrabold"
-                              : m.current_active_complaints > 4
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-slate-100 text-slate-800"
+                        <button
+                          type="button"
+                          onClick={() => toggleAvailability(m)}
+                          title="Click to toggle availability"
+                          className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border ${
+                            m.is_available
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                              : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
                           }`}
                         >
-                          {m.current_active_complaints}
-                        </span>
-                        <span className="text-[11px] text-slate-400">tickets</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${m.is_available ? "bg-emerald-500" : "bg-amber-500"}`} />
+                          {m.is_available ? "Online" : "Away"}
+                        </button>
                       </div>
-                    </td>
-                    <td className="px-3 py-3 font-medium text-slate-700">{m.resolved}</td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`font-semibold ${
-                          m.response_sla_pct === null
-                            ? "text-slate-400"
-                            : m.response_sla_pct >= 90
-                            ? "text-emerald-600"
-                            : m.response_sla_pct >= 75
-                            ? "text-amber-600"
-                            : "text-rose-600"
-                        }`}
-                      >
-                        {m.response_sla_pct !== null ? `${m.response_sla_pct}%` : "—"}
-                      </span>
-                      {m.avg_response_hours !== null && (
-                        <div className="text-[10px] text-slate-400">{m.avg_response_hours}h avg</div>
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`font-semibold ${
-                          m.resolution_sla_pct === null
-                            ? "text-slate-400"
-                            : m.resolution_sla_pct >= 90
-                            ? "text-emerald-600"
-                            : m.resolution_sla_pct >= 75
-                            ? "text-amber-600"
-                            : "text-rose-600"
-                        }`}
-                      >
-                        {m.resolution_sla_pct !== null ? `${m.resolution_sla_pct}%` : "—"}
-                      </span>
-                      {m.avg_resolution_hours !== null && (
-                        <div className="text-[10px] text-slate-400">{m.avg_resolution_hours}h avg</div>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-slate-700">
-                      {m.sla_breaches > 0 ? (
-                        <span className="text-rose-600 font-bold">{m.sla_breaches}</span>
-                      ) : (
-                        <span className="text-slate-400">0</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      {m.avg_rating !== null ? (
-                        <div className="flex items-center gap-1 font-semibold text-slate-800">
-                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-                          {m.avg_rating}
+                      
+                      <div className="p-4 flex-1 grid grid-cols-4 gap-3 bg-white">
+                        <div className="text-center">
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Active</div>
+                          <div className={`font-mono text-lg font-bold rounded-md py-0.5 ${m.current_active_complaints > 8 ? "bg-rose-100 text-rose-800" : m.current_active_complaints > 4 ? "bg-amber-50 text-amber-800" : "text-slate-800"}`}>
+                            {m.current_active_complaints}
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        onClick={() => setSelectedMember(m)}
-                      >
-                        Manage Workload
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                        <div className="text-center border-l border-slate-100">
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Done</div>
+                          <div className="text-lg font-bold text-slate-800 py-0.5">{m.resolved}</div>
+                        </div>
+                        <div className="text-center border-l border-slate-100">
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">SLA %</div>
+                          <div className={`text-lg font-bold py-0.5 ${m.resolution_sla_pct === null ? "text-slate-400" : m.resolution_sla_pct >= 90 ? "text-emerald-600" : m.resolution_sla_pct >= 75 ? "text-amber-600" : "text-rose-600"}`}>
+                            {m.resolution_sla_pct !== null ? `${m.resolution_sla_pct}%` : "—"}
+                          </div>
+                        </div>
+                        <div className="text-center border-l border-slate-100">
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Rating</div>
+                          <div className="text-lg font-bold text-slate-800 py-0.5 flex items-center justify-center gap-1">
+                            {m.avg_rating !== null ? m.avg_rating : "—"}
+                            {m.avg_rating !== null && <Star className="w-3 h-3 text-amber-400 fill-amber-400 -mt-0.5" />}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
+                        <button
+                          type="button"
+                          className={secondaryButtonClass + " w-full flex justify-center py-2"}
+                          onClick={() => setSelectedMember(m)}
+                        >
+                          Manage Workload
+                        </button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
               )}
-            </tbody>
-          </table>
+            </div>
           </div>
-        </Card>
+        )}
 
         {selectedMember && data && (
           <MemberComplaintsModal

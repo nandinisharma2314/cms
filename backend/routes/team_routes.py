@@ -26,31 +26,52 @@ class ReassignComplaintRequest(BaseModel):
     reason: str | None = None
 
 
+@router.get("/managers")
+def list_managers(
+    ctx: AccessContext = Depends(require_permission("team.view")),
+):
+    """Returns a list of managers accessible to the current user."""
+    db = ctx.db
+    managers = team_service.get_accessible_managers(db, ctx)
+    return serialize_users(db, managers, ctx)
+
+
 @router.get("/dashboard")
 def get_dashboard(
     date_from: date | None = None,
     date_to: date | None = None,
     direct_only: bool = False,
+    manager_id: int | None = None,
     ctx: AccessContext = Depends(require_permission("team.view")),
 ):
     """Team overview with aggregated performance metrics and per-member breakdown."""
-    return team_service.get_team_dashboard(ctx, date_from, date_to, direct_only)
+    return team_service.get_team_dashboard(ctx, date_from, date_to, direct_only, manager_id)
 
 
 @router.get("/members")
 def list_members(
     direct_only: bool = False,
+    manager_id: int | None = None,
     ctx: AccessContext = Depends(require_permission("team.view")),
 ):
     """Returns direct or recursive team members under the current manager."""
     db = ctx.db
-    manager = ctx.user
+    if manager_id is not None and manager_id != ctx.user.id:
+        if not team_service.can_manage_member(db, ctx, manager_id):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized to view this team")
+        manager = db.get(User, manager_id)
+        if not manager:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Manager not found")
+    else:
+        manager = ctx.user
+
     members = (
         team_service.get_direct_reports(db, manager.id)
         if direct_only
         else team_service.get_all_subordinates(db, manager.id)
     )
     return serialize_users(db, members, ctx)
+
 
 
 @router.get("/members/{member_id}/complaints")
@@ -61,9 +82,8 @@ def member_complaints(
     """Returns active complaints assigned to a team member."""
     db = ctx.db
     # Verify member is under caller
-    subordinates = {u.id for u in team_service.get_all_subordinates(db, ctx.user.id)}
-    if not ctx.is_super_admin and member_id not in subordinates and member_id != ctx.user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "User is not in your reporting line")
+    if not team_service.can_manage_member(db, ctx, member_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "User is not in your reporting line or scope")
 
     complaints = (
         db.query(Complaint)
@@ -75,6 +95,15 @@ def member_complaints(
     return serialize_complaints(db, complaints)
 
 
+@router.get("/members/{member_id}/profile")
+def get_member_profile(
+    member_id: int,
+    ctx: AccessContext = Depends(require_permission("team.view")),
+):
+    """Returns a comprehensive profile for a specific member including hierarchy and stats."""
+    return team_service.get_member_profile(ctx.db, ctx, member_id)
+
+
 @router.post("/members/{member_id}/availability")
 def set_member_availability(
     member_id: int,
@@ -84,9 +113,8 @@ def set_member_availability(
 ):
     """Manager override for team member availability (e.g. marking on unplanned leave)."""
     db = ctx.db
-    subordinates = {u.id for u in team_service.get_all_subordinates(db, ctx.user.id)}
-    if not ctx.is_super_admin and member_id not in subordinates and member_id != ctx.user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "User is not in your reporting line")
+    if not team_service.can_manage_member(db, ctx, member_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "User is not in your reporting line or scope")
 
     user = db.get(User, member_id)
     if not user:

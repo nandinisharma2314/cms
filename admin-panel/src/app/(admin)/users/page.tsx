@@ -3,6 +3,8 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Power, Shield, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { EndUsersList } from "./EndUsersList";
 import {
   api,
   CustomPermissionInput,
@@ -571,7 +573,7 @@ function UsersList() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-130px)] -mt-5 sm:-mt-2">
+    <div className="flex flex-col h-full">
       <div className="shrink-0">
         <PageHeader
           title="Staff users"
@@ -647,7 +649,9 @@ function UsersList() {
               data.items.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50/70 align-top">
                   <td className="px-5 py-3">
-                    <div className="font-bold text-slate-800">{u.name}</div>
+                    <Link href={`/users/staff/${u.id}`} className="font-bold text-sky-700 hover:underline">
+                      {u.name}
+                    </Link>
                     <div className="text-[11px] text-slate-400">{u.email}</div>
                     {u.mobile && <div className="text-[11px] text-slate-400">{u.mobile}</div>}
                   </td>
@@ -755,11 +759,48 @@ function UsersList() {
 }
 
 export default function UsersPage() {
+  const [activeTab, setActiveTab] = useState<"staff" | "end-users">("staff");
+
   return (
-    <RequirePermission anyOf={["user.view"]}>
-      <Suspense>
-        <UsersList />
-      </Suspense>
-    </RequirePermission>
+    <div className="flex flex-col h-[calc(100vh-130px)] -mt-5 sm:-mt-2">
+      <div className="flex gap-4 border-b border-slate-200 mb-4 px-2">
+        <button
+          className={`py-2 px-1 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "staff"
+              ? "border-sky-500 text-sky-700"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+          }`}
+          onClick={() => setActiveTab("staff")}
+        >
+          Staff Users
+        </button>
+        <button
+          className={`py-2 px-1 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "end-users"
+              ? "border-sky-500 text-sky-700"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+          }`}
+          onClick={() => setActiveTab("end-users")}
+        >
+          End Users
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-hidden relative">
+        {activeTab === "staff" ? (
+          <RequirePermission anyOf={["user.view"]}>
+            <Suspense>
+              <UsersList />
+            </Suspense>
+          </RequirePermission>
+        ) : (
+          <RequirePermission anyOf={["end_user.view"]}>
+            <Suspense>
+              <EndUsersList />
+            </Suspense>
+          </RequirePermission>
+        )}
+      </div>
+    </div>
   );
 }

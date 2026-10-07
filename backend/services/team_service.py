@@ -53,6 +53,127 @@ def get_all_subordinates(db: Session, manager_id: int) -> list[User]:
     return sorted(result, key=lambda u: u.name)
 
 
+def can_manage_member(db: Session, ctx: AccessContext, member_id: int) -> bool:
+    """Checks if the current user has permission to manage the given member."""
+    if ctx.is_super_admin:
+        return True
+    if member_id == ctx.user.id:
+        return True
+        
+    # Is in reporting line?
+    subordinates = {u.id for u in get_all_subordinates(db, ctx.user.id)}
+    if member_id in subordinates:
+        return True
+        
+    # Is in scope?
+    user = db.get(User, member_id)
+    if not user:
+        return False
+    department_id = user.primary_department_id
+    location_path = user.primary_location.path if user.primary_location else None
+    return ctx.covers(department_id, location_path)
+
+
+def get_accessible_managers(db: Session, ctx: AccessContext) -> list[User]:
+    """Returns a list of all managers (users who have subordinates) accessible to the current user."""
+    manager_ids_query = db.query(User.reports_to_id).filter(User.reports_to_id.isnot(None)).distinct()
+    manager_ids = [row[0] for row in manager_ids_query.all()]
+
+    if not manager_ids:
+        return [ctx.user]
+
+    query = (
+        db.query(User)
+        .options(selectinload(User.scopes), selectinload(User.custom_permissions))
+        .filter(User.id.in_(manager_ids))
+        .filter(User.is_active == True)
+    )
+
+    if ctx.is_super_admin:
+        managers = query.order_by(User.name).all()
+    else:
+        candidates = query.order_by(User.name).all()
+        subordinate_ids = {u.id for u in get_all_subordinates(db, ctx.user.id)}
+        
+        managers = []
+        for m in candidates:
+            if m.id == ctx.user.id:
+                managers.append(m)
+            elif m.id in subordinate_ids:
+                managers.append(m)
+            else:
+                department_id = m.primary_department_id
+                location_path = m.primary_location.path if m.primary_location else None
+                if ctx.covers(department_id, location_path):
+                    managers.append(m)
+                    
+    if not any(m.id == ctx.user.id for m in managers):
+        managers.append(ctx.user)
+        
+    return sorted(managers, key=lambda m: m.name)
+
+
+def get_member_profile(db: Session, ctx: AccessContext, member_id: int) -> dict[str, Any]:
+    """Returns a comprehensive profile for a specific member including hierarchy and stats."""
+    if not can_manage_member(db, ctx, member_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized to view this member")
+
+    member = db.get(User, member_id)
+    if not member:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Member not found")
+
+    # Hierarchy Up
+    managers_above = []
+    current = member.reports_to
+    while current:
+        managers_above.append({
+            "id": current.id, 
+            "name": current.name, 
+            "role": current.role.name,
+            "department": current.primary_department.name if current.primary_department else None,
+            "location": current.primary_location.name if current.primary_location else None
+        })
+        current = current.reports_to
+    managers_above.reverse()
+
+    # Hierarchy Down (direct reports)
+    directs = get_direct_reports(db, member.id)
+    subordinates_below = [{
+        "id": sub.id, 
+        "name": sub.name, 
+        "role": sub.role.name,
+        "department": sub.primary_department.name if sub.primary_department else None,
+        "location": sub.primary_location.name if sub.primary_location else None
+    } for sub in directs]
+
+    # Base Info
+    base_info = serialize_users(db, [member], ctx)[0]
+
+    # Performance Stats
+    filters = get_team_filters(db)
+    rows = load_rows(ctx, filters)
+    member_rows = [r for r in rows if r.assignee_id == member.id]
+    
+    # Count current active complaints for this member
+    active_statuses = ("SUBMITTED", "ASSIGNED", "ACKNOWLEDGED", "IN_PROGRESS", "WAITING_FOR_INFORMATION", "REOPENED")
+    active_count = db.query(Complaint.id).filter(
+        Complaint.assigned_to_id == member.id,
+        Complaint.status.in_(active_statuses)
+    ).count()
+
+    performance = _performance_row(member.name, member_rows, extra={"current_active_complaints": active_count})
+
+    return {
+        "user": base_info,
+        "hierarchy": {
+            "above": managers_above,
+            "below": subordinates_below,
+        },
+        "performance": performance
+    }
+
+
+
 def get_team_filters(db: Session, date_from: date | None = None, date_to: date | None = None) -> Filters:
     """Builds date filters defaulting to the last 30 days in organisation timezone."""
     tz = settings_service.timezone(db)
@@ -67,10 +188,19 @@ def get_team_dashboard(
     date_from: date | None = None,
     date_to: date | None = None,
     direct_only: bool = False,
+    manager_id: int | None = None,
 ) -> dict[str, Any]:
     """Produces the complete team overview: aggregated KPIs, workload summary, and member table."""
     db = ctx.db
-    manager = ctx.user
+    
+    if manager_id is not None and manager_id != ctx.user.id:
+        if not can_manage_member(db, ctx, manager_id):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authorized to view this team")
+        manager = db.get(User, manager_id)
+        if not manager:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Manager not found")
+    else:
+        manager = ctx.user
 
     members = get_direct_reports(db, manager.id) if direct_only else get_all_subordinates(db, manager.id)
     # If the user has no direct reports but has team.view (e.g. manager testing), include themselves or subordinates
@@ -181,9 +311,8 @@ def reassign_team_complaint(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Assignee not found or inactive")
 
     # Verify that the new assignee is in the manager's team or manageable
-    subordinates = {u.id for u in get_all_subordinates(db, ctx.user.id)}
-    if not ctx.is_super_admin and new_assignee.id not in subordinates and new_assignee.id != ctx.user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Assignee is not a member of your team")
+    if not can_manage_member(db, ctx, new_assignee.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Assignee is not a member of your team or within your scope")
 
     old_assignee_id = complaint.assigned_to_id
     old_assignee_name = complaint.assigned_to.name if complaint.assigned_to else "Unassigned"

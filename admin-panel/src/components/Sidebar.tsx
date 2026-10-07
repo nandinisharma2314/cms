@@ -48,7 +48,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Ban,
     anyOf: ["complaint.reject.approve", "complaint.reject.request"],
   },
-  { href: "/my-team", label: "My Team", icon: UserCheck, anyOf: ["team.view"] },
+  { href: "/my-team", label: "Teams", icon: UserCheck, anyOf: ["team.view"] },
   {
     href: "/grievances",
     label: "Staff Grievances",
@@ -56,8 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["grievance.file", "grievance.view_own", "grievance.manage", "grievance.view_all"],
   },
   { href: "/reports", label: "Reports", icon: BarChart3, anyOf: ["reports.view"] },
-  { href: "/users", label: "Staff users", icon: Users, anyOf: ["user.view"] },
-  { href: "/end-users", label: "End users", icon: Contact, anyOf: ["end_user.view"] },
+  { href: "/users", label: "Users", icon: Users, anyOf: ["user.view", "end_user.view"] },
   { href: "/departments", label: "Departments", icon: Building2, anyOf: ["department.view"] },
   { href: "/locations", label: "Locations", icon: MapPin, anyOf: ["location.view"] },
   { href: "/roles", label: "Roles & permissions", icon: ShieldCheck, anyOf: ["role.view"] },

@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Download, FileSpreadsheet, Pencil, Power, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { api, EndUserRow, LocationNode } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { channelNames, formatDateTime } from "@/lib/format";
@@ -159,7 +160,7 @@ function EndUserForm({
   );
 }
 
-function EndUsersList() {
+export function EndUsersList() {
   useDocumentTitle("End users");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -248,7 +249,6 @@ function EndUsersList() {
         <table className="w-full min-w-215 text-left text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider">
-              <th className="px-5 py-3 font-semibold">User ID</th>
               <th className="px-3 py-3 font-semibold">Name</th>
               <th className="px-3 py-3 font-semibold">Mobile</th>
               <th className="px-3 py-3 font-semibold">Email</th>
@@ -266,12 +266,15 @@ function EndUsersList() {
             ) : !data ? (
               <TableMessage colSpan={8}>The list could not be loaded (see the message above).</TableMessage>
             ) : data.items.length === 0 ? (
-              <TableMessage colSpan={8}>{term ? "Nobody matches." : "No end users in your scope yet."}</TableMessage>
+              <TableMessage colSpan={7}>{term ? "Nobody matches." : "No end users in your scope yet."}</TableMessage>
             ) : (
               data.items.map((row) => (
                 <tr key={row.id} className="hover:bg-slate-50/70">
-                  <td className="px-5 py-3 font-mono text-[11px] text-slate-500">{row.external_id ?? "—"}</td>
-                  <td className="px-3 py-3 font-bold text-slate-800">{row.name}</td>
+                  <td className="px-3 py-3 font-bold text-slate-800">
+                    <Link href={`/users/end-user/${row.id}`} className="hover:text-sky-700 hover:underline">
+                      {row.name}
+                    </Link>
+                  </td>
                   <td className="px-3 py-3 text-slate-600">{row.mobile}</td>
                   <td className="px-3 py-3 text-slate-600">{row.email}</td>
                   <td className="px-3 py-3 text-slate-600">{row.location?.label ?? "—"}</td>
@@ -338,15 +341,5 @@ function EndUsersList() {
         </Modal>
       )}
     </>
-  );
-}
-
-export default function EndUsersPage() {
-  return (
-    <RequirePermission anyOf={["end_user.view"]}>
-      <Suspense>
-        <EndUsersList />
-      </Suspense>
-    </RequirePermission>
   );
 }

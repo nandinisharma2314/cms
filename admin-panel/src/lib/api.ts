@@ -163,6 +163,17 @@ export interface EndUserRow {
   last_login_at: string | null;
 }
 
+export interface EndUserProfileResponse {
+  user: EndUserRow;
+  stats: {
+    total_complaints: number;
+    open_complaints: number;
+    resolved_complaints: number;
+    rejected_complaints: number;
+  };
+  recent_complaints: ComplaintData[];
+}
+
 export interface Paged<T> {
   items: T[];
   total: number;
@@ -701,6 +712,23 @@ export interface TeamDashboardResponse {
   members: TeamMemberPerformance[];
 }
 
+export interface HierarchyMember {
+  id: number;
+  name: string;
+  role: string;
+  department: string | null;
+  location: string | null;
+}
+
+export interface MemberProfileResponse {
+  user: StaffUser;
+  hierarchy: {
+    above: HierarchyMember[];
+    below: HierarchyMember[];
+  };
+  performance: TeamMemberPerformance;
+}
+
 export interface SystemSettings {
   organisation_name: string | null;
   product_name: string | null;
@@ -981,6 +1009,11 @@ const id = (value: string) => encodeURIComponent(value);
 
 export const api = {
   config: () => publicRequest<PublicConfig>("/public/config"),
+  checkIdentifier: (identifier: string) =>
+    publicRequest<{ method: "password" | "otp" }>("/public/auth/check-identifier", {
+      method: "POST",
+      body: { identifier },
+    }),
   auth: {
     login: async (identifier: string, password: string): Promise<Me> => {
       const data = await publicRequest<{ access_token: string; user: Me }>("/auth/login", {
@@ -1208,6 +1241,8 @@ export const api = {
   endUsers: {
     list: (query: { search?: string; page?: number; page_size?: number } = {}) =>
       request<Paged<EndUserRow>>("/end-users/", { query }),
+    profile: (endUserId: number) => 
+      request<EndUserProfileResponse>(`/end-users/${endUserId}/profile`),
     create: (data: { external_id: string | null; name: string; mobile: string; email: string; location_id: number | null }) =>
       request<EndUserRow>("/end-users/", { method: "POST", body: data }),
     update: (
@@ -1311,10 +1346,12 @@ export const api = {
       request<StaffGrievance>(`/grievances/${id(identifier)}/notes`, { method: "POST", body: data }),
   },
   team: {
-    dashboard: (query: { date_from?: string; date_to?: string; direct_only?: boolean } = {}) =>
+    managers: () => request<StaffUser[]>("/team/managers"),
+    dashboard: (query: { date_from?: string; date_to?: string; direct_only?: boolean; manager_id?: number } = {}) =>
       request<TeamDashboardResponse>("/team/dashboard", { query }),
-    members: (query: { direct_only?: boolean } = {}) => request<StaffUser[]>("/team/members", { query }),
+    members: (query: { direct_only?: boolean; manager_id?: number } = {}) => request<StaffUser[]>("/team/members", { query }),
     memberComplaints: (memberId: number) => request<ComplaintData[]>(`/team/members/${memberId}/complaints`),
+    memberProfile: (memberId: number) => request<MemberProfileResponse>(`/team/members/${memberId}/profile`),
     setAvailability: (memberId: number, is_available: boolean) =>
       request<{ id: number; name: string; is_available: boolean }>(`/team/members/${memberId}/availability`, {
         method: "POST",
