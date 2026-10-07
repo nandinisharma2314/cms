@@ -260,13 +260,13 @@ function Indicator({
   label, 
   field, 
   desc, 
-  format = (v: string | number | null | undefined) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
+  format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
 }: { 
-  row: Record<string, string | number | null | undefined>; 
+  row: any; 
   label: string; 
   field: string; 
   desc: string;
-  format?: (v: string | number | null | undefined) => React.ReactNode;
+  format?: (v: any) => React.ReactNode;
 }) {
   const val = row[field];
   

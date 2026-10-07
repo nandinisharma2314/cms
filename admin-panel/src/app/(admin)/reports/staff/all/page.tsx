@@ -15,13 +15,13 @@ function Indicator({
   label, 
   field, 
   desc, 
-  format = (v: string | number | null | undefined) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
+  format = (v: any) => (v !== null && v !== undefined ? v.toLocaleString() : "—") 
 }: { 
-  row: Record<string, string | number | null | undefined>; 
+  row: any; 
   label: string; 
   field: string; 
   desc: string;
-  format?: (v: string | number | null | undefined) => React.ReactNode;
+  format?: (v: any) => React.ReactNode;
 }) {
   const val = row[field];
   
@@ -54,7 +54,7 @@ function Indicator({
   );
 }
 
-function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: { organisation_name?: string; support?: { email?: string; phone?: string; } } }) {
+function StaffReportCard({ staff, config }: { staff: PerformanceRow, config: any }) {
   const initials = staff.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
   const total = staff.total;
   const solved = staff.resolved;

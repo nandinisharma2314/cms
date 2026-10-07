@@ -253,7 +253,7 @@ export function RegisterComplaintDialog({ onClose, onCreated }: { onClose: () =>
         ) : (
           <Field label="Location">
             {department ? (
-              <LocationPicker tree={tree} value={locationId} onChange={setLocationId} />
+              <LocationPicker value={locationId} onChange={setLocationId} />
             ) : (
               <p className="text-[11px] text-slate-400">Choose the department first.</p>
             )}

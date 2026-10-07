@@ -297,7 +297,7 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
                 : undefined
             }
           >
-            <LocationPicker tree={tree} value={locationId} onChange={setLocationId} />
+            <LocationPicker value={locationId} onChange={setLocationId} />
           </Field>
           <Field label="Reason for the change (kept on the internal timeline)">
             <textarea
