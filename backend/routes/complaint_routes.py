@@ -16,6 +16,7 @@ from services.complaint_service import (
     DETAIL_OPTIONS, LIST_OPTIONS, clean_complaint_text, dashboard_stats, reclassify, register_complaint,
     resolve_classification, serialize_complaints, sla_at_risk_clause, sla_breached_clause, staff_detail,
 )
+from services.location_service import get_nodes
 from services.phone_service import phone_format
 from services.statuses import ACTIVE_STATUSES, CLOSED, REJECTED, STATUS_GROUPS, STATUS_LABELS, status_label
 from services.user_service import visible_reset_tickets
@@ -272,6 +273,7 @@ def classification_options(ctx: AccessContext = Depends(get_access_context)):
             }
             for d in departments if any(c.is_active for c in d.categories)
         ],
+        "locations": get_nodes(ctx.db, parent_id=None, include_inactive=False),
         "priorities": [priority_service.serialize(p) for p in priority_service.list_priorities(ctx.db, False)],
     }
 

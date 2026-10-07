@@ -239,11 +239,15 @@ def export_locations(
     select_cols = ", ".join(f"l{depth - 1 - i}.name" for i in range(depth))
 
     def batch_sql(ids: list[int]) -> text:
+        active_filter = ""
+        if not include_inactive:
+            active_filter = " AND " + " AND ".join(f"l{i}.is_active = true" for i in range(depth))
         return text(f"""
             SELECT {select_cols}
             FROM locations l0
             {joins}
             WHERE l0.id IN ({",".join(str(i) for i in ids)})
+            {active_filter}
             ORDER BY {select_cols}
         """)
 
