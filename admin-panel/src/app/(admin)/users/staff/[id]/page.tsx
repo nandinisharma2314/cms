@@ -3,13 +3,13 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRightLeft, CheckCircle2, Clock, ExternalLink, ShieldCheck, Star } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, CheckCircle2, Clock, ExternalLink, ShieldCheck, ShieldAlert, Star, Loader2 } from "lucide-react";
 import { api, ComplaintData, MemberProfileResponse } from "@/lib/api";
 import { useApiData } from "@/lib/hooks";
 import { formatDateTime } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/config";
 import { RequirePermission } from "@/components/RequirePermission";
-import { Card, PageHeader, ErrorBanner, secondaryButtonClass } from "@/components/ui";
+import { Card, PageHeader, ErrorBanner, secondaryButtonClass, Modal } from "@/components/ui";
 
 export default function MemberProfilePage() {
   const { id } = useParams();
@@ -39,6 +39,22 @@ export default function MemberProfilePage() {
     return () => { active = false; };
   }, [memberId]);
 
+  const [checkingId, setCheckingId] = useState<number | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const handleProfileClick = async (e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    if (checkingId !== null) return;
+    setCheckingId(id);
+    try {
+      await api.team.memberProfile(id);
+      router.push(`/users/staff/${id}`);
+    } catch (err: any) {
+      setAuthError(err.message || "Not authorized to view this member.");
+    } finally {
+      setCheckingId(null);
+    }
+  };
 
   if (loading) return <div className="p-8 text-center text-slate-500 text-sm">Loading member profile...</div>;
   if (error) return <div className="p-8"><ErrorBanner message={error} /><button onClick={() => router.back()} className={secondaryButtonClass + " mt-4"}>Back</button></div>;
@@ -94,8 +110,9 @@ export default function MemberProfilePage() {
                   <div key={h.id} className="flex flex-col" style={{ paddingLeft: `${i * 12}px` }}>
                     <div className="flex items-center gap-2">
                       {i > 0 && <span className="text-slate-300">└</span>}
-                      <Link href={`/users/staff/${h.id}`} className="font-bold text-sky-700 hover:underline">
+                      <Link href={`/users/staff/${h.id}`} onClick={(e) => handleProfileClick(e, h.id)} className="font-bold text-sky-700 hover:underline flex items-center gap-1.5">
                         {h.name}
+                        {checkingId === h.id && <Loader2 className="w-3 h-3 animate-spin text-sky-500" />}
                       </Link>
                     </div>
                     <div className="text-[10px] text-slate-400 pl-3">{h.role} {h.department ? ` • ${h.department}` : ""}</div>
@@ -113,8 +130,9 @@ export default function MemberProfilePage() {
                   <div key={h.id} className="flex flex-col" style={{ paddingLeft: `${(hierarchy.above.length + 1) * 12}px` }}>
                     <div className="flex items-center gap-2">
                       <span className="text-slate-300">└</span>
-                      <Link href={`/users/staff/${h.id}`} className="font-medium text-slate-700 hover:text-sky-700 hover:underline">
+                      <Link href={`/users/staff/${h.id}`} onClick={(e) => handleProfileClick(e, h.id)} className="font-medium text-slate-700 hover:text-sky-700 hover:underline flex items-center gap-1.5">
                         {h.name}
+                        {checkingId === h.id && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
                       </Link>
                     </div>
                     <div className="text-[10px] text-slate-400 pl-4">{h.role}</div>
@@ -202,6 +220,30 @@ export default function MemberProfilePage() {
           </div>
         </div>
       </div>
+      
+      {authError && (
+        <Modal title="Access Restricted" onClose={() => setAuthError(null)}>
+          <div className="flex flex-col items-center text-center space-y-4 py-4">
+            <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-600">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Permission Denied</h3>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                {authError}
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                onClick={() => setAuthError(null)}
+                className={secondaryButtonClass}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </RequirePermission>
   );
 }

@@ -389,7 +389,7 @@ function PermissionMatrix({ roles, permissions }: { roles: RoleDetail[]; permiss
 
 function RolesEditor() {
   useDocumentTitle("Roles & permissions");
-  const { can } = useSession();
+  const { can, me } = useSession();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mode, setMode] = useState<"edit" | "matrix">("edit");
   const [notice, setNotice] = useState<string | null>(null);
@@ -398,9 +398,18 @@ function RolesEditor() {
     const [roles, permissions] = await Promise.all([api.roles.list(), api.roles.permissions()]);
     return { roles, permissions };
   }, []);
-  const roles = data?.roles ?? [];
-  const staffRoles = roles.filter((r) => r.audience === "staff");
-  const endUserRoles = roles.filter((r) => r.audience === "end_user");
+  
+  const rawRoles = data?.roles ?? [];
+  const visibleStaffRoles = me.is_super_admin
+    ? rawRoles.filter((r) => r.audience === "staff")
+    : rawRoles.filter((r) => r.audience === "staff" && (r.id === me.role.id || r.assignable));
+    
+  const minDepth = visibleStaffRoles.length > 0 ? Math.min(...visibleStaffRoles.map(r => r.depth)) : 0;
+  const staffRoles = visibleStaffRoles.map(r => ({ ...r, depth: r.depth - minDepth }));
+  
+  const endUserRoles = rawRoles.filter((r) => r.audience === "end_user");
+  const roles = [...staffRoles, ...endUserRoles];
+  
   const selected = roles.find((r) => r.id === selectedId) ?? staffRoles.find((r) => r.editable) ?? roles[0] ?? null;
 
   const select = (id: number | null) => {
