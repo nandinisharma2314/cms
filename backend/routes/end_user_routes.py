@@ -26,6 +26,8 @@ class CreateEndUserRequest(BaseModel):
     mobile: str
     email: str
     location_id: int | None = None
+    aadhar: str
+    pan_card: str
 
 
 class UpdateEndUserRequest(BaseModel):
@@ -36,6 +38,8 @@ class UpdateEndUserRequest(BaseModel):
     location_id: int | None = None
     clear_location: bool = False
     is_active: bool | None = None
+    aadhar: str | None = None
+    pan_card: str | None = None
 
 
 def serialize_end_users(db: Session, end_users: list[EndUser]) -> list[dict]:
@@ -49,6 +53,8 @@ def serialize_end_users(db: Session, end_users: list[EndUser]) -> list[dict]:
             "email": e.email,
             "location": serialize_location(e.location, names),
             "is_active": e.is_active,
+            "aadhar": e.aadhar,
+            "pan_card": e.pan_card,
             "created_at": e.created_at.isoformat(),
             "last_login_at": e.last_login_at.isoformat() if e.last_login_at else None,
         }
@@ -70,7 +76,7 @@ def _search(query, search: str | None):
     return query
 
 
-def _clean(db: Session, name: str | None, mobile: str | None, email: str | None, external_id: str | None):
+def _clean(db: Session, name: str | None, mobile: str | None, email: str | None, external_id: str | None, aadhar: str | None = None, pan_card: str | None = None):
     result = {}
     if name is not None:
         result["name"] = single_line(name, "Name", max_length(EndUser.name))
@@ -87,6 +93,14 @@ def _clean(db: Session, name: str | None, mobile: str | None, email: str | None,
         result["email"] = clean_email
     if external_id is not None:
         result["external_id"] = single_line(external_id, "User ID", max_length(EndUser.external_id), required=False)
+    if aadhar is not None:
+        if not aadhar.strip():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Aadhar is required")
+        result["aadhar"] = single_line(aadhar, "Aadhar", max_length(EndUser.aadhar), required=True)
+    if pan_card is not None:
+        if not pan_card.strip():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "PAN Card is required")
+        result["pan_card"] = single_line(pan_card, "PAN Card", max_length(EndUser.pan_card), required=True)
     return result
 
 
@@ -125,7 +139,7 @@ def list_end_users(
 def create_end_user(payload: CreateEndUserRequest, request: Request,
                     ctx: AccessContext = Depends(require_permission("end_user.create"))):
     db = ctx.db
-    values = _clean(db, payload.name, payload.mobile, payload.email, payload.external_id)
+    values = _clean(db, payload.name, payload.mobile, payload.email, payload.external_id, payload.aadhar, payload.pan_card)
     location = _location(ctx, payload.location_id) if payload.location_id is not None else None
     if location is None:
         ctx.require_covers_location(None)
@@ -155,8 +169,9 @@ def update_end_user(
     before = {
         "external_id": end_user.external_id, "name": end_user.name, "mobile": end_user.mobile,
         "email": end_user.email, "location_id": end_user.location_id, "is_active": end_user.is_active,
+        "aadhar": end_user.aadhar, "pan_card": end_user.pan_card,
     }
-    for key, value in _clean(db, payload.name, payload.mobile, payload.email, payload.external_id).items():
+    for key, value in _clean(db, payload.name, payload.mobile, payload.email, payload.external_id, payload.aadhar, payload.pan_card).items():
         setattr(end_user, key, value)
     if payload.clear_location:
         ctx.require_covers_location(None)
@@ -175,6 +190,7 @@ def update_end_user(
     after = {
         "external_id": end_user.external_id, "name": end_user.name, "mobile": end_user.mobile,
         "email": end_user.email, "location_id": end_user.location_id, "is_active": end_user.is_active,
+        "aadhar": end_user.aadhar, "pan_card": end_user.pan_card,
     }
     changes = audit_service.diff(before, after)
     if "is_active" in changes and not end_user.is_active:
@@ -223,8 +239,8 @@ def export_end_users(
     rows = []
     for c in end_users:
         path = names[c.location_id] if c.location_id else []
-        rows.append([c.external_id or "", c.name, c.mobile, c.email] + path + [""] * (len(levels) - len(path)))
-    return csv_response("end_users", ["user_id", "name", "mobile", "email"] + levels, rows)
+        rows.append([c.name, c.mobile, c.email, c.aadhar or "", c.pan_card or ""] + path + [""] * (len(levels) - len(path)))
+    return csv_response("end_users", ["name", "mobile", "email", "aadhar", "pan_card"] + levels, rows)
 
 
 @router.get("/{end_user_id}/profile")
@@ -246,8 +262,8 @@ def get_end_user_profile(
     rejected_count = complaints_query.filter(Complaint.status == REJECTED).count()
     open_count = total_complaints - resolved_count - rejected_count
 
-    # Get recent complaints (last 10)
-    recent = complaints_query.order_by(Complaint.created_at.desc()).limit(10).all()
+    # Get all complaints
+    recent = complaints_query.order_by(Complaint.created_at.desc()).all()
 
     return {
         "user": serialize_end_users(db, [end_user])[0],

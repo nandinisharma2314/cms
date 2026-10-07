@@ -3,12 +3,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, KeyRound } from "lucide-react";
+import { ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import { api, PublicConfig } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { useSession } from "@/lib/session";
 import { BrandMark } from "./BrandMark";
-import { Card, ErrorBanner, Field, inputClass, primaryButtonClass, secondaryButtonClass } from "./ui";
+import { Card, ErrorBanner, Field, inputClass, Modal, primaryButtonClass, secondaryButtonClass } from "./ui";
 
 type PasswordRules = PublicConfig["password"];
 
@@ -24,6 +24,42 @@ export function passwordProblems(password: string, rules: PasswordRules): string
 
 export function passwordHint(rules: PasswordRules): string {
   return `${rules.min_length}+ characters with ${rules.character_classes} of: lowercase, uppercase, digit, symbol.`;
+}
+
+function PasswordInput({
+  value,
+  onChange,
+  autoComplete,
+  isInvalid = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete: string;
+  isInvalid?: boolean;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        required
+        type={showPassword ? "text" : "password"}
+        autoComplete={autoComplete}
+        className={`${inputClass} pr-10`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={isInvalid}
+      />
+      <button
+        type="button"
+        onClick={() => setShowPassword(!showPassword)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+        aria-label={showPassword ? "Hide password" : "Show password"}
+        title={showPassword ? "Hide password" : "Show password"}
+      >
+        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
 }
 
 export function ChangePasswordForm() {
@@ -48,6 +84,10 @@ export function ChangePasswordForm() {
     }
     if (next !== confirm) {
       setError("The two new passwords don't match.");
+      return;
+    }
+    if (current === next) {
+      setError("The new password cannot be the same as the current password.");
       return;
     }
     setBusy(true);
@@ -84,35 +124,13 @@ export function ChangePasswordForm() {
           <form onSubmit={submit} className="space-y-3">
             <ErrorBanner message={error} />
             <Field label={forced ? "Temporary password" : "Current password"}>
-              <input
-                required
-                type="password"
-                autoComplete="current-password"
-                className={inputClass}
-                value={current}
-                onChange={(e) => setCurrent(e.target.value)}
-              />
+              <PasswordInput value={current} onChange={setCurrent} autoComplete="current-password" />
             </Field>
             <Field label="New password" hint={problems.length ? `Still needs ${problems.join(", ")}.` : passwordHint(rules)}>
-              <input
-                required
-                type="password"
-                autoComplete="new-password"
-                className={inputClass}
-                value={next}
-                onChange={(e) => setNext(e.target.value)}
-                aria-invalid={problems.length > 0}
-              />
+              <PasswordInput value={next} onChange={setNext} autoComplete="new-password" isInvalid={problems.length > 0} />
             </Field>
             <Field label="Repeat the new password">
-              <input
-                required
-                type="password"
-                autoComplete="new-password"
-                className={inputClass}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-              />
+              <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
             </Field>
             <div className="flex items-center justify-between gap-2 pt-1">
               {forced ? (
@@ -132,5 +150,67 @@ export function ChangePasswordForm() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { setMe } = useSession();
+  const { password: rules } = useConfig();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const problems = next ? passwordProblems(next, rules) : [];
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (problems.length) {
+      setError(`The new password needs ${problems.join(", ")}.`);
+      return;
+    }
+    if (next !== confirm) {
+      setError("The two new passwords don't match.");
+      return;
+    }
+    if (current === next) {
+      setError("The new password cannot be the same as the current password.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      setMe(await api.auth.changePassword(current, next));
+      onClose();
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title="Change password" description="You stay signed in here; every other session is signed out." onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <ErrorBanner message={error} />
+        <Field label="Current password">
+          <PasswordInput value={current} onChange={setCurrent} autoComplete="current-password" />
+        </Field>
+        <Field label="New password" hint={problems.length ? `Still needs ${problems.join(", ")}.` : passwordHint(rules)}>
+          <PasswordInput value={next} onChange={setNext} autoComplete="new-password" isInvalid={problems.length > 0} />
+        </Field>
+        <Field label="Repeat the new password">
+          <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
+        </Field>
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" className={secondaryButtonClass} onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="submit" className={primaryButtonClass} disabled={busy}>
+            {busy ? "Saving…" : "Save password"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

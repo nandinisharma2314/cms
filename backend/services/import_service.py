@@ -284,6 +284,8 @@ class _EndUserRow:
     name: str
     mobile: str
     email: str
+    aadhar: str
+    pan_card: str
     level_names: list[str]
 
 
@@ -301,7 +303,7 @@ def _existing_end_users(db: Session, parsed: list[_EndUserRow]) -> list[EndUser]
 
 def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportResult:
     headers, rows = read_csv(content)
-    missing = [c for c in ("name", "mobile", "email") if c not in headers]
+    missing = [c for c in ("name", "mobile", "email", "aadhar", "pan_card") if c not in headers]
     if missing:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"CSV is missing required column(s): {', '.join(missing)}")
     resolver = _LocationResolver(db)
@@ -329,12 +331,20 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
         if email is None:
             result.fail(row_number, "Email is not valid", row)
             continue
+        aadhar = (row.get("aadhar") or "").strip()
+        if not aadhar:
+            result.fail(row_number, "Aadhar is required", row)
+            continue
+        pan_card = (row.get("pan_card") or "").strip()
+        if not pan_card:
+            result.fail(row_number, "PAN Card is required", row)
+            continue
         try:
             level_names = resolver.levels(row)
         except ValueError as exc:
             result.fail(row_number, str(exc), row)
             continue
-        parsed.append(_EndUserRow(row_number, row, external_id, name, mobile, email, level_names))
+        parsed.append(_EndUserRow(row_number, row, external_id, name, mobile, email, aadhar, pan_card, level_names))
 
     # Everything that already exists for these identifiers, in a few queries.
     by_external: dict[str, EndUser] = {}
@@ -447,6 +457,8 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
                 "name": p.name,
                 "mobile": p.mobile,
                 "email": p.email,
+                "aadhar": p.aadhar,
+                "pan_card": p.pan_card,
                 "location_id": location.id if location is not None else existing.location_id,
             }
             if all(getattr(existing, k) == v for k, v in new_values.items()):
@@ -469,6 +481,7 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
         else:
             target = EndUser(
                 external_id=p.external_id, name=p.name, mobile=p.mobile, email=p.email,
+                aadhar=p.aadhar, pan_card=p.pan_card,
                 location_id=location.id if location is not None else None,
             )
             db.add(target)

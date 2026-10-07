@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Clock, Mail, MapPin, Phone, ShieldAlert, User as UserIcon, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Mail, MapPin, Phone, ShieldAlert, User as UserIcon, XCircle, CreditCard } from "lucide-react";
 import { api, EndUserProfileResponse } from "@/lib/api";
 import { useApiData } from "@/lib/hooks";
 import { formatDateTime } from "@/lib/format";
@@ -23,34 +23,32 @@ function KpiTile({
   tone: "success" | "warning" | "danger" | "neutral" | "brand";
 }) {
   const colors = {
-    success: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
-    warning: "bg-amber-500/10 text-amber-700 border-amber-500/20",
-    danger: "bg-rose-500/10 text-rose-700 border-rose-500/20",
-    neutral: "bg-slate-500/10 text-slate-700 border-slate-500/20",
-    brand: "bg-sky-500/10 text-sky-700 border-sky-500/20",
+    success: "bg-emerald-500/10 text-emerald-700",
+    warning: "bg-amber-500/10 text-amber-700",
+    danger: "bg-rose-500/10 text-rose-700",
+    neutral: "bg-slate-500/10 text-slate-700",
+    brand: "bg-sky-500/10 text-sky-700",
   };
 
   const iconColors = {
-    success: "text-emerald-600",
-    warning: "text-amber-600",
-    danger: "text-rose-600",
-    neutral: "text-slate-600",
-    brand: "text-sky-600",
+    success: "text-emerald-600 bg-emerald-50",
+    warning: "text-amber-600 bg-amber-50",
+    danger: "text-rose-600 bg-rose-50",
+    neutral: "text-slate-600 bg-slate-50",
+    brand: "text-sky-600 bg-sky-50",
   };
 
   return (
     <div
-      className={`p-5 rounded-2xl border ${colors[tone]} flex flex-col justify-between transition-all hover:scale-[1.02] duration-200 shadow-sm`}
+      className={`p-3.5 rounded-2xl ${colors[tone]} flex flex-col justify-between transition-all hover:scale-[1.02] duration-200 shadow-sm`}
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2 rounded-xl bg-white shadow-sm ${iconColors[tone]}`}>
-          <Icon className="w-5 h-5" />
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-2xl font-extrabold tracking-tight leading-none">{value}</div>
+        <div className={`p-2 rounded-xl shadow-sm bg-white ${iconColors[tone]}`}>
+          <Icon className="w-4 h-4" />
         </div>
       </div>
-      <div>
-        <div className="text-3xl font-extrabold tracking-tight mb-1">{value}</div>
-        <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">{label}</div>
-      </div>
+      <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">{label}</div>
     </div>
   );
 }
@@ -59,7 +57,31 @@ function EndUserProfileContent() {
   const params = useParams();
   const id = Number(params.id);
 
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("newest");
+
   const { data, error, loading } = useApiData<EndUserProfileResponse>(() => api.endUsers.profile(id), [id]);
+
+  const filteredComplaints = useMemo(() => {
+    if (!data?.recent_complaints) return [];
+    let result = [...data.recent_complaints];
+    
+    if (statusFilter === "open") {
+      result = result.filter((c: any) => c.status_group !== "resolved" && c.status_group !== "rejected");
+    } else if (statusFilter === "resolved") {
+      result = result.filter((c: any) => c.status_group === "resolved");
+    } else if (statusFilter === "rejected") {
+      result = result.filter((c: any) => c.status_group === "rejected");
+    }
+
+    result.sort((a: any, b: any) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
+    });
+
+    return result;
+  }, [data?.recent_complaints, statusFilter, sortOrder]);
 
   useDocumentTitle(data?.user?.name ? `${data.user.name} - End User` : "End User Profile");
 
@@ -80,18 +102,20 @@ function EndUserProfileContent() {
   const { user, stats, recent_complaints } = data;
 
   return (
-    <div className="max-w-5xl mx-auto py-6 space-y-6">
+    <div className="flex flex-col h-[calc(100vh-8.5rem)]">
       {/* Header & Navigation */}
-      <div className="flex items-center gap-4">
+      <div className="flex-none flex items-center gap-4 pb-4">
         <Link
           href="/users"
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{user.name}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">End User Profile {user.external_id ? `• ID: ${user.external_id}` : ""}</p>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">{user.name}</h1>
+          <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+            End User Profile {user.external_id ? `• ID: ${user.external_id}` : ""}
+          </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <StatusPill active={user.is_active} />
@@ -99,19 +123,19 @@ function EndUserProfileContent() {
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: User Info */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 relative">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: User Info with Stats inside */}
+        <div className="lg:col-span-5 h-full overflow-y-auto custom-scrollbar pr-1 pb-1">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col min-h-full">
+            <div className="h-24 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 relative shrink-0">
               <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
             </div>
-            <div className="px-8 pb-8 relative">
-              <div className="w-24 h-24 bg-white rounded-2xl shadow-md border-4 border-white flex items-center justify-center text-4xl font-extrabold text-slate-800 bg-gradient-to-br from-slate-50 to-slate-100 -mt-12 mb-5">
+            <div className="px-8 pb-8 flex-1 flex flex-col relative">
+              <div className="w-20 h-20 bg-white rounded-2xl shadow-md flex items-center justify-center text-3xl font-extrabold text-slate-800 bg-gradient-to-br from-slate-50 to-slate-100 -mt-10 mb-5 shrink-0">
                 {user.name.charAt(0).toUpperCase()}
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-5 flex-1">
                 <div className="flex items-start gap-3.5 group">
                   <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-sky-600 group-hover:bg-sky-50 transition-colors">
                     <Mail className="w-4 h-4" />
@@ -142,7 +166,27 @@ function EndUserProfileContent() {
                   </div>
                 </div>
 
-                <div className="pt-6 mt-2 border-t border-slate-100 flex items-center justify-between">
+                <div className="flex items-start gap-3.5 group">
+                  <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-purple-600 group-hover:bg-purple-50 transition-colors">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Aadhar</div>
+                    <div className="text-[13px] font-semibold text-slate-800">{user.aadhar || "—"}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3.5 group">
+                  <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-orange-600 group-hover:bg-orange-50 transition-colors">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">PAN Card</div>
+                    <div className="text-[13px] font-semibold text-slate-800">{user.pan_card || "—"}</div>
+                  </div>
+                </div>
+
+                <div className="pt-5 flex items-center justify-between">
                   <div>
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Joined</div>
                     <div className="text-[11px] text-slate-600 font-medium">{formatDateTime(user.created_at)}</div>
@@ -154,43 +198,69 @@ function EndUserProfileContent() {
                     </div>
                   )}
                 </div>
+
+                {/* KPI Cards inside User Info */}
+                <div className="pt-6 mt-2 border-t border-slate-100">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Complaint Statistics</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <KpiTile label="Total Filed" value={stats.total_complaints} icon={Mail} tone="brand" />
+                    <KpiTile
+                      label="Currently Open"
+                      value={stats.open_complaints}
+                      icon={Clock}
+                      tone={stats.open_complaints > 0 ? "warning" : "neutral"}
+                    />
+                    <KpiTile label="Resolved" value={stats.resolved_complaints} icon={CheckCircle2} tone="success" />
+                    <KpiTile
+                      label="Rejected"
+                      value={stats.rejected_complaints}
+                      icon={XCircle}
+                      tone={stats.rejected_complaints > 0 ? "danger" : "neutral"}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Stats & Complaints */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiTile label="Total Filed" value={stats.total_complaints} icon={Mail} tone="brand" />
-            <KpiTile
-              label="Currently Open"
-              value={stats.open_complaints}
-              icon={Clock}
-              tone={stats.open_complaints > 0 ? "warning" : "neutral"}
-            />
-            <KpiTile label="Resolved" value={stats.resolved_complaints} icon={CheckCircle2} tone="success" />
-            <KpiTile
-              label="Rejected"
-              value={stats.rejected_complaints}
-              icon={XCircle}
-              tone={stats.rejected_complaints > 0 ? "danger" : "neutral"}
-            />
-          </div>
+        {/* Right Column: Complaints */}
+        <div className="lg:col-span-7 h-full flex flex-col min-h-0">
+          <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4 shrink-0">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-indigo-500" />
+                Recent Complaints
+              </h3>
+              <div className="flex items-center gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-medium cursor-pointer"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="open">Currently Open</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-medium cursor-pointer"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                </select>
+              </div>
+            </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm p-7">
-            <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-indigo-500" />
-              Recent Complaints
-            </h3>
-
-            {recent_complaints.length === 0 ? (
-              <div className="text-center py-12 bg-slate-50/50 rounded-2xl border border-slate-200 border-dashed">
-                <p className="text-slate-500 text-sm font-medium">This user hasn&apos;t filed any complaints yet.</p>
+            {filteredComplaints.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50/50 rounded-2xl border border-slate-200 border-dashed m-1">
+                <p className="text-slate-500 text-sm font-medium">No complaints match your filters.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {recent_complaints.map(
+              <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+                {filteredComplaints.map(
                   (complaint: {
                     id: string | number;
                     title: string;
@@ -202,24 +272,24 @@ function EndUserProfileContent() {
                     <Link
                       key={complaint.id}
                       href={`/complaints/${complaint.id}`}
-                      className="block bg-white hover:bg-slate-50 border border-slate-200/80 rounded-2xl p-4.5 transition-all hover:shadow-sm group"
+                      className="block bg-slate-50/50 hover:bg-slate-100/80 rounded-2xl p-4 transition-all hover:shadow-sm group"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-3 gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-2 gap-2">
                         <div className="font-bold text-slate-800 group-hover:text-sky-700 transition-colors">
                           {complaint.title || "(No subject provided)"}
                         </div>
-                        <div className="text-[11px] font-mono font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
+                        <div className="text-[11px] font-mono font-semibold text-slate-500 bg-white shadow-sm px-2.5 py-1 rounded-lg shrink-0">
                           {complaint.id}
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
                         <span
-                          className={`px-2.5 py-1 rounded-lg font-bold tracking-wide uppercase text-[9px] border ${
+                          className={`px-2.5 py-1 rounded-lg font-bold tracking-wide uppercase text-[9px] ${
                             complaint.status_group === "resolved"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              ? "bg-emerald-100 text-emerald-800"
                               : complaint.status_group === "rejected"
-                                ? "bg-rose-50 text-rose-700 border-rose-200"
-                                : "bg-sky-50 text-sky-700 border-sky-200"
+                                ? "bg-rose-100 text-rose-800"
+                                : "bg-sky-100 text-sky-800"
                           }`}
                         >
                           {complaint.status_label}

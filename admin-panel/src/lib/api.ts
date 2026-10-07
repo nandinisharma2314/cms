@@ -157,6 +157,8 @@ export interface EndUserRow {
   name: string;
   mobile: string;
   email: string;
+  aadhar: string | null;
+  pan_card: string | null;
   location: LocationRef | null;
   is_active: boolean;
   created_at: string;
@@ -1243,7 +1245,7 @@ export const api = {
     list: (query: { search?: string; page?: number; page_size?: number } = {}) =>
       request<Paged<EndUserRow>>("/end-users/", { query }),
     profile: (endUserId: number) => request<EndUserProfileResponse>(`/end-users/${endUserId}/profile`),
-    create: (data: { external_id: string | null; name: string; mobile: string; email: string; location_id: number | null }) =>
+    create: (data: { external_id: string | null; name: string; mobile: string; email: string; aadhar: string; pan_card: string; location_id: number | null }) =>
       request<EndUserRow>("/end-users/", { method: "POST", body: data }),
     update: (
       endUserId: number,
@@ -1255,6 +1257,8 @@ export const api = {
         location_id: number;
         clear_location: boolean;
         is_active: boolean;
+        aadhar: string;
+        pan_card: string;
       }>,
     ) => request<EndUserRow>(`/end-users/${endUserId}`, { method: "PATCH", body: data }),
     importCsv: (file: File, dryRun: boolean) => uploadCsv("/end-users/import", file, dryRun),

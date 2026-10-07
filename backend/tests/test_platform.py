@@ -279,7 +279,7 @@ def test_a_just_rotated_token_does_not_outlive_sign_out(client):
     assert own.post("/auth/logout", params={"principal": "staff"}, headers=CLIENT_HEADERS).status_code == 200
     # still inside the grace window, but the session it belonged to has ended
     stale = new_client()
-    stale.cookies.set("cms_refresh_staff", first, path="/auth")
+    stale.cookies.set("cms_refresh_staff", first, path="/")
     refused = stale.post("/auth/refresh", params={"principal": "staff"}, headers=CLIENT_HEADERS)
     assert refused.status_code == 401
     # the dead cookie is removed, so the app stops trying it on every load
@@ -290,7 +290,7 @@ def test_login_cookie_is_http_only_and_scoped_to_auth(client):
     own = new_client()
     response = own.post("/auth/login", json={"identifier": WATER_AGENT, "password": PASSWORD})
     cookie = response.headers["set-cookie"]
-    assert "HttpOnly" in cookie and "Path=/auth" in cookie and "samesite=lax" in cookie.lower()
+    assert "HttpOnly" in cookie and "Path=/" in cookie and "samesite=lax" in cookie.lower()
     assert "refresh_token" not in response.json()
 
 

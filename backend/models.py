@@ -259,6 +259,8 @@ class EndUser(Base):
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     token_version = Column(Integer, default=0, nullable=False)
+    aadhar = Column(String(20), nullable=True)
+    pan_card = Column(String(20), nullable=True)
 
     # Profile details the end user maintains in the portal
     dob = Column(Date, nullable=True)

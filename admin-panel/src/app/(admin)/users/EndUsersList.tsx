@@ -45,6 +45,8 @@ function EndUserForm({
   const [name, setName] = useState(editing?.name ?? "");
   const [mobile, setMobile] = useState(editing?.mobile ?? "");
   const [email, setEmail] = useState(editing?.email ?? "");
+  const [aadhar, setAadhar] = useState(editing?.aadhar ?? "");
+  const [panCard, setPanCard] = useState(editing?.pan_card ?? "");
   const [locationId, setLocationId] = useState<number | null>(editing?.location?.id ?? null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
@@ -69,13 +71,15 @@ function EndUserForm({
         if (name !== editing.name) changes.name = name;
         if (mobile !== editing.mobile) changes.mobile = mobile;
         if (email !== editing.email) changes.email = email;
+        if (aadhar !== editing.aadhar) changes.aadhar = aadhar;
+        if (panCard !== editing.pan_card) changes.pan_card = panCard;
         if (locationId !== (editing.location?.id ?? null)) {
           changes.location_id = locationId;
         }
         if (Object.keys(changes).length) await api.endUsers.update(editing.id, changes);
         onSaved(identityChanged ? `${name} updated. They were signed out and told about the change.` : `${name} updated.`);
       } else {
-        await api.endUsers.create({ external_id: externalId.trim() || null, name, mobile, email, location_id: locationId });
+        await api.endUsers.create({ external_id: externalId.trim() || null, name, mobile, email, aadhar, pan_card: panCard, location_id: locationId });
         onSaved(`${name} added. They can now sign in to the portal with their ${signInWith}.`);
       }
     });
@@ -137,6 +141,22 @@ function EndUserForm({
               className={inputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          <Field label="Aadhar">
+            <input
+              required
+              className={inputClass}
+              value={aadhar}
+              onChange={(e) => setAadhar(e.target.value)}
+            />
+          </Field>
+          <Field label="PAN Card">
+            <input
+              required
+              className={inputClass}
+              value={panCard}
+              onChange={(e) => setPanCard(e.target.value)}
             />
           </Field>
         </div>
@@ -329,12 +349,12 @@ export function EndUsersList() {
       {importOpen && reference && (
         <Modal
           title="Import end users"
-          description="Rows are matched by user_id (or mobile + email) and updated; others are created. Locations must already exist."
+          description="Rows are matched by mobile + email and updated; others are created. Locations must already exist."
           onClose={() => setImportOpen(false)}
           wide
         >
           <CsvImportPanel
-            columns={["user_id", "name", "mobile", "email", ...reference.levels.map((l) => l.key)]}
+            columns={["name", "mobile", "email", "aadhar", "pan_card", ...reference.levels.map((l) => l.key)]}
             templateName="end-users-template.csv"
             onImport={api.endUsers.importCsv}
             onDone={reload}

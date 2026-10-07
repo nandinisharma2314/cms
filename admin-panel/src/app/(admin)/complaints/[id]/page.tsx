@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpCircle,
@@ -628,6 +628,7 @@ function Timeline({ detail }: { detail: ComplaintDetail }) {
 
 function ComplaintView() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const complaintId = decodeURIComponent(id);
   useDocumentTitle(complaintId);
   const { ui } = useConfig();
@@ -645,12 +646,12 @@ function ComplaintView() {
 
   return (
     <>
-      <Link
-        href="/complaints"
-        className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-blue-600"
+      <button
+        onClick={() => router.back()}
+        className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-blue-600 mb-4"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> All complaints
-      </Link>
+        <ArrowLeft className="w-3.5 h-3.5" /> Back
+      </button>
 
       <div>
         <div className="flex flex-wrap items-center gap-2">

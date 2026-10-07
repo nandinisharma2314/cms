@@ -11,6 +11,7 @@ import { useApiData } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import { scopeLabel } from "./ScopeEditor";
 import { QuickActionsBar } from "./QuickActionsBar";
+import { ChangePasswordModal } from "./ChangePasswordForm";
 
 /** Closes a popover on outside click or Escape. */
 function usePopover() {
@@ -152,6 +153,7 @@ function UserMenu() {
   const { me, can, logout, setMe } = useSession();
   const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
   const [error, setError] = useState<string | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
     <div className="relative" ref={menuRef}>
@@ -208,13 +210,15 @@ function UserMenu() {
             </label>
           )}
           {error && <p className="px-3.5 py-1 text-[11px] text-rose-600">{error}</p>}
-          <Link
-            href="/change-password"
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            onClick={() => setMenuOpen(false)}
+          <button
+            onClick={() => {
+              setPasswordOpen(true);
+              setMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer text-left"
           >
             <KeyRound className="w-3.5 h-3.5" /> Change password
-          </Link>
+          </button>
           <button
             onClick={logout}
             className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
@@ -223,6 +227,7 @@ function UserMenu() {
           </button>
         </div>
       )}
+      {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
     </div>
   );
 }
