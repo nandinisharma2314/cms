@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Edit3,
   Filter,
   Flame,
   Gift,
@@ -21,11 +22,13 @@ import {
   Printer,
   RotateCcw,
   Search,
+  Trash2,
   TrendingUp,
   Trophy,
   X,
   Zap,
 } from "lucide-react";
+import { toast } from "@/components/Toast";
 import {
   api,
   Department,
@@ -420,6 +423,389 @@ function ManualAdjustmentModal({
 }
 
 // ---------------------------------------------------------------------------
+// Perk Edit / Create Modal (Super Admin & Managers)
+// ---------------------------------------------------------------------------
+function PerkModal({
+  isOpen,
+  onClose,
+  editingPerk,
+  form,
+  setForm,
+  onSubmit,
+  busy,
+  error,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  editingPerk: RewardPerk | null;
+  form: {
+    title: string;
+    description: string;
+    points_cost: number;
+    category: string;
+    icon: string;
+    is_active: boolean;
+  };
+  setForm: React.Dispatch<
+    React.SetStateAction<{
+      title: string;
+      description: string;
+      points_cost: number;
+      category: string;
+      icon: string;
+      is_active: boolean;
+    }>
+  >;
+  onSubmit: (e: React.FormEvent) => void;
+  busy: boolean;
+  error?: string | null;
+}) {
+  if (!isOpen) return null;
+
+  const quickIcons = ["🎁", "☕", "🎟️", "🏖️", "🍕", "💻", "📚", "🎧", "🎬", "🛍️", "🍔", "🏆"];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+          <div className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-fuchsia-600" />
+            <h3 className="text-sm font-bold text-slate-900">
+              {editingPerk ? `Edit Perk: ${editingPerk.title}` : "Add New Catalog Perk"}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="p-6 space-y-4">
+          <ErrorBanner message={error} />
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-start">
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Icon / Emoji</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  maxLength={4}
+                  className={`${inputClass} text-center text-xl font-bold p-2`}
+                  value={form.icon}
+                  onChange={(e) => setForm((prev) => ({ ...prev, icon: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {quickIcons.map((ic) => (
+                  <button
+                    key={ic}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, icon: ic }))}
+                    className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center border hover:bg-slate-100 cursor-pointer ${
+                      form.icon === ic ? "border-fuchsia-500 bg-fuchsia-50 ring-1 ring-fuchsia-400" : "border-slate-200"
+                    }`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sm:col-span-3 space-y-3">
+              <Field label="Perk Title" hint="Display name for this reward">
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Amazon Gift Card ₹1000, 1-Day Extra Casual Leave"
+                  value={form.title}
+                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                  required
+                />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Points Cost" hint="Cost to redeem">
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={1}
+                      className={`${inputClass} font-bold text-amber-700`}
+                      value={form.points_cost}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          points_cost: Math.max(1, Number(e.target.value) || 0),
+                        }))
+                      }
+                      required
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs font-bold text-amber-600">pts</span>
+                  </div>
+                </Field>
+
+                <Field label="Category" hint="Reward classification">
+                  <select
+                    className={inputClass}
+                    value={form.category}
+                    onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                  >
+                    <option value="perk">Perk / Privileges</option>
+                    <option value="voucher">Voucher / Coupons</option>
+                    <option value="gift_card">Gift Card</option>
+                    <option value="leave">Leave / Time-off</option>
+                    <option value="hardware">Gear / Hardware</option>
+                    <option value="learning">Course / Learning</option>
+                    <option value="other">Other</option>
+                  </select>
+                </Field>
+              </div>
+            </div>
+          </div>
+
+          <Field label="Description" hint="Terms, redemption conditions, or how the perk is delivered">
+            <textarea
+              rows={3}
+              className={inputClass}
+              placeholder="e.g. Valid across all outlets. Sent directly to employee work email within 24 hours of admin fulfillment."
+              value={form.description}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+              required
+            />
+          </Field>
+
+          {/* Active Status Toggle */}
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-800">Perk Availability</p>
+              <p className="text-[11px] text-slate-400">
+                {form.is_active ? "Visible to all employees in the catalog" : "Hidden from catalog (employees cannot redeem)"}
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-fuchsia-600"></div>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+            <button type="button" onClick={onClose} className={secondaryButtonClass} disabled={busy}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !form.title.trim()}
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-xs cursor-pointer disabled:opacity-50 transition-all"
+            >
+              {busy ? "Saving…" : editingPerk ? "Update Perk" : "Create Perk"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Redemption Review & Fulfillment Modal (Super Admin & Managers)
+// ---------------------------------------------------------------------------
+function RedemptionReviewModal({
+  isOpen,
+  onClose,
+  redemption,
+  status,
+  setStatus,
+  adminNotes,
+  setAdminNotes,
+  onSubmit,
+  busy,
+  error,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  redemption: RewardRedemption | null;
+  status: "approved" | "fulfilled" | "rejected";
+  setStatus: (s: "approved" | "fulfilled" | "rejected") => void;
+  adminNotes: string;
+  setAdminNotes: (n: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  busy: boolean;
+  error?: string | null;
+}) {
+  if (!isOpen || !redemption) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+            <h3 className="text-sm font-bold text-slate-900">
+              Review Redemption Request #{redemption.id}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="p-6 space-y-4">
+          <ErrorBanner message={error} />
+
+          {/* Details Card */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Staff Member</span>
+                <p className="font-bold text-slate-800">{redemption.user_name}</p>
+                <p className="text-[11px] text-slate-500">{redemption.user_email}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Points Spent</span>
+                <p className="text-sm font-black text-amber-700">-{redemption.points_spent} 🪙</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Claimed Reward</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xl">{redemption.perk_icon}</span>
+                  <span className="font-bold text-slate-800">{redemption.perk_title}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Current Status</span>
+                <div className="mt-0.5">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      redemption.status === "fulfilled"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : redemption.status === "approved"
+                        ? "bg-blue-100 text-blue-800"
+                        : redemption.status === "rejected"
+                        ? "bg-rose-100 text-rose-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {redemption.status.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {redemption.notes && (
+              <div className="pt-2 border-t border-slate-200/60">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Employee Request Notes</span>
+                <p className="text-slate-600 italic mt-0.5">&ldquo;{redemption.notes}&rdquo;</p>
+              </div>
+            )}
+          </div>
+
+          {/* Status Decision Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Review Decision</label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setStatus("approved")}
+                className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                  status === "approved"
+                    ? "bg-blue-50 text-blue-800 border-blue-300 ring-2 ring-blue-400/40 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <span>Approved</span>
+                <span className="text-[9px] font-normal text-slate-400">In process</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatus("fulfilled")}
+                className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                  status === "fulfilled"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 ring-2 ring-emerald-400/40 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <span>Fulfilled</span>
+                <span className="text-[9px] font-normal text-slate-400">Delivered</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatus("rejected")}
+                className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                  status === "rejected"
+                    ? "bg-rose-50 text-rose-800 border-rose-300 ring-2 ring-rose-400/40 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <span>Rejected</span>
+                <span className="text-[9px] font-normal text-slate-400">Refund points</span>
+              </button>
+            </div>
+          </div>
+
+          {status === "rejected" && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+              <span className="text-base leading-none">⚠️</span>
+              <div>
+                <p className="font-bold">Automatic Points Refund</p>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Rejecting this claim will immediately refund <strong>+{redemption.points_spent} points</strong> back to {redemption.user_name}&apos;s balance and record a ledger entry.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <Field
+            label="Admin Notes / Voucher Details"
+            hint="Details visible to the employee (e.g. Voucher coupon code, instructions, or rejection reason)"
+          >
+            <textarea
+              rows={3}
+              className={inputClass}
+              placeholder="e.g. Amazon code AMZ-8899-XX sent to your mail, or request rejected because inventory is depleted."
+              value={adminNotes}
+              onChange={(e) => setAdminNotes(e.target.value)}
+            />
+          </Field>
+
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+            <button type="button" onClick={onClose} className={secondaryButtonClass} disabled={busy}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-xs cursor-pointer disabled:opacity-50 transition-all ${
+                status === "fulfilled"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : status === "rejected"
+                  ? "bg-rose-600 hover:bg-rose-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              {busy ? "Saving Decision…" : `Confirm ${status.toUpperCase()}`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Rewards Page Component
 // ---------------------------------------------------------------------------
 export default function RewardsPage() {
@@ -446,12 +832,126 @@ export default function RewardsPage() {
   const { data: managers } = useApiData<StaffUser[]>(() => api.team.managers(), []);
   const { data: allStaffUsers } = useApiData<{ items: StaffUser[] }>(() => api.users.list({ page_size: 100 }), []);
 
-  // Perks Catalog
-  const { data: perks } = useApiData<RewardPerk[]>(() => api.rewards.listPerks(), []);
-  const { data: myRedemptions, reload: reloadRedemptions } = useApiData<Paged<RewardRedemption>>(
-    () => api.rewards.listRedemptions({ user_id: canManage ? undefined : me.id, page_size: 20 }),
-    [me.id, canManage],
+  // Perks Catalog & Redemptions
+  const [redemptionStatusFilter, setRedemptionStatusFilter] = useState<string>("all");
+  const [redemptionPage, setRedemptionPage] = useState<number>(1);
+  const { data: perks, reload: reloadPerks } = useApiData<RewardPerk[]>(
+    () => api.rewards.listPerks(canManage ? true : false),
+    [canManage],
   );
+  const { data: myRedemptions, reload: reloadRedemptions } = useApiData<Paged<RewardRedemption>>(
+    () =>
+      api.rewards.listRedemptions({
+        user_id: canManage ? undefined : me.id,
+        status: redemptionStatusFilter === "all" ? undefined : redemptionStatusFilter,
+        page: redemptionPage,
+        page_size: 20,
+      }),
+    [me.id, canManage, redemptionStatusFilter, redemptionPage],
+  );
+
+  // Perks Management Modal State
+  const [perkModalOpen, setPerkModalOpen] = useState(false);
+  const [editingPerk, setEditingPerk] = useState<RewardPerk | null>(null);
+  const [perkForm, setPerkForm] = useState<{
+    title: string;
+    description: string;
+    points_cost: number;
+    category: string;
+    icon: string;
+    is_active: boolean;
+  }>({
+    title: "",
+    description: "",
+    points_cost: 100,
+    category: "perk",
+    icon: "🎁",
+    is_active: true,
+  });
+  const perkAction = useAction();
+
+  const openCreatePerk = () => {
+    setEditingPerk(null);
+    setPerkForm({
+      title: "",
+      description: "",
+      points_cost: 100,
+      category: "perk",
+      icon: "🎁",
+      is_active: true,
+    });
+    setPerkModalOpen(true);
+  };
+
+  const openEditPerk = (perk: RewardPerk) => {
+    setEditingPerk(perk);
+    setPerkForm({
+      title: perk.title,
+      description: perk.description,
+      points_cost: perk.points_cost,
+      category: perk.category,
+      icon: perk.icon,
+      is_active: perk.is_active,
+    });
+    setPerkModalOpen(true);
+  };
+
+  const handleSavePerk = (e: React.FormEvent) => {
+    e.preventDefault();
+    perkAction.run(async () => {
+      if (editingPerk) {
+        await api.rewards.updatePerk(editingPerk.id, perkForm);
+        toast.success("Perk Updated", `Successfully updated "${perkForm.title}".`);
+      } else {
+        await api.rewards.createPerk(perkForm);
+        toast.success("Perk Created", `Added "${perkForm.title}" to redemption catalog.`);
+      }
+      setPerkModalOpen(false);
+      reloadPerks();
+    });
+  };
+
+  const handleDeletePerk = (perk: RewardPerk) => {
+    if (!confirm(`Are you sure you want to remove "${perk.title}" from the catalog?`)) return;
+    perkAction.run(async () => {
+      await api.rewards.deletePerk(perk.id);
+      toast.success("Perk Removed", `"${perk.title}" was removed or deactivated.`);
+      reloadPerks();
+    });
+  };
+
+  // Redemption Review Modal State
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewingRedemption, setReviewingRedemption] = useState<RewardRedemption | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<"approved" | "fulfilled" | "rejected">("approved");
+  const [reviewAdminNotes, setReviewAdminNotes] = useState("");
+  const reviewAction = useAction();
+
+  const openReviewModal = (redemption: RewardRedemption) => {
+    setReviewingRedemption(redemption);
+    setReviewStatus(
+      redemption.status === "pending"
+        ? "approved"
+        : (redemption.status as "approved" | "fulfilled" | "rejected"),
+    );
+    setReviewAdminNotes(redemption.admin_notes || "");
+    setReviewModalOpen(true);
+  };
+
+  const handleSaveReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewingRedemption) return;
+    reviewAction.run(async () => {
+      await api.rewards.updateRedemption(reviewingRedemption.id, {
+        status: reviewStatus,
+        admin_notes: reviewAdminNotes.trim() || undefined,
+      });
+      toast.success("Redemption Updated", `Claim marked as ${reviewStatus.toUpperCase()}.`);
+      setReviewModalOpen(false);
+      reloadRedemptions();
+      reloadMySummary();
+    });
+  };
 
   const flattenLocationsList = useMemo(() => {
     return locationNodes ? flattenLocations(locationNodes) : [];
@@ -1403,7 +1903,7 @@ export default function RewardsPage() {
           <div className="space-y-6">
             <ErrorBanner message={redeemAction.error || statusAction.error} />
 
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                   <Gift className="w-4 h-4 text-fuchsia-600" />
@@ -1413,9 +1913,21 @@ export default function RewardsPage() {
                   Convert your earned points into real certificates, scheduling perks, cafeteria vouchers, and shopping rewards.
                 </p>
               </div>
-              <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-1.5">
-                <span>🪙 Available:</span>
-                <span className="text-sm">{mySummary?.balance ?? 0} pts</span>
+              <div className="flex items-center gap-3">
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={openCreatePerk}
+                    className="px-3.5 py-1.5 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add New Perk</span>
+                  </button>
+                )}
+                <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-1.5">
+                  <span>🪙 Available:</span>
+                  <span className="text-sm">{mySummary?.balance ?? 0} pts</span>
+                </div>
               </div>
             </div>
 
@@ -1424,34 +1936,84 @@ export default function RewardsPage() {
               {perks?.map((perk) => {
                 const canAfford = (mySummary?.balance ?? 0) >= perk.points_cost;
                 return (
-                  <Card key={perk.id} className="p-5 rounded-2xl border border-slate-100 hover:border-fuchsia-200 hover:shadow-md transition-all flex flex-col justify-between">
+                  <Card
+                    key={perk.id}
+                    className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                      !perk.is_active
+                        ? "bg-slate-50/80 border-dashed border-slate-300 opacity-80"
+                        : "border-slate-100 hover:border-fuchsia-200 hover:shadow-md"
+                    }`}
+                  >
                     <div>
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="w-12 h-12 rounded-2xl bg-fuchsia-50 border border-fuchsia-100 flex items-center justify-center text-2xl shadow-xs">
                           {perk.icon}
                         </div>
-                        <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs">
-                          {perk.points_cost} pts
-                        </span>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs">
+                            {perk.points_cost} pts
+                          </span>
+                          {canManage && (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                perk.is_active
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-slate-200 text-slate-700"
+                              }`}
+                            >
+                              {perk.is_active ? "Active" : "Inactive"}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <h4 className="text-sm font-bold text-slate-800">{perk.title}</h4>
+                      <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        {perk.title}
+                      </h4>
                       <p className="text-xs text-slate-500 mt-1 line-clamp-2">{perk.description}</p>
                     </div>
 
-                    <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                       <span className="text-[11px] font-semibold uppercase text-slate-400">{perk.category}</span>
-                      <button
-                        type="button"
-                        disabled={!canAfford || redeemAction.busy}
-                        onClick={() => handleRedeemPerk(perk)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          canAfford
-                            ? "bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-xs"
-                            : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                        }`}
-                      >
-                        {canAfford ? "Redeem Perk" : `Need ${perk.points_cost - (mySummary?.balance ?? 0)} more`}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {canManage && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openEditPerk(perk)}
+                              title="Edit perk title, points cost, and details"
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer transition-colors"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePerk(perk)}
+                              title="Delete or deactivate perk"
+                              className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          disabled={!canAfford || !perk.is_active || redeemAction.busy}
+                          onClick={() => handleRedeemPerk(perk)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            !perk.is_active
+                              ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                              : canAfford
+                              ? "bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-xs"
+                              : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                          }`}
+                        >
+                          {!perk.is_active
+                            ? "Unavailable"
+                            : canAfford
+                            ? "Redeem Perk"
+                            : `Need ${perk.points_cost - (mySummary?.balance ?? 0)} more`}
+                        </button>
+                      </div>
                     </div>
                   </Card>
                 );
@@ -1460,17 +2022,40 @@ export default function RewardsPage() {
 
             {/* Redemptions History */}
             <Card className="rounded-2xl border border-slate-100 overflow-hidden shadow-xs mt-6">
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-slate-500" />
-                  {canManage ? "All Employee Redemptions Queue" : "Your Redemption History"}
-                </h3>
-                <span className="text-xs text-slate-400">{myRedemptions?.total ?? 0} records</span>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {canManage ? "All Employee Redemptions Queue" : "Your Redemption History"}
+                  </h3>
+                  <span className="text-xs text-slate-400">({myRedemptions?.total ?? 0} records)</span>
+                </div>
+
+                {/* Status filter tabs */}
+                <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
+                  {(["all", "pending", "approved", "fulfilled", "rejected"] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => {
+                        setRedemptionStatusFilter(st);
+                        setRedemptionPage(1);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                        redemptionStatusFilter === st
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {!myRedemptions || myRedemptions.items.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 text-xs">
-                  No redemption requests found. Start redeeming perks when you earn enough points!
+                  No redemption requests found for this filter.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1481,6 +2066,7 @@ export default function RewardsPage() {
                         {canManage && <th className="py-3 px-4">Staff Member</th>}
                         <th className="py-3 px-4">Perk Claimed</th>
                         <th className="py-3 px-4">Points Spent</th>
+                        <th className="py-3 px-4">Notes & Voucher Info</th>
                         <th className="py-3 px-4">Status</th>
                         {canManage && <th className="py-3 px-4 text-right">Review Action</th>}
                       </tr>
@@ -1488,7 +2074,7 @@ export default function RewardsPage() {
                     <tbody className="divide-y divide-slate-100">
                       {myRedemptions.items.map((r) => (
                         <tr key={r.id} className="hover:bg-slate-50/60">
-                          <td className="py-3 px-4 text-slate-500">{formatDateTime(r.created_at)}</td>
+                          <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
                           {canManage && (
                             <td className="py-3 px-4 font-bold text-slate-800">
                               {r.user_name} <span className="text-[10px] text-slate-400 font-normal">({r.user_email})</span>
@@ -1499,8 +2085,21 @@ export default function RewardsPage() {
                               <span>{r.perk_icon}</span> {r.perk_title}
                             </span>
                           </td>
-                          <td className="py-3 px-4 font-bold text-amber-700">-{r.points_spent} 🪙</td>
-                          <td className="py-3 px-4">
+                          <td className="py-3 px-4 font-bold text-amber-700 whitespace-nowrap">-{r.points_spent} 🪙</td>
+                          <td className="py-3 px-4 text-slate-600 max-w-xs">
+                            {r.admin_notes && (
+                              <p className="text-[11px] font-medium text-slate-700">
+                                <span className="font-bold text-indigo-600">Admin:</span> {r.admin_notes}
+                              </p>
+                            )}
+                            {r.notes && (
+                              <p className="text-[11px] text-slate-500 italic mt-0.5">
+                                <span className="font-semibold not-italic text-slate-400">User:</span> {r.notes}
+                              </p>
+                            )}
+                            {!r.admin_notes && !r.notes && <span className="text-slate-400">—</span>}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                 r.status === "fulfilled"
@@ -1516,9 +2115,16 @@ export default function RewardsPage() {
                             </span>
                           </td>
                           {canManage && (
-                            <td className="py-3 px-4 text-right">
-                              {r.status === "pending" || r.status === "approved" ? (
-                                <div className="flex items-center justify-end gap-1.5">
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => openReviewModal(r)}
+                                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold shadow-xs cursor-pointer"
+                                >
+                                  Review
+                                </button>
+                                {(r.status === "pending" || r.status === "approved") && (
                                   <button
                                     type="button"
                                     onClick={() => handleUpdateRedemptionStatus(r.id, "fulfilled")}
@@ -1526,23 +2132,41 @@ export default function RewardsPage() {
                                   >
                                     Fulfill
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateRedemptionStatus(r.id, "rejected")}
-                                    className="px-2 py-1 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-[10px] font-bold cursor-pointer"
-                                  >
-                                    Reject & Refund
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="text-[11px] text-slate-400">—</span>
-                              )}
+                                )}
+                              </div>
                             </td>
                           )}
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Redemption Pagination */}
+              {myRedemptions && Math.ceil((myRedemptions.total || 0) / 20) > 1 && (
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                  <span className="text-xs text-slate-500">
+                    Page {redemptionPage} of {Math.ceil((myRedemptions.total || 0) / 20)}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={redemptionPage <= 1}
+                      onClick={() => setRedemptionPage((p) => Math.max(1, p - 1))}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={redemptionPage >= Math.ceil((myRedemptions.total || 0) / 20)}
+                      onClick={() => setRedemptionPage((p) => p + 1)}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
             </Card>
@@ -2008,6 +2632,36 @@ export default function RewardsPage() {
             message={celebration.message}
             badge={celebration.badge}
             onClose={() => setCelebration(null)}
+          />
+        )}
+
+        {/* Perk Create / Edit Modal */}
+        {perkModalOpen && (
+          <PerkModal
+            isOpen={perkModalOpen}
+            onClose={() => setPerkModalOpen(false)}
+            editingPerk={editingPerk}
+            form={perkForm}
+            setForm={setPerkForm}
+            onSubmit={handleSavePerk}
+            busy={perkAction.busy}
+            error={perkAction.error}
+          />
+        )}
+
+        {/* Redemption Review Modal */}
+        {reviewModalOpen && reviewingRedemption && (
+          <RedemptionReviewModal
+            isOpen={reviewModalOpen}
+            onClose={() => setReviewModalOpen(false)}
+            redemption={reviewingRedemption}
+            status={reviewStatus}
+            setStatus={setReviewStatus}
+            adminNotes={reviewAdminNotes}
+            setAdminNotes={setReviewAdminNotes}
+            onSubmit={handleSaveReview}
+            busy={reviewAction.busy}
+            error={reviewAction.error}
           />
         )}
       </div>

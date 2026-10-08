@@ -787,6 +787,13 @@ export interface MemberProfileResponse {
   performance: TeamMemberPerformance;
 }
 
+export interface BadgeTier {
+  name: string;
+  badge: string;
+  min_points: number;
+  max_points: number | null;
+}
+
 export interface RewardSettings {
   id: number;
   is_enabled: boolean;
@@ -801,6 +808,7 @@ export interface RewardSettings {
   streak_interval: number;
   streak_bonus: number;
   priority_multipliers: Record<string, number>;
+  tier_config?: BadgeTier[];
   updated_at: string | null;
   updated_by: { id: number; name: string } | null;
 }
@@ -1639,6 +1647,27 @@ export const api = {
       request<RewardTransaction>("/rewards/admin/adjust", { method: "POST", body: data }),
     listPerks: (includeInactive = false) =>
       request<RewardPerk[]>("/rewards/perks", { query: { include_inactive: includeInactive } }),
+    createPerk: (data: {
+      title: string;
+      description: string;
+      points_cost: number;
+      category?: string;
+      icon?: string;
+      is_active?: boolean;
+    }) => request<RewardPerk>("/rewards/perks", { method: "POST", body: data }),
+    updatePerk: (
+      perkId: number,
+      data: Partial<{
+        title: string;
+        description: string;
+        points_cost: number;
+        category: string;
+        icon: string;
+        is_active: boolean;
+      }>,
+    ) => request<RewardPerk>(`/rewards/perks/${perkId}`, { method: "PATCH", body: data }),
+    deletePerk: (perkId: number) =>
+      request<{ success: boolean; message: string }>(`/rewards/perks/${perkId}`, { method: "DELETE" }),
     redeemPerk: (data: { perk_id: number; notes?: string }) =>
       request<{ id: number; perk_title: string; points_spent: number; status: string; created_at: string }>(
         "/rewards/perks/redeem",

@@ -29,43 +29,69 @@ DEFAULT_PRIORITY_MULTIPLIERS = {
     "neutral": 1.0,
 }
 
-TIERS = [
+DEFAULT_TIERS = [
     {"name": "Bronze Resolver", "badge": "🥉", "min_points": 0, "max_points": 499},
     {"name": "Silver Specialist", "badge": "🥈", "min_points": 500, "max_points": 1999},
     {"name": "Gold Champion", "badge": "🥇", "min_points": 2000, "max_points": 4999},
     {"name": "Platinum Legend", "badge": "💎", "min_points": 5000, "max_points": None},
 ]
+TIERS = DEFAULT_TIERS
 
 
-def calculate_user_tier(lifetime_points: int) -> dict[str, Any]:
+def get_tiers(db: Session | None = None) -> list[dict[str, Any]]:
+    if db:
+        try:
+            settings = get_reward_settings(db)
+            if settings and settings.tier_config:
+                parsed = json.loads(settings.tier_config)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    return sorted(parsed, key=lambda t: t.get("min_points", 0))
+        except Exception:
+            pass
+    return DEFAULT_TIERS
+
+
+def calculate_user_tier(lifetime_points: int, db: Session | None = None) -> dict[str, Any]:
     points = max(0, lifetime_points)
-    if points < 500:
-        tier = TIERS[0]
-        next_tier = TIERS[1]
-        progress = int((points / 500) * 100)
-        needed = 500 - points
-    elif points < 2000:
-        tier = TIERS[1]
-        next_tier = TIERS[2]
-        progress = int(((points - 500) / 1500) * 100)
-        needed = 2000 - points
-    elif points < 5000:
-        tier = TIERS[2]
-        next_tier = TIERS[3]
-        progress = int(((points - 2000) / 3000) * 100)
-        needed = 5000 - points
-    else:
-        tier = TIERS[3]
-        next_tier = None
-        progress = 100
-        needed = 0
+    tiers = get_tiers(db)
+    if not tiers:
+        tiers = DEFAULT_TIERS
+
+    current_tier = tiers[0]
+    next_tier = None
+    progress = 100
+    needed = 0
+
+    for idx, t in enumerate(tiers):
+        min_p = t.get("min_points", 0)
+        max_p = t.get("max_points")
+        if max_p is None:
+            if points >= min_p:
+                current_tier = t
+                next_tier = None
+                progress = 100
+                needed = 0
+                break
+        else:
+            if min_p <= points <= max_p:
+                current_tier = t
+                if idx + 1 < len(tiers):
+                    next_tier = tiers[idx + 1]
+                    span = max_p - min_p + 1
+                    progress = int(((points - min_p) / span) * 100) if span > 0 else 100
+                    needed = next_tier.get("min_points", max_p + 1) - points
+                else:
+                    next_tier = None
+                    progress = 100
+                    needed = 0
+                break
 
     return {
-        "current_tier": tier["name"],
-        "badge": tier["badge"],
-        "next_tier": next_tier["name"] if next_tier else None,
+        "current_tier": current_tier.get("name", "Bronze"),
+        "badge": current_tier.get("badge", "🥉"),
+        "next_tier": next_tier.get("name") if next_tier else None,
         "progress_pct": min(100, max(0, progress)),
-        "points_to_next_tier": needed,
+        "points_to_next_tier": max(0, needed),
     }
 
 
@@ -88,6 +114,7 @@ def get_reward_settings(db: Session) -> RewardSettings:
             streak_interval=10,
             streak_bonus=100,
             priority_multipliers=json.dumps(DEFAULT_PRIORITY_MULTIPLIERS),
+            tier_config=json.dumps(DEFAULT_TIERS),
             updated_at=utcnow(),
         )
         db.add(settings)
@@ -109,6 +136,11 @@ def serialize_reward_settings(s: RewardSettings) -> dict[str, Any]:
     except Exception:
         priority_multipliers = DEFAULT_PRIORITY_MULTIPLIERS
 
+    try:
+        tier_config = json.loads(s.tier_config) if s.tier_config else DEFAULT_TIERS
+    except Exception:
+        tier_config = DEFAULT_TIERS
+
     return {
         "id": s.id,
         "is_enabled": s.is_enabled,
@@ -123,6 +155,7 @@ def serialize_reward_settings(s: RewardSettings) -> dict[str, Any]:
         "streak_interval": s.streak_interval,
         "streak_bonus": s.streak_bonus,
         "priority_multipliers": priority_multipliers,
+        "tier_config": tier_config,
         "updated_at": s.updated_at.isoformat() if s.updated_at else None,
         "updated_by": {"id": s.updated_by.id, "name": s.updated_by.name} if s.updated_by else None,
     }
@@ -158,6 +191,19 @@ def update_reward_settings(db: Session, data: dict[str, Any], user: User) -> dic
         multipliers = data["priority_multipliers"]
         if isinstance(multipliers, dict):
             settings.priority_multipliers = json.dumps(multipliers)
+    if "tier_config" in data:
+        tiers = data["tier_config"]
+        if isinstance(tiers, list) and len(tiers) > 0:
+            cleaned_tiers = []
+            for t in tiers:
+                cleaned_tiers.append({
+                    "name": str(t.get("name", "Tier")).strip()[:50],
+                    "badge": str(t.get("badge", "🎖️")).strip()[:10],
+                    "min_points": max(0, int(t.get("min_points", 0))),
+                    "max_points": int(t["max_points"]) if t.get("max_points") is not None and str(t.get("max_points")).strip() != "" else None,
+                })
+            cleaned_tiers.sort(key=lambda x: x["min_points"])
+            settings.tier_config = json.dumps(cleaned_tiers)
 
     settings.updated_at = utcnow()
     settings.updated_by_id = user.id
@@ -987,7 +1033,7 @@ def get_leaderboard(
             "points": int(row.period_points or 0),
             "balance": row.reward_points_balance or 0,
             "lifetime_points": row.lifetime_reward_points or 0,
-            "tier": calculate_user_tier(row.lifetime_reward_points or 0),
+            "tier": calculate_user_tier(row.lifetime_reward_points or 0, db),
             "on_time_count": row.on_time_count or 0,
             "five_star_count": row.five_star_count or 0,
         })
@@ -1021,7 +1067,7 @@ def get_user_rewards_summary(db: Session, user_id: int) -> dict[str, Any]:
         "balance": user.reward_points_balance or 0,
         "lifetime_points": user.lifetime_reward_points or 0,
         "rank": rank,
-        "tier": calculate_user_tier(user.lifetime_reward_points or 0),
+        "tier": calculate_user_tier(user.lifetime_reward_points or 0, db),
         "currency_name": settings.currency_name,
         "currency_symbol": settings.currency_symbol,
         "is_enabled": settings.is_enabled,
@@ -1108,6 +1154,97 @@ def list_perks(db: Session, include_inactive: bool = False) -> list[dict[str, An
         }
         for p in perks
     ]
+
+
+def create_perk(db: Session, data: dict[str, Any], user: User) -> dict[str, Any]:
+    title = str(data.get("title", "")).strip()
+    if not title:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Perk title is required")
+    description = str(data.get("description", "")).strip()
+    points_cost = int(data.get("points_cost", 0))
+    if points_cost <= 0:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Points cost must be greater than 0")
+    category = str(data.get("category", "perk")).strip()[:50] or "perk"
+    icon = str(data.get("icon", "🎁")).strip()[:10] or "🎁"
+    is_active = bool(data.get("is_active", True))
+
+    perk = RewardPerk(
+        title=title[:100],
+        description=description[:500],
+        points_cost=points_cost,
+        category=category,
+        icon=icon,
+        is_active=is_active,
+        created_at=utcnow(),
+    )
+    db.add(perk)
+    db.commit()
+    db.refresh(perk)
+    return {
+        "id": perk.id,
+        "title": perk.title,
+        "description": perk.description,
+        "points_cost": perk.points_cost,
+        "category": perk.category,
+        "icon": perk.icon,
+        "is_active": perk.is_active,
+        "created_at": perk.created_at.isoformat(),
+    }
+
+
+def update_perk(db: Session, perk_id: int, data: dict[str, Any], user: User) -> dict[str, Any]:
+    perk = db.get(RewardPerk, perk_id)
+    if not perk:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Perk not found")
+
+    if "title" in data:
+        title = str(data["title"]).strip()
+        if not title:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Perk title cannot be empty")
+        perk.title = title[:100]
+    if "description" in data:
+        perk.description = str(data["description"]).strip()[:500]
+    if "points_cost" in data:
+        cost = int(data["points_cost"])
+        if cost <= 0:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Points cost must be greater than 0")
+        perk.points_cost = cost
+    if "category" in data:
+        perk.category = str(data["category"]).strip()[:50] or "perk"
+    if "icon" in data:
+        perk.icon = str(data["icon"]).strip()[:10] or "🎁"
+    if "is_active" in data:
+        perk.is_active = bool(data["is_active"])
+
+    db.commit()
+    db.refresh(perk)
+    return {
+        "id": perk.id,
+        "title": perk.title,
+        "description": perk.description,
+        "points_cost": perk.points_cost,
+        "category": perk.category,
+        "icon": perk.icon,
+        "is_active": perk.is_active,
+        "created_at": perk.created_at.isoformat(),
+    }
+
+
+def delete_perk(db: Session, perk_id: int, user: User) -> dict[str, Any]:
+    perk = db.get(RewardPerk, perk_id)
+    if not perk:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Perk not found")
+
+    # If any redemptions exist, soft delete (deactivate) to preserve audit integrity
+    redemption_count = db.query(RewardRedemption).filter(RewardRedemption.perk_id == perk_id).count()
+    if redemption_count > 0:
+        perk.is_active = False
+        db.commit()
+        return {"success": True, "message": "Perk deactivated (historical redemptions preserved)"}
+    else:
+        db.delete(perk)
+        db.commit()
+        return {"success": True, "message": "Perk deleted successfully"}
 
 
 def redeem_perk(

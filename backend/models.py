@@ -908,6 +908,7 @@ class RewardSettings(Base):
     streak_interval = Column(Integer, default=10, nullable=False)
     streak_bonus = Column(Integer, default=100, nullable=False)
     priority_multipliers = Column(Text, nullable=False, default='{"critical": 2.0, "danger": 1.5, "warning": 1.2, "info": 1.0, "neutral": 1.0}')
+    tier_config = Column(Text, nullable=True)
     updated_at = Column(DateTime, nullable=True)
     updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 

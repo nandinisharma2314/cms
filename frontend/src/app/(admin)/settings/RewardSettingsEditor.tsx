@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Award, Sparkles } from "lucide-react";
-import { api, RewardSettings, RoleDetail } from "@/lib/api";
+import { Award, Plus, Shield, Sparkles, Trash2 } from "lucide-react";
+import { api, BadgeTier, RewardSettings, RoleDetail } from "@/lib/api";
 import { useAction, useApiData } from "@/lib/hooks";
 import {
   Card,
@@ -20,6 +20,13 @@ const DEFAULT_PRIORITIES = [
   { key: "warning", label: "Warning / Medium" },
   { key: "info", label: "Info / Low" },
   { key: "neutral", label: "Neutral / Standard" },
+];
+
+const DEFAULT_TIERS: BadgeTier[] = [
+  { name: "Bronze Resolver", badge: "🥉", min_points: 0, max_points: 499 },
+  { name: "Silver Specialist", badge: "🥈", min_points: 500, max_points: 1999 },
+  { name: "Gold Champion", badge: "🥇", min_points: 2000, max_points: 4999 },
+  { name: "Platinum Legend", badge: "💎", min_points: 5000, max_points: null },
 ];
 
 function RewardSettingsForm({
@@ -52,6 +59,31 @@ function RewardSettingsForm({
         [priorityKey]: val,
       },
     });
+  };
+
+  const currentTiers = form.tier_config && form.tier_config.length > 0 ? form.tier_config : DEFAULT_TIERS;
+
+  const updateTier = (idx: number, patch: Partial<BadgeTier>) => {
+    const updated = currentTiers.map((t, i) => (i === idx ? { ...t, ...patch } : t));
+    setForm({ ...form, tier_config: updated });
+  };
+
+  const addTier = () => {
+    const lastTier = currentTiers[currentTiers.length - 1];
+    const minPoints = lastTier && lastTier.max_points !== null ? lastTier.max_points + 1 : 10000;
+    const newTier: BadgeTier = {
+      name: `Tier ${currentTiers.length + 1}`,
+      badge: "⭐",
+      min_points: minPoints,
+      max_points: null,
+    };
+    setForm({ ...form, tier_config: [...currentTiers, newTier] });
+  };
+
+  const removeTier = (idx: number) => {
+    if (currentTiers.length <= 1) return;
+    const updated = currentTiers.filter((_, i) => i !== idx);
+    setForm({ ...form, tier_config: updated });
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -259,6 +291,107 @@ function RewardSettingsForm({
                 </Field>
               );
             })}
+          </div>
+        </div>
+
+        {/* Badges & Progression Tiers */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Badges & Gamification Progression Tiers
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Customize badge titles, emojis, and point milestones awarded to staff as their lifetime earnings grow.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={addTier}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Tier</span>
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {currentTiers.map((tier, idx) => (
+              <div
+                key={idx}
+                className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center gap-3"
+              >
+                <div className="flex items-center gap-2 min-w-32">
+                  <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0">
+                    {idx + 1}
+                  </span>
+                  <div className="w-12">
+                    <input
+                      type="text"
+                      className="w-12 h-9 text-center text-lg bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500"
+                      value={tier.badge}
+                      onChange={(e) => updateTier(idx, { badge: e.target.value })}
+                      title="Badge emoji or icon"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-44">
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Tier Label</label>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={tier.name}
+                    onChange={(e) => updateTier(idx, { name: e.target.value })}
+                    placeholder="e.g. Gold Champion"
+                    required
+                  />
+                </div>
+
+                <div className="w-32">
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Min Points</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className={inputClass}
+                    value={tier.min_points}
+                    onChange={(e) => updateTier(idx, { min_points: Number(e.target.value) })}
+                    required
+                  />
+                </div>
+
+                <div className="w-36">
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Max Points</label>
+                  <input
+                    type="number"
+                    min={tier.min_points}
+                    className={inputClass}
+                    value={tier.max_points ?? ""}
+                    onChange={(e) =>
+                      updateTier(idx, {
+                        max_points: e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                    placeholder="Unlimited (Top)"
+                  />
+                </div>
+
+                <div className="self-end md:self-center">
+                  <button
+                    type="button"
+                    onClick={() => removeTier(idx)}
+                    disabled={currentTiers.length <= 1}
+                    className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition disabled:opacity-30 cursor-pointer"
+                    title="Remove this tier"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

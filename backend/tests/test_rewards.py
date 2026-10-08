@@ -229,6 +229,83 @@ def test_perks_and_redemptions(client, login):
     assert upd_res.json()["status"] == "fulfilled"
 
 
+def test_admin_perk_crud_and_custom_badges(client, login):
+    root = login(SUPER_ADMIN)
+    agent = login(ELEC_AGENT)
+
+    # 1. Super admin creates a new perk
+    new_perk_res = client.post(
+        "/rewards/perks",
+        headers=root,
+        json={
+            "title": "Weekend Cinema Pass",
+            "description": "Two free movie tickets at PVR/INOX",
+            "points_cost": 350,
+            "category": "voucher",
+            "icon": "🎬",
+            "is_active": True,
+        },
+    )
+    assert new_perk_res.status_code == 201, new_perk_res.text
+    perk_data = new_perk_res.json()
+    assert perk_data["title"] == "Weekend Cinema Pass"
+    assert perk_data["points_cost"] == 350
+    perk_id = perk_data["id"]
+
+    # 2. Super admin edits the perk (change title, price, icon)
+    edit_res = client.patch(
+        f"/rewards/perks/{perk_id}",
+        headers=root,
+        json={
+            "title": "VIP Cinema & Popcorn Pass",
+            "points_cost": 400,
+            "icon": "🍿",
+        },
+    )
+    assert edit_res.status_code == 200, edit_res.text
+    assert edit_res.json()["title"] == "VIP Cinema & Popcorn Pass"
+    assert edit_res.json()["points_cost"] == 400
+    assert edit_res.json()["icon"] == "🍿"
+
+    # 3. Super admin customizes badge tiers and labels in reward_settings
+    custom_tiers = [
+        {"name": "Rookie Champion", "badge": "🌱", "min_points": 0, "max_points": 299},
+        {"name": "Veteran Specialist", "badge": "🛡️", "min_points": 300, "max_points": 999},
+        {"name": "Grandmaster", "badge": "👑", "min_points": 1000, "max_points": None},
+    ]
+    set_res = client.put(
+        "/rewards/settings",
+        headers=root,
+        json={"tier_config": custom_tiers},
+    )
+    assert set_res.status_code == 200, set_res.text
+    assert set_res.json()["tier_config"][0]["name"] == "Rookie Champion"
+    assert set_res.json()["tier_config"][0]["badge"] == "🌱"
+
+    # 4. Check that user's badge tier in /rewards/me immediately reflects the new custom badge!
+    me_res = client.get("/rewards/me", headers=agent)
+    assert me_res.status_code == 200, me_res.text
+    tier_info = me_res.json()["tier"]
+    assert tier_info["current_tier"] in ["Rookie Champion", "Veteran Specialist", "Grandmaster"]
+
+    # 5. Super admin deletes the created perk
+    del_res = client.delete(f"/rewards/perks/{perk_id}", headers=root)
+    assert del_res.status_code == 200, del_res.text
+    assert del_res.json()["success"] is True
+
+    # 6. Restore default tiers to prevent test pollution
+    client.put(
+        "/rewards/settings",
+        headers=root,
+        json={"tier_config": [
+            {"name": "Bronze Resolver", "badge": "🥉", "min_points": 0, "max_points": 499},
+            {"name": "Silver Specialist", "badge": "🥈", "min_points": 500, "max_points": 1999},
+            {"name": "Gold Champion", "badge": "🥇", "min_points": 2000, "max_points": 4999},
+            {"name": "Platinum Legend", "badge": "💎", "min_points": 5000, "max_points": None},
+        ]},
+    )
+
+
 def test_reopen_clawback(client, login, end_user_login):
     agent_headers = login(ELEC_AGENT)
     citizen_headers = end_user_login()
