@@ -200,6 +200,8 @@ class User(Base):
     aadhar = Column(String(20), nullable=True)
     pan_card = Column(String(20), nullable=True)
     avatar_url = Column(String(500), nullable=True)
+    reward_points_balance = Column(Integer, default=0, nullable=False)
+    lifetime_reward_points = Column(Integer, default=0, nullable=False)
     password_hash = Column(String(255), nullable=False)
     # Set for passwords someone else chose (new accounts, approved resets).
     must_change_password = Column(Boolean, default=False, nullable=False)
@@ -859,3 +861,68 @@ class StaffGrievanceEvent(Base):
 
     grievance = relationship("StaffGrievance", back_populates="events")
     actor = relationship("User")
+
+
+# ---------------------------------------------------------------------------
+# Reward & Recognition System
+# ---------------------------------------------------------------------------
+
+REWARD_RULE_ON_TIME = "on_time_resolution"
+REWARD_RULE_SPEED_BONUS = "speed_bonus"
+REWARD_RULE_FIVE_STAR = "five_star_rating"
+REWARD_RULE_FOUR_STAR = "four_star_rating"
+REWARD_RULE_ZERO_REOPEN = "zero_reopen"
+REWARD_RULE_STREAK = "streak_milestone"
+REWARD_RULE_MANUAL = "manual_adjustment"
+
+REWARD_RULES = (
+    REWARD_RULE_ON_TIME,
+    REWARD_RULE_SPEED_BONUS,
+    REWARD_RULE_FIVE_STAR,
+    REWARD_RULE_FOUR_STAR,
+    REWARD_RULE_ZERO_REOPEN,
+    REWARD_RULE_STREAK,
+    REWARD_RULE_MANUAL,
+)
+
+
+class RewardSettings(Base):
+    __tablename__ = "reward_settings"
+
+    id = Column(Integer, primary_key=True)
+    is_enabled = Column(Boolean, default=False, nullable=False)
+    currency_name = Column(String(50), default="Points", nullable=False)
+    currency_symbol = Column(String(10), default="🪙", nullable=False)
+    eligible_roles = Column(Text, nullable=False, default='["agent", "field_worker"]')
+    points_on_time_resolution = Column(Integer, default=50, nullable=False)
+    points_speed_bonus = Column(Integer, default=25, nullable=False)
+    points_five_star = Column(Integer, default=30, nullable=False)
+    points_four_star = Column(Integer, default=15, nullable=False)
+    points_zero_reopen = Column(Integer, default=20, nullable=False)
+    streak_interval = Column(Integer, default=10, nullable=False)
+    streak_bonus = Column(Integer, default=100, nullable=False)
+    priority_multipliers = Column(Text, nullable=False, default='{"critical": 2.0, "danger": 1.5, "warning": 1.2, "info": 1.0, "neutral": 1.0}')
+    updated_at = Column(DateTime, nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    updated_by = relationship("User", foreign_keys=[updated_by_id])
+
+
+class RewardTransaction(Base):
+    __tablename__ = "reward_transactions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    complaint_id = Column(Integer, ForeignKey("complaints.id", ondelete="SET NULL"), nullable=True, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True)
+    location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True, index=True)
+    rule_type = Column(String(50), nullable=False, index=True)
+    points = Column(Integer, nullable=False)
+    description = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+
+    user = relationship("User", foreign_keys=[user_id], lazy="joined")
+    complaint = relationship("Complaint", foreign_keys=[complaint_id], lazy="joined")
+    department = relationship("Department", foreign_keys=[department_id], lazy="joined")
+    location = relationship("Location", foreign_keys=[location_id], lazy="joined")
+

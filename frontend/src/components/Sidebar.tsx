@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowUpCircle,
+  Award,
   Ban,
   BarChart3,
   Building2,
@@ -55,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["grievance.file", "grievance.view_own", "grievance.manage", "grievance.view_all"],
   },
   { href: "/reports", label: "Reports", icon: BarChart3, anyOf: ["reports.view"] },
+  { href: "/rewards", label: "Rewards", icon: Award, anyOf: ["rewards.view"] },
   { href: "/users", label: "Users", icon: Users, anyOf: ["user.view", "end_user.view"] },
   { href: "/departments", label: "Departments", icon: Building2, anyOf: ["department.view"] },
   { href: "/locations", label: "Locations", icon: MapPin, anyOf: ["location.view"] },

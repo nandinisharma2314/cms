@@ -61,6 +61,9 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "team.view": ("My Team", "View team members, reporting structure and individual performance metrics"),
     "team.manage": ("My Team", "Manage team workload, availability and reassign complaints between members"),
 
+    "rewards.view": ("Rewards", "View rewards leaderboard, point balance and transaction history"),
+    "rewards.manage": ("Rewards", "Configure reward system policies and grant manual reward adjustments"),
+
     # What end users may do in the portal. Signing in and viewing their own
     # complaints and notifications are always allowed.
     "portal.complaint.create": ("End User Portal", "Register new complaints"),
@@ -104,6 +107,7 @@ SYSTEM_ROLES: dict[str, tuple[str, str, str | None, list[str]]] = {
             "user.view", "user.create", "user.update", "user.deactivate", "user.reset_password",
             "end_user.view", "end_user.create", "end_user.update",
             "reports.view", "audit.view",
+            "rewards.manage", "rewards.view",
         ],
     ),
     "manager": (
@@ -113,15 +117,16 @@ SYSTEM_ROLES: dict[str, tuple[str, str, str | None, list[str]]] = {
             "user.view", "user.create", "user.update", "user.deactivate",
             "end_user.view",
             "reports.view",
+            "rewards.view",
         ],
     ),
     "supervisor": (
         "Supervisor / Team Lead", "Supervises agents and their complaints.", "manager",
-        _COMPLAINT_SUPERVISION + _STAFF_GRIEVANCE_BASIC + _TEAM_MANAGEMENT + ["user.view", "role.view", "reports.view"],
+        _COMPLAINT_SUPERVISION + _STAFF_GRIEVANCE_BASIC + _TEAM_MANAGEMENT + ["user.view", "role.view", "reports.view", "rewards.view"],
     ),
     "agent": (
         "Agent", "Handles assigned complaints.", "supervisor",
-        _COMPLAINT_HANDLING + _STAFF_GRIEVANCE_BASIC + ["complaint.reject.request", "complaint.receive"],
+        _COMPLAINT_HANDLING + _STAFF_GRIEVANCE_BASIC + ["complaint.reject.request", "complaint.receive", "rewards.view"],
     ),
     END_USER_ROLE_KEY: (
         "End User", "Everyone who signs in to the end-user portal.", None, PORTAL_PERMISSIONS,

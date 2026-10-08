@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Camera, ChevronDown, KeyRound, LogOut, MapPin, Menu, Search, Shield } from "lucide-react";
+import { Award, Bell, Camera, ChevronDown, KeyRound, LogOut, MapPin, Menu, Search, Shield } from "lucide-react";
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT, resolveAvatarUrl } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatDateTime, initials } from "@/lib/format";
@@ -217,6 +217,19 @@ function UserMenu() {
             </label>
           )}
           {error && <p className="px-3.5 py-1 text-[11px] text-rose-600">{error}</p>}
+          {can("rewards.view") && (
+            <Link
+              href="/rewards"
+              onClick={() => setMenuOpen(false)}
+              className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-amber-800 hover:bg-amber-50 cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Award className="w-3.5 h-3.5 text-amber-600" />
+                Rewards & Recognition
+              </span>
+              <span className="font-bold text-[11px] text-amber-700">🪙 {me.reward_points_balance ?? 0}</span>
+            </Link>
+          )}
           <button
             onClick={() => {
               setAvatarOpen(true);
@@ -304,6 +317,17 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
           <MapPin className="w-3.5 h-3.5 text-blue-500" />
           <span className="font-medium max-w-55 truncate">{scopeSummary}</span>
         </div>
+        {can("rewards.view") && (
+          <Link
+            href="/rewards"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200/80 text-amber-900 transition-colors cursor-pointer text-xs font-semibold shadow-xs"
+            title={`Reward Points: ${me.reward_points_balance ?? 0}`}
+          >
+            <span className="text-sm">🪙</span>
+            <span className="font-bold text-amber-900">{me.reward_points_balance ?? 0}</span>
+            <span className="hidden sm:inline text-[11px] text-amber-700 font-medium">pts</span>
+          </Link>
+        )}
         <Notifications />
         <QuickActionsBar />
         <UserMenu />

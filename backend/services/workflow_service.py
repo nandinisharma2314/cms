@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from config import COMMENT_MAX_LENGTH, NOTE_MAX_LENGTH
 from models import Complaint, ComplaintComment, EndUser, User, max_length
-from services import notification_service, rejection_service, settings_service, sla_service
+from services import notification_service, rejection_service, reward_service, settings_service, sla_service
 from services.access_service import AccessContext
 from services.events import record_event
 from services.statuses import (
@@ -94,6 +94,10 @@ def change_status(
         from_status=old, to_status=new_status, note=note, at=now,
     )
     sla_service.on_status_change(db, complaint, old, new_status, now)
+    if new_status == RESOLVED and isinstance(actor, User):
+        reward_service.evaluate_resolution_reward(db, complaint, actor, at=now)
+    elif new_status == CLOSED:
+        reward_service.evaluate_closure_reward(db, complaint, at=now)
 
     gid = complaint.generated_id
     if isinstance(actor, User) and public:
@@ -219,7 +223,7 @@ def _require_end_user_action(db: Session, complaint: Complaint, action: str, now
         raise HTTPException(status.HTTP_409_CONFLICT, "This action is not available for this complaint")
 
 
-def _store_feedback(complaint: Complaint, rating: int | None, comment: str | None, now: datetime) -> None:
+def _store_feedback(db: Session, complaint: Complaint, rating: int | None, comment: str | None, now: datetime) -> None:
     if rating is None:
         return
     if not 1 <= rating <= 5:
@@ -228,6 +232,7 @@ def _store_feedback(complaint: Complaint, rating: int | None, comment: str | Non
     complaint.feedback_comment = multi_line(comment, "The comment", max_length(Complaint.feedback_comment),
                                             required=False)
     complaint.feedback_at = now
+    reward_service.evaluate_feedback_reward(db, complaint, rating, at=now)
 
 
 def end_user_confirm(
@@ -237,7 +242,7 @@ def end_user_confirm(
     _require_end_user_action(db, complaint, "confirm")
     now = at or utcnow()
     if complaint.feedback_rating is None:
-        _store_feedback(complaint, rating, comment, now)
+        _store_feedback(db, complaint, rating, comment, now)
     complaint.closed_at = now
     change_status(db, complaint, CLOSED, end_user, at=now, message="End user confirmed the resolution; complaint closed",
                   public_message="You confirmed the resolution; complaint closed")
@@ -264,7 +269,7 @@ def end_user_feedback(
 ) -> None:
     _require_end_user_action(db, complaint, "feedback")
     now = at or utcnow()
-    _store_feedback(complaint, rating, comment, now)
+    _store_feedback(db, complaint, rating, comment, now)
     record_event(
         db, complaint, "feedback", end_user,
         f"End user rated the resolution {rating}/5", public_message=f"You rated the resolution {rating}/5",

@@ -149,6 +149,12 @@ export function StaffMobileDashboard() {
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px]">
             <span className="font-semibold text-blue-600">{me.role.name}</span>
+            <Link
+              href="/rewards"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200/80 text-amber-900 font-semibold text-[11px]"
+            >
+              <span>🪙</span> {me.reward_points_balance ?? 0} pts
+            </Link>
             {scopeText && (
               <>
                 <span className="text-slate-300">·</span>

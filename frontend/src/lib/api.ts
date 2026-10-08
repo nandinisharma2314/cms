@@ -75,6 +75,8 @@ export interface StaffUser {
   created_at: string;
   last_login_at: string | null;
   can_manage?: boolean;
+  reward_points_balance?: number;
+  lifetime_reward_points?: number;
 }
 
 export interface Me extends StaffUser {
@@ -734,6 +736,82 @@ export interface MemberProfileResponse {
     below: HierarchyMember[];
   };
   performance: TeamMemberPerformance;
+}
+
+export interface RewardSettings {
+  id: number;
+  is_enabled: boolean;
+  currency_name: string;
+  currency_symbol: string;
+  eligible_roles: string[];
+  points_on_time_resolution: number;
+  points_speed_bonus: number;
+  points_five_star: number;
+  points_four_star: number;
+  points_zero_reopen: number;
+  streak_interval: number;
+  streak_bonus: number;
+  priority_multipliers: Record<string, number>;
+  updated_at: string | null;
+  updated_by: { id: number; name: string } | null;
+}
+
+export interface RewardTransaction {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  user_role: string;
+  department_id: number | null;
+  department_name: string | null;
+  location_id: number | null;
+  location_name: string | null;
+  complaint_id: number | null;
+  complaint_generated_id: string | null;
+  complaint_title: string | null;
+  rule_type: string;
+  points: number;
+  multiplier: number;
+  description: string;
+  breakdown: Record<string, unknown>;
+  granted_by_id: number | null;
+  granted_by_name: string | null;
+  created_at: string;
+}
+
+export interface RewardUserSummary {
+  balance: number;
+  lifetime_points: number;
+  rank: number;
+  currency_name: string;
+  currency_symbol: string;
+  is_enabled: boolean;
+  recent_transactions: RewardTransaction[];
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    avatar_url: string | null;
+    role_name: string;
+    department: string | null;
+    location: string | null;
+  };
+  points: number;
+  balance: number;
+  lifetime_points: number;
+  on_time_count: number;
+  five_star_count: number;
+}
+
+export interface RewardStats {
+  total_points: number;
+  total_transactions: number;
+  by_rule: { rule: string; count: number; points: number }[];
+  by_department: { department: string; points: number }[];
 }
 
 export interface SystemSettings {
@@ -1398,5 +1476,65 @@ export const api = {
       }),
     reassign: (data: { complaint_id: string; new_assignee_id: number; reason?: string }) =>
       request<ComplaintData>("/team/reassign", { method: "POST", body: data }),
+  },
+  rewards: {
+    getSettings: () => request<RewardSettings>("/rewards/settings"),
+    updateSettings: (data: Partial<RewardSettings>) =>
+      request<RewardSettings>("/rewards/settings", { method: "PUT", body: data }),
+    myRewards: () => request<RewardUserSummary>("/rewards/me"),
+    leaderboard: (
+      query: {
+        timeframe?: "today" | "week" | "month" | "all";
+        department_id?: number;
+        location_id?: number;
+        limit?: number;
+      } = {},
+    ) => request<LeaderboardEntry[]>("/rewards/leaderboard", { query }),
+    adminTransactions: (
+      query: {
+        date_from?: string;
+        date_to?: string;
+        department_id?: number;
+        location_id?: number;
+        manager_id?: number;
+        supervisor_id?: number;
+        user_id?: number;
+        rule_type?: string;
+        complaint_id?: string;
+        q?: string;
+        page?: number;
+        page_size?: number;
+      } = {},
+    ) => request<Paged<RewardTransaction>>("/rewards/admin/transactions", { query }),
+    adminStats: (
+      query: {
+        date_from?: string;
+        date_to?: string;
+        department_id?: number;
+        location_id?: number;
+        manager_id?: number;
+        supervisor_id?: number;
+        user_id?: number;
+        rule_type?: string;
+        complaint_id?: string;
+        q?: string;
+      } = {},
+    ) => request<RewardStats>("/rewards/admin/stats", { query }),
+    exportCsv: (
+      query: {
+        date_from?: string;
+        date_to?: string;
+        department_id?: number;
+        location_id?: number;
+        manager_id?: number;
+        supervisor_id?: number;
+        user_id?: number;
+        rule_type?: string;
+        complaint_id?: string;
+        q?: string;
+      } = {},
+    ) => downloadFile("/rewards/admin/export", query),
+    adjustPoints: (data: { user_id: number; points: number; description: string }) =>
+      request<RewardTransaction>("/rewards/admin/adjust", { method: "POST", body: data }),
   },
 };

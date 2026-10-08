@@ -20,6 +20,7 @@ import {
   Spinner,
   StatusPill,
 } from "@/components/ui";
+import { RewardSettingsEditor } from "./RewardSettingsEditor";
 
 function toForm(s: SettingsResponse): SettingsForm {
   return {
@@ -396,6 +397,7 @@ function SettingsPageContent() {
         />
       )}
       <RejectionReasons />
+      <RewardSettingsEditor />
     </>
   );
 }
