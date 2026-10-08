@@ -3,7 +3,18 @@
 import React, { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Clock, Mail, MapPin, Phone, ShieldAlert, User as UserIcon, XCircle, CreditCard } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldAlert,
+  User as UserIcon,
+  XCircle,
+  CreditCard,
+} from "lucide-react";
 import { api, EndUserProfileResponse } from "@/lib/api";
 import { useApiData } from "@/lib/hooks";
 import { formatDateTime } from "@/lib/format";
@@ -62,26 +73,27 @@ function EndUserProfileContent() {
 
   const { data, error, loading } = useApiData<EndUserProfileResponse>(() => api.endUsers.profile(id), [id]);
 
+  const recentComplaints = data?.recent_complaints;
   const filteredComplaints = useMemo(() => {
-    if (!data?.recent_complaints) return [];
-    let result = [...data.recent_complaints];
-    
+    if (!recentComplaints) return [];
+    let result = [...recentComplaints];
+
     if (statusFilter === "open") {
-      result = result.filter((c: any) => c.status_group !== "resolved" && c.status_group !== "rejected");
+      result = result.filter((c) => c.status_group !== "resolved" && c.status_group !== "rejected");
     } else if (statusFilter === "resolved") {
-      result = result.filter((c: any) => c.status_group === "resolved");
+      result = result.filter((c) => c.status_group === "resolved");
     } else if (statusFilter === "rejected") {
-      result = result.filter((c: any) => c.status_group === "rejected");
+      result = result.filter((c) => c.status_group === "rejected");
     }
 
-    result.sort((a: any, b: any) => {
+    result.sort((a, b) => {
       const dateA = new Date(a.created_at).getTime();
       const dateB = new Date(b.created_at).getTime();
       return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
     });
 
     return result;
-  }, [data?.recent_complaints, statusFilter, sortOrder]);
+  }, [recentComplaints, statusFilter, sortOrder]);
 
   useDocumentTitle(data?.user?.name ? `${data.user.name} - End User` : "End User Profile");
 
@@ -99,7 +111,7 @@ function EndUserProfileContent() {
     );
   }
 
-  const { user, stats, recent_complaints } = data;
+  const { user, stats } = data;
 
   return (
     <div className="flex flex-col h-[calc(100vh-8.5rem)]">

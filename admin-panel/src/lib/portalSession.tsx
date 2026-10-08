@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Profile, UNAUTHORIZED_EVENT } from "./portalApi";
+import { api as staffApi } from "./api";
 
 interface EndUserSession {
   profile: Profile;
@@ -30,8 +31,23 @@ export function EndUserSessionProvider({ children }: { children: React.ReactNode
       (loaded: Profile) => active && setProfile(loaded),
       (err: Error & { status?: number }) => {
         if (!active) return;
-        if (err.status === 401) router.replace("/login");
-        else setError(err.message);
+        if (err.status === 401) {
+          staffApi.auth
+            .restore()
+            .then((isStaff) => {
+              if (!active) return;
+              if (isStaff) {
+                router.replace("/");
+              } else {
+                router.replace("/login");
+              }
+            })
+            .catch(() => {
+              if (active) router.replace("/login");
+            });
+        } else {
+          setError(err.message);
+        }
       },
     );
     return () => {

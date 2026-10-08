@@ -617,3 +617,29 @@ def test_location_level_keys_cannot_reuse_import_columns(client, login):
     for key in ("name", "email", "user_id"):
         refused = client.post("/locations/types", headers=root, json={"key": key, "name": f"Level {key}"})
         assert refused.status_code == 400 and "end-user import" in refused.json()["detail"]
+
+
+def test_check_identifier_flow(client, login):
+    # Empty or whitespace returns not_found
+    res = client.post("/public/auth/check-identifier", json={"identifier": ""})
+    assert res.status_code == 200
+    assert res.json() == {"status": "not_found", "method": None, "role": None}
+
+    # Unknown identifier returns not_found
+    res = client.post("/public/auth/check-identifier", json={"identifier": "nonexistent@user.test"})
+    assert res.status_code == 200
+    assert res.json() == {"status": "not_found", "method": None, "role": None}
+
+    # Staff user returns found, staff, password
+    res = client.post("/public/auth/check-identifier", json={"identifier": SUPER_ADMIN})
+    assert res.status_code == 200
+    assert res.json() == {"status": "found", "method": "password", "role": "staff"}
+
+    # End user by mobile returns found, end_user, otp, sms
+    res = client.post("/public/auth/check-identifier", json={"identifier": "9876543210"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "found" and data["role"] == "end_user" and data["method"] == "otp"
+    assert data.get("channel") == "sms"
+
+

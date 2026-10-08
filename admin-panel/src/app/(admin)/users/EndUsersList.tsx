@@ -85,7 +85,15 @@ function EndUserForm({
         if (Object.keys(changes).length) await api.endUsers.update(editing.id, changes);
         onSaved(identityChanged ? `${name} updated. They were signed out and told about the change.` : `${name} updated.`);
       } else {
-        await api.endUsers.create({ external_id: externalId.trim() || null, name, mobile, email, aadhar, pan_card: panCard, location_id: locationId });
+        await api.endUsers.create({
+          external_id: externalId.trim() || null,
+          name,
+          mobile,
+          email,
+          aadhar,
+          pan_card: panCard,
+          location_id: locationId,
+        });
         onSaved(`${name} added. They can now sign in to the portal with their ${signInWith}.`);
       }
     });
@@ -171,7 +179,10 @@ function EndUserForm({
               maxLength={10}
               value={panCard}
               onChange={(e) => {
-                const val = e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 10);
+                const val = e.target.value
+                  .replace(/[^A-Za-z0-9]/g, "")
+                  .toUpperCase()
+                  .slice(0, 10);
                 setPanCard(val);
                 setPanError(val && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val) ? "Invalid PAN format." : null);
               }}

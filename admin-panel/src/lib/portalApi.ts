@@ -52,6 +52,7 @@ export interface Profile {
   id: number;
   external_id: string | null;
   name: string;
+  agent_name?: string | null;
   mobile: string;
   email: string;
   location: LocationRef | null;
@@ -126,7 +127,15 @@ export interface Complaint {
 export type EndUserAction = "comment" | "confirm" | "reopen" | "feedback";
 
 export interface ComplaintDetail extends Complaint {
-  timeline: { id: number; type: string; message: string; note: string | null; actor_name: string | null; created_at: string }[];
+  timeline: {
+    id: number;
+    type: string;
+    message: string;
+    note: string | null;
+    actor_type: string | null;
+    actor_name: string | null;
+    created_at: string;
+  }[];
   comments: {
     id: number;
     author_type: "staff" | "end_user";
@@ -427,6 +436,17 @@ const id = (value: string) => encodeURIComponent(value);
 
 export const api = {
   config: () => publicRequest<PublicConfig>("/public/config"),
+  checkIdentifier: (identifier: string) =>
+    publicRequest<{
+      status: "found" | "not_found" | "deactivated";
+      method: "password" | "otp" | null;
+      role: "staff" | "end_user" | null;
+      channel?: "sms" | "email";
+      message?: string;
+    }>("/public/auth/check-identifier", {
+      method: "POST",
+      body: { identifier },
+    }),
   auth: {
     requestOtp: (channel: OtpChannel, identifier: string) =>
       publicRequest<OtpChallenge>("/portal/auth/request-otp", { method: "POST", body: { channel, identifier } }),

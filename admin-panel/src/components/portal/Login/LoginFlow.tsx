@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { BellRing, KeyRound, ListChecks, UserRound } from "lucide-react";
+import { BellRing, Eye, EyeOff, HelpCircle, KeyRound, ListChecks, Lock, UserRound } from "lucide-react";
 import { AccountChoice, api, OtpChallenge, OtpChannel } from "@/lib/portalApi";
 import { api as staffApi } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
@@ -18,6 +18,8 @@ import {
   SmartphoneIcon,
 } from "./AuthIcons";
 import { NeedHelpModal } from "./NeedHelpModal";
+import { AdminContactModal } from "./AdminContactModal";
+import { ResetRequestDialog } from "@/components/AdminLogin";
 import { SkylineIllustration } from "./SkylineIllustration";
 import emailIllustration from "@/assets/login/email.jpg";
 import heroPhoto from "@/assets/login/hero.jpg";
@@ -132,6 +134,7 @@ export function LoginFlow() {
   const [channel, setChannel] = useState<OtpChannel>(otp.channels[0]);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
   const [digits, setDigits] = useState<string[]>(() => Array(otp.length).fill(""));
   const [choice, setChoice] = useState<AccountChoice | null>(null);
@@ -140,6 +143,8 @@ export function LoginFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
+  const [notFoundOpen, setNotFoundOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
 
   // Already signed in on this device? Go straight to the dashboard.
@@ -180,8 +185,12 @@ export function LoginFlow() {
     setBusy(true);
     setError("");
     try {
-      const { method } = await staffApi.checkIdentifier(identifier.trim());
-      if (method === "password") {
+      const result = await staffApi.checkIdentifier(identifier.trim());
+      if (result.status === "not_found") {
+        setNotFoundOpen(true);
+      } else if (result.status === "deactivated") {
+        setError(result.message || "This account has been deactivated. Please contact support.");
+      } else if (result.role === "staff" || result.method === "password") {
         setStep("password");
       } else {
         await sendCode();
@@ -470,27 +479,46 @@ export function LoginFlow() {
                 <label className="block">
                   <span className="sr-only">Password</span>
                   <span className="flex h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                    <KeyRound size={18} color="#64748b" />
+                    <Lock size={18} color="#64748b" />
                     <input
                       required
                       autoFocus
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Password"
                       className="min-w-0 flex-1 bg-transparent text-[16px] text-slate-900 outline-none placeholder:text-slate-400"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? <EyeOff size={18} className="text-blue-600" /> : <Eye size={18} />}
+                    </button>
                   </span>
                 </label>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#1877f2] text-[16px] font-semibold text-white shadow-sm transition-all hover:bg-[#166fe5] active:scale-[0.98] disabled:opacity-70"
+                  className="mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#1877f2] text-[16px] font-semibold text-white shadow-sm transition-all hover:bg-[#166fe5] active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                 >
                   {busy ? "Signing in…" : "Sign in"}
                   <ArrowRightIcon size={18} color="#ffffff" />
                 </button>
+                <div className="mt-2 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setResetOpen(true)}
+                    className="text-[13px] font-semibold text-blue-600 hover:underline flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    Forgot your password?
+                  </button>
+                </div>
               </form>
             </Screen>
           )}
@@ -635,6 +663,8 @@ export function LoginFlow() {
       </div>
 
       {helpOpen && <NeedHelpModal onClose={() => setHelpOpen(false)} />}
+      {notFoundOpen && <AdminContactModal onClose={() => setNotFoundOpen(false)} />}
+      {resetOpen && <ResetRequestDialog initialIdentifier={identifier} onClose={() => setResetOpen(false)} />}
     </div>
   );
 }
