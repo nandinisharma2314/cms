@@ -59,13 +59,9 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [admin-panel, end-user]
     defaults:
       run:
-        working-directory: ${{ matrix.app }}
+        working-directory: frontend
     env:
       # Only baked into the build output; nothing is contacted during CI.
       NEXT_PUBLIC_API_URL: http://localhost:5000
@@ -75,7 +71,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -87,5 +83,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t cms-backend ./backend
-      - run: docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:5000 -t cms-admin-panel ./admin-panel
-      - run: docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:5000 -t cms-end-user ./end-user
+      - run: docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:5000 -t cms-frontend ./frontend

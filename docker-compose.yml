@@ -73,26 +73,14 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  admin-panel:
+  frontend:
     build:
-      context: ./admin-panel
+      context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in .env}
     restart: unless-stopped
     ports:
-      - "${ADMIN_PORT:?set ADMIN_PORT in .env}:3000"
-    depends_on:
-      api:
-        condition: service_healthy
-
-  end-user:
-    build:
-      context: ./end-user
-      args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in .env}
-    restart: unless-stopped
-    ports:
-      - "${PORTAL_PORT:?set PORTAL_PORT in .env}:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
