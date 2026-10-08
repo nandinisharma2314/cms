@@ -166,4 +166,92 @@ def test_leaderboard(client, login):
         assert "rank" in lb[0]
         assert "user" in lb[0]
         assert "points" in lb[0]
+        assert "tier" in lb[0]
+        assert "badge" in lb[0]["tier"]
         assert lb[0]["user"]["name"] is not None
+
+
+def test_gamification_tier_in_summary(client, login):
+    agent = login(ELEC_AGENT)
+    me = client.get("/rewards/me", headers=agent).json()
+    assert "tier" in me
+    assert "current_tier" in me["tier"]
+    assert "badge" in me["tier"]
+    assert "progress_pct" in me["tier"]
+
+
+def test_perks_and_redemptions(client, login):
+    root = login(SUPER_ADMIN)
+    agent = login(ELEC_AGENT)
+
+    # 1. Fetch perks catalog
+    perks_res = client.get("/rewards/perks", headers=agent)
+    assert perks_res.status_code == 200, perks_res.text
+    perks = perks_res.json()
+    assert len(perks) > 0
+    first_perk = perks[0]
+
+    # 2. Give agent enough points to redeem
+    me_agent = client.get("/auth/me", headers=agent).json()
+    client.post(
+        "/rewards/admin/adjust",
+        headers=root,
+        json={"user_id": me_agent["id"], "points": first_perk["points_cost"] + 100, "description": "Bonus for test"},
+    )
+    bal_before = client.get("/rewards/me", headers=agent).json()["balance"]
+
+    # 3. Redeem perk
+    redeem_res = client.post(
+        "/rewards/perks/redeem",
+        headers=agent,
+        json={"perk_id": first_perk["id"], "notes": "Please issue digital certificate"},
+    )
+    assert redeem_res.status_code == 201, redeem_res.text
+    redemption = redeem_res.json()
+    assert redemption["points_spent"] == first_perk["points_cost"]
+
+    # Verify points deducted
+    bal_after = client.get("/rewards/me", headers=agent).json()["balance"]
+    assert bal_after == bal_before - first_perk["points_cost"]
+
+    # 4. Super Admin lists redemptions
+    list_res = client.get("/rewards/admin/redemptions", headers=root)
+    assert list_res.status_code == 200, list_res.text
+    assert list_res.json()["total"] >= 1
+
+    # 5. Super Admin updates redemption
+    upd_res = client.put(
+        f"/rewards/admin/redemptions/{redemption['id']}",
+        headers=root,
+        json={"status": "fulfilled", "admin_notes": "Certificate sent to agent email"},
+    )
+    assert upd_res.status_code == 200, upd_res.text
+    assert upd_res.json()["status"] == "fulfilled"
+
+
+def test_reopen_clawback(client, login, end_user_login):
+    agent_headers = login(ELEC_AGENT)
+    citizen_headers = end_user_login()
+
+    # File and resolve complaint
+    cid = file_complaint(client, citizen_headers, title="Noise issue in community park")
+    act(client, agent_headers, cid, "start_progress")
+    act(client, agent_headers, cid, "resolve", note="Patrol dispersed the loud gathering")
+
+    me_resolved = client.get("/rewards/me", headers=agent_headers).json()
+    bal_resolved = me_resolved["balance"]
+
+    # Citizen reopens complaint
+    reopen_res = client.post(
+        f"/portal/complaints/{cid}/reopen",
+        headers=citizen_headers,
+        json={"reason": "They came back after 10 minutes and made more noise"},
+    )
+    assert reopen_res.status_code == 200, reopen_res.text
+
+    # Agent balance clawed back
+    me_clawed = client.get("/rewards/me", headers=agent_headers).json()
+    assert me_clawed["balance"] < bal_resolved
+    rule_types = [tx["rule_type"] for tx in me_clawed["recent_transactions"]]
+    assert "reopen_clawback" in rule_types
+

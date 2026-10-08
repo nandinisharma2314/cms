@@ -779,10 +779,45 @@ export interface RewardTransaction {
   created_at: string;
 }
 
+export interface GamificationTier {
+  current_tier: string;
+  badge: string;
+  next_tier: string | null;
+  progress_pct: number;
+  points_to_next_tier: number;
+}
+
+export interface RewardPerk {
+  id: number;
+  title: string;
+  description: string;
+  points_cost: number;
+  category: string;
+  icon: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface RewardRedemption {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  perk_id: number;
+  perk_title: string;
+  perk_icon: string;
+  points_spent: number;
+  status: "pending" | "approved" | "rejected" | "fulfilled";
+  notes: string | null;
+  admin_notes: string | null;
+  created_at: string;
+}
+
 export interface RewardUserSummary {
   balance: number;
   lifetime_points: number;
   rank: number;
+  tier?: GamificationTier;
   currency_name: string;
   currency_symbol: string;
   is_enabled: boolean;
@@ -803,6 +838,7 @@ export interface LeaderboardEntry {
   points: number;
   balance: number;
   lifetime_points: number;
+  tier?: GamificationTier;
   on_time_count: number;
   five_star_count: number;
 }
@@ -1536,5 +1572,19 @@ export const api = {
     ) => downloadFile("/rewards/admin/export", query),
     adjustPoints: (data: { user_id: number; points: number; description: string }) =>
       request<RewardTransaction>("/rewards/admin/adjust", { method: "POST", body: data }),
+    listPerks: (includeInactive = false) =>
+      request<RewardPerk[]>("/rewards/perks", { query: { include_inactive: includeInactive } }),
+    redeemPerk: (data: { perk_id: number; notes?: string }) =>
+      request<{ id: number; perk_title: string; points_spent: number; status: string; created_at: string }>(
+        "/rewards/perks/redeem",
+        { method: "POST", body: data },
+      ),
+    listRedemptions: (query: { user_id?: number; status?: string; page?: number; page_size?: number } = {}) =>
+      request<Paged<RewardRedemption>>("/rewards/admin/redemptions", { query }),
+    updateRedemption: (id: number, data: { status: string; admin_notes?: string }) =>
+      request<{ id: number; status: string; admin_notes: string | null; updated_at: string }>(
+        `/rewards/admin/redemptions/${id}`,
+        { method: "PUT", body: data },
+      ),
   },
 };

@@ -8,14 +8,15 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Download,
   Filter,
   Flame,
+  Gift,
   MapPin,
   Plus,
   RotateCcw,
   Search,
-  Sparkles,
   TrendingUp,
   Trophy,
   X,
@@ -27,6 +28,8 @@ import {
   LeaderboardEntry,
   LocationNode,
   Paged,
+  RewardPerk,
+  RewardRedemption,
   RewardStats,
   RewardTransaction,
   RewardUserSummary,
@@ -69,6 +72,8 @@ const RULE_LABELS: Record<string, { label: string; color: string; icon: string }
   zero_reopen_closure: { label: "Zero-Reopen Closure", color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: "🎯" },
   streak_milestone: { label: "Clean Streak Milestone", color: "bg-purple-50 text-purple-700 border-purple-200", icon: "🔥" },
   manual_adjustment: { label: "Admin Adjustment", color: "bg-slate-100 text-slate-700 border-slate-200", icon: "🛡️" },
+  perk_redemption: { label: "Perk Redemption", color: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200", icon: "🎁" },
+  reopen_clawback: { label: "Reopen Clawback", color: "bg-rose-50 text-rose-700 border-rose-200", icon: "↩️" },
 };
 
 function RuleBadge({ rule }: { rule: string }) {
@@ -78,6 +83,42 @@ function RuleBadge({ rule }: { rule: string }) {
       <span>{meta.icon}</span>
       <span>{meta.label}</span>
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Celebration Modal
+// ---------------------------------------------------------------------------
+function CelebrationModal({
+  title,
+  message,
+  badge = "🎉",
+  onClose,
+}: {
+  title: string;
+  message: string;
+  badge?: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 text-center space-y-4">
+        <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-tr from-amber-200 to-amber-400 flex items-center justify-center text-3xl shadow-md animate-bounce">
+          {badge}
+        </div>
+        <div>
+          <h3 className="text-lg font-black text-slate-900">{title}</h3>
+          <p className="text-xs text-slate-500 mt-1">{message}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm cursor-pointer"
+        >
+          Awesome!
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -187,8 +228,9 @@ export default function RewardsPage() {
   const isSuperAdmin = me.is_super_admin;
   const canManage = can("rewards.manage") || isSuperAdmin;
 
-  const [activeTab, setActiveTab] = useState<"leaderboard" | "audit">("leaderboard");
+  const [activeTab, setActiveTab] = useState<"leaderboard" | "perks" | "audit">("leaderboard");
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [celebration, setCelebration] = useState<{ title: string; message: string; badge?: string } | null>(null);
 
   // My Summary
   const { data: mySummary, reload: reloadMySummary } = useApiData<RewardUserSummary>(() => api.rewards.myRewards(), [me.id]);
@@ -199,11 +241,17 @@ export default function RewardsPage() {
   const { data: managers } = useApiData<StaffUser[]>(() => api.team.managers(), []);
   const { data: allStaffUsers } = useApiData<{ items: StaffUser[] }>(() => api.users.list({ page_size: 100 }), []);
 
-  const flattenedLocations = useMemo(() => {
+  // Perks Catalog
+  const { data: perks } = useApiData<RewardPerk[]>(() => api.rewards.listPerks(), []);
+  const { data: myRedemptions, reload: reloadRedemptions } = useApiData<Paged<RewardRedemption>>(
+    () => api.rewards.listRedemptions({ user_id: canManage ? undefined : me.id, page_size: 20 }),
+    [me.id, canManage],
+  );
+
+  const flattenLocationsList = useMemo(() => {
     return locationNodes ? flattenLocations(locationNodes) : [];
   }, [locationNodes]);
 
-  // Supervisors list: users who have supervisor or manager roles or reportees
   const supervisors = useMemo(() => {
     if (!allStaffUsers?.items) return [];
     return allStaffUsers.items.filter((u) => u.role.key === "supervisor" || u.role.key === "manager");
@@ -275,7 +323,6 @@ export default function RewardsPage() {
     setAuditPage(1);
   };
 
-  // Admin Transactions Query Object
   const auditQuery = useMemo(
     () => ({
       date_from: filterDateFrom || undefined,
@@ -336,6 +383,36 @@ export default function RewardsPage() {
     reloadLeaderboard();
     reloadAudit();
     reloadStats();
+    setCelebration({
+      title: "Adjustment Applied!",
+      message: "Points have been successfully recorded in the audit trail.",
+      badge: "⭐",
+    });
+  };
+
+  const redeemAction = useAction();
+  const handleRedeemPerk = (perk: RewardPerk) => {
+    redeemAction.run(async () => {
+      await api.rewards.redeemPerk({ perk_id: perk.id });
+      reloadMySummary();
+      reloadRedemptions();
+      reloadAudit();
+      setCelebration({
+        title: "Perk Claimed! 🎉",
+        message: `You successfully redeemed "${perk.title}". Your balance was deducted ${perk.points_cost} points.`,
+        badge: perk.icon,
+      });
+    });
+  };
+
+  const statusAction = useAction();
+  const handleUpdateRedemptionStatus = (id: number, status: string) => {
+    statusAction.run(async () => {
+      await api.rewards.updateRedemption(id, { status });
+      reloadRedemptions();
+      reloadMySummary();
+      reloadAudit();
+    });
   };
 
   return (
@@ -344,7 +421,7 @@ export default function RewardsPage() {
         {/* Page Header */}
         <PageHeader
           title="Rewards & Recognition"
-          description="Incentives engine, performance leaderboard rankings, and staff recognition audit trail."
+          description="Real-time employee gamification, performance leaderboard rankings, and perks redemption catalog."
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {canManage && (
@@ -360,10 +437,10 @@ export default function RewardsPage() {
           }
         />
 
-        {/* 1. Personal Overview Banner */}
+        {/* 1. Personal Overview & Gamification Tier Progress */}
         {mySummary && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <Card className="p-4 rounded-2xl border-amber-200/60 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 flex items-center justify-between">
+            <Card className="p-4 rounded-2xl border-amber-200/60 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 flex items-center justify-between shadow-xs">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Available Balance</p>
                 <div className="mt-1 flex items-baseline gap-1.5">
@@ -376,7 +453,7 @@ export default function RewardsPage() {
               </div>
             </Card>
 
-            <Card className="p-4 rounded-2xl border-slate-100 bg-white flex items-center justify-between">
+            <Card className="p-4 rounded-2xl border-slate-100 bg-white flex items-center justify-between shadow-xs">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Lifetime Earned</p>
                 <div className="mt-1 flex items-baseline gap-1.5">
@@ -389,7 +466,7 @@ export default function RewardsPage() {
               </div>
             </Card>
 
-            <Card className="p-4 rounded-2xl border-slate-100 bg-white flex items-center justify-between">
+            <Card className="p-4 rounded-2xl border-slate-100 bg-white flex items-center justify-between shadow-xs">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Current Standing</p>
                 <div className="mt-1 flex items-baseline gap-1.5">
@@ -402,20 +479,31 @@ export default function RewardsPage() {
               </div>
             </Card>
 
-            <Card className="p-4 rounded-2xl border-slate-100 bg-white flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">System Status</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-sm font-bold text-slate-800">
-                    {mySummary.is_enabled ? "Rewards Active" : "Paused"}
+            {/* Gamification Tier Card */}
+            {mySummary.tier && (
+              <Card className="p-4 rounded-2xl border-indigo-100 bg-gradient-to-br from-indigo-50/60 via-white to-purple-50/30 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Gamification Tier</p>
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1">
+                    <span>{mySummary.tier.badge}</span> {mySummary.tier.current_tier}
                   </span>
                 </div>
-              </div>
-              <div className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Sparkles className="w-5 h-5" />
-              </div>
-            </Card>
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-2">
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${mySummary.tier.progress_pct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-slate-500 mt-1.5 font-medium">
+                  <span>{mySummary.tier.progress_pct}% completed</span>
+                  {mySummary.tier.next_tier ? (
+                    <span>{mySummary.tier.points_to_next_tier} pts to {mySummary.tier.next_tier}</span>
+                  ) : (
+                    <span className="text-purple-700 font-bold">Top Tier Reached! 👑</span>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
         )}
 
@@ -429,6 +517,17 @@ export default function RewardsPage() {
             <span className="flex items-center gap-2">
               <Trophy className="w-4 h-4" />
               Leaderboard & Rankings
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("perks")}
+            className={tabClass(activeTab === "perks")}
+          >
+            <span className="flex items-center gap-2">
+              <Gift className="w-4 h-4 text-fuchsia-600" />
+              Perks & Rewards Redemption
             </span>
           </button>
 
@@ -490,7 +589,7 @@ export default function RewardsPage() {
                   className="h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-700 max-w-xs truncate"
                 >
                   <option value="">All Locations</option>
-                  {flattenedLocations.map((l) => (
+                  {flattenLocationsList.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.label}
                     </option>
@@ -579,7 +678,7 @@ export default function RewardsPage() {
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                         <th className="py-3 px-4 w-16">Rank</th>
-                        <th className="py-3 px-4">Staff Member</th>
+                        <th className="py-3 px-4">Staff Member & Tier</th>
                         <th className="py-3 px-4">Role</th>
                         <th className="py-3 px-4">Department & Area</th>
                         <th className="py-3 px-4 text-center">On-Time</th>
@@ -605,12 +704,20 @@ export default function RewardsPage() {
                                   )}
                                 </div>
                                 <div>
-                                  <span className="font-bold text-slate-800">{row.user.name}</span>
-                                  {isMe && (
-                                    <span className="ml-1.5 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold">
-                                      You
-                                    </span>
-                                  )}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-slate-800">{row.user.name}</span>
+                                    {row.tier && (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                        <span>{row.tier.badge}</span>
+                                        <span>{row.tier.current_tier}</span>
+                                      </span>
+                                    )}
+                                    {isMe && (
+                                      <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold">
+                                        You
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-[10px] text-slate-400">{row.user.email}</p>
                                 </div>
                               </div>
@@ -667,7 +774,160 @@ export default function RewardsPage() {
         )}
 
         {/* ================================================================= */}
-        {/* TAB 2: SUPER ADMIN AUDIT DASHBOARD (WITH EVERY FILTER)            */}
+        {/* TAB 2: PERKS & REWARDS REDEMPTION CATALOG                         */}
+        {/* ================================================================= */}
+        {activeTab === "perks" && (
+          <div className="space-y-6">
+            <ErrorBanner message={redeemAction.error || statusAction.error} />
+
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-fuchsia-600" />
+                  Redeemable Rewards & Perks Catalog
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Convert your earned points into real certificates, scheduling perks, cafeteria vouchers, and shopping rewards.
+                </p>
+              </div>
+              <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-1.5">
+                <span>🪙 Available:</span>
+                <span className="text-sm">{mySummary?.balance ?? 0} pts</span>
+              </div>
+            </div>
+
+            {/* Perks Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {perks?.map((perk) => {
+                const canAfford = (mySummary?.balance ?? 0) >= perk.points_cost;
+                return (
+                  <Card key={perk.id} className="p-5 rounded-2xl border border-slate-100 hover:border-fuchsia-200 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="w-12 h-12 rounded-2xl bg-fuchsia-50 border border-fuchsia-100 flex items-center justify-center text-2xl shadow-xs">
+                          {perk.icon}
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs">
+                          {perk.points_cost} pts
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">{perk.title}</h4>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{perk.description}</p>
+                    </div>
+
+                    <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase text-slate-400">{perk.category}</span>
+                      <button
+                        type="button"
+                        disabled={!canAfford || redeemAction.busy}
+                        onClick={() => handleRedeemPerk(perk)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          canAfford
+                            ? "bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                        }`}
+                      >
+                        {canAfford ? "Redeem Perk" : `Need ${perk.points_cost - (mySummary?.balance ?? 0)} more`}
+                      </button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Redemptions History */}
+            <Card className="rounded-2xl border border-slate-100 overflow-hidden shadow-xs mt-6">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-slate-500" />
+                  {canManage ? "All Employee Redemptions Queue" : "Your Redemption History"}
+                </h3>
+                <span className="text-xs text-slate-400">{myRedemptions?.total ?? 0} records</span>
+              </div>
+
+              {!myRedemptions || myRedemptions.items.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 text-xs">
+                  No redemption requests found. Start redeeming perks when you earn enough points!
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-4">Date</th>
+                        {canManage && <th className="py-3 px-4">Staff Member</th>}
+                        <th className="py-3 px-4">Perk Claimed</th>
+                        <th className="py-3 px-4">Points Spent</th>
+                        <th className="py-3 px-4">Status</th>
+                        {canManage && <th className="py-3 px-4 text-right">Review Action</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {myRedemptions.items.map((r) => (
+                        <tr key={r.id} className="hover:bg-slate-50/60">
+                          <td className="py-3 px-4 text-slate-500">{formatDateTime(r.created_at)}</td>
+                          {canManage && (
+                            <td className="py-3 px-4 font-bold text-slate-800">
+                              {r.user_name} <span className="text-[10px] text-slate-400 font-normal">({r.user_email})</span>
+                            </td>
+                          )}
+                          <td className="py-3 px-4">
+                            <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                              <span>{r.perk_icon}</span> {r.perk_title}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-bold text-amber-700">-{r.points_spent} 🪙</td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                r.status === "fulfilled"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : r.status === "approved"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : r.status === "rejected"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {r.status.toUpperCase()}
+                            </span>
+                          </td>
+                          {canManage && (
+                            <td className="py-3 px-4 text-right">
+                              {r.status === "pending" || r.status === "approved" ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateRedemptionStatus(r.id, "fulfilled")}
+                                    className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 cursor-pointer"
+                                  >
+                                    Fulfill
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateRedemptionStatus(r.id, "rejected")}
+                                    className="px-2 py-1 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-[10px] font-bold cursor-pointer"
+                                  >
+                                    Reject & Refund
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">—</span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* TAB 3: SUPER ADMIN AUDIT DASHBOARD (WITH EVERY FILTER)            */}
         {/* ================================================================= */}
         {activeTab === "audit" && canManage && (
           <div className="space-y-6">
@@ -819,7 +1079,7 @@ export default function RewardsPage() {
                     className={inputClass}
                   >
                     <option value="">All Locations</option>
-                    {flattenedLocations.map((l) => (
+                    {flattenLocationsList.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.label}
                       </option>
@@ -845,6 +1105,8 @@ export default function RewardsPage() {
                     <option value="four_star_rating">✨ 4★ Citizen Rating</option>
                     <option value="zero_reopen_closure">🎯 Zero-Reopen Closure</option>
                     <option value="streak_milestone">🔥 Clean Streak Milestone</option>
+                    <option value="perk_redemption">🎁 Perk Redemption</option>
+                    <option value="reopen_clawback">↩️ Reopen Clawback</option>
                     <option value="manual_adjustment">🛡️ Manual Adjustment</option>
                   </select>
                 </div>
@@ -1104,6 +1366,16 @@ export default function RewardsPage() {
             users={allStaffUsers?.items || []}
             onClose={() => setAdjustModalOpen(false)}
             onAdjusted={handleAdjustmentSuccess}
+          />
+        )}
+
+        {/* Celebration Modal */}
+        {celebration && (
+          <CelebrationModal
+            title={celebration.title}
+            message={celebration.message}
+            badge={celebration.badge}
+            onClose={() => setCelebration(null)}
           />
         )}
       </div>

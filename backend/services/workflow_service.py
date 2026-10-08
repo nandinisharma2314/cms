@@ -171,6 +171,7 @@ def apply_staff_action(
         complaint.resolved_at = None
         complaint.closed_at = None
         complaint.reopen_count += 1
+        reward_service.evaluate_reopen_clawback(db, complaint, at=now)
 
     previous_status = complaint.status
     change_status(db, complaint, action.to_status, ctx.user, note=note, at=now)
@@ -259,6 +260,7 @@ def end_user_reopen(
     complaint.resolved_at = None
     complaint.closed_at = None
     complaint.reopen_count += 1
+    reward_service.evaluate_reopen_clawback(db, complaint, at=now)
     change_status(db, complaint, REOPENED, end_user, note=reason, at=now, message="End user reopened the complaint",
                   public_message="You reopened the complaint")
 

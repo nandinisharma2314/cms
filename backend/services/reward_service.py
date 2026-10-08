@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from models import (
     Complaint, Department, Location, Priority, Role, User,
-    RewardSettings, RewardTransaction,
+    RewardSettings, RewardTransaction, RewardPerk, RewardRedemption,
     REWARD_RULE_ON_TIME, REWARD_RULE_SPEED_BONUS, REWARD_RULE_FIVE_STAR,
     REWARD_RULE_FOUR_STAR, REWARD_RULE_ZERO_REOPEN, REWARD_RULE_STREAK,
-    REWARD_RULE_MANUAL,
+    REWARD_RULE_MANUAL, REWARD_RULE_PERK_REDEMPTION, REWARD_RULE_REOPEN_CLAWBACK,
 )
 from services import notification_service
 from services.team_service import get_all_subordinates
@@ -28,6 +28,46 @@ DEFAULT_PRIORITY_MULTIPLIERS = {
     "info": 1.0,
     "neutral": 1.0,
 }
+
+TIERS = [
+    {"name": "Bronze Resolver", "badge": "🥉", "min_points": 0, "max_points": 499},
+    {"name": "Silver Specialist", "badge": "🥈", "min_points": 500, "max_points": 1999},
+    {"name": "Gold Champion", "badge": "🥇", "min_points": 2000, "max_points": 4999},
+    {"name": "Platinum Legend", "badge": "💎", "min_points": 5000, "max_points": None},
+]
+
+
+def calculate_user_tier(lifetime_points: int) -> dict[str, Any]:
+    points = max(0, lifetime_points)
+    if points < 500:
+        tier = TIERS[0]
+        next_tier = TIERS[1]
+        progress = int((points / 500) * 100)
+        needed = 500 - points
+    elif points < 2000:
+        tier = TIERS[1]
+        next_tier = TIERS[2]
+        progress = int(((points - 500) / 1500) * 100)
+        needed = 2000 - points
+    elif points < 5000:
+        tier = TIERS[2]
+        next_tier = TIERS[3]
+        progress = int(((points - 2000) / 3000) * 100)
+        needed = 5000 - points
+    else:
+        tier = TIERS[3]
+        next_tier = None
+        progress = 100
+        needed = 0
+
+    return {
+        "current_tier": tier["name"],
+        "badge": tier["badge"],
+        "next_tier": next_tier["name"] if next_tier else None,
+        "progress_pct": min(100, max(0, progress)),
+        "points_to_next_tier": needed,
+    }
+
 
 
 def get_reward_settings(db: Session) -> RewardSettings:
@@ -308,6 +348,24 @@ def evaluate_feedback_reward(
     now = at or utcnow()
     created_txs: list[RewardTransaction] = []
 
+    # Anti-gaming guardrail: maximum 2 ratings per citizen per handler within 24 hours
+    if complaint.end_user_id:
+        day_ago = now - timedelta(hours=24)
+        recent_feedback_count = (
+            db.query(func.count(RewardTransaction.id))
+            .join(Complaint, RewardTransaction.complaint_id == Complaint.id)
+            .filter(
+                RewardTransaction.user_id == handler.id,
+                Complaint.end_user_id == complaint.end_user_id,
+                RewardTransaction.rule_type.in_([REWARD_RULE_FIVE_STAR, REWARD_RULE_FOUR_STAR]),
+                RewardTransaction.created_at >= day_ago,
+            )
+            .scalar()
+            or 0
+        )
+        if recent_feedback_count >= 2:
+            return []
+
     if rating == 5 and settings.points_five_star > 0:
         tx = _apply_reward_transaction(
             db,
@@ -332,6 +390,55 @@ def evaluate_feedback_reward(
         created_txs.append(tx)
 
     return created_txs
+
+
+def evaluate_reopen_clawback(
+    db: Session, complaint: Complaint, at: datetime | None = None,
+) -> list[RewardTransaction]:
+    """Triggered when complaint is REOPENED. Claws back prematurely awarded resolution points."""
+    settings = get_reward_settings(db)
+    if not settings.is_enabled:
+        return []
+
+    prev_txs = (
+        db.query(RewardTransaction)
+        .filter(
+            RewardTransaction.complaint_id == complaint.id,
+            RewardTransaction.rule_type.in_([REWARD_RULE_ON_TIME, REWARD_RULE_SPEED_BONUS]),
+        )
+        .all()
+    )
+    if not prev_txs:
+        return []
+
+    already_clawed = (
+        db.query(RewardTransaction)
+        .filter(
+            RewardTransaction.complaint_id == complaint.id,
+            RewardTransaction.rule_type == REWARD_RULE_REOPEN_CLAWBACK,
+        )
+        .first()
+    )
+    if already_clawed:
+        return []
+
+    total_clawback = sum(t.points for t in prev_txs)
+    if total_clawback <= 0:
+        return []
+
+    now = at or utcnow()
+    handler = prev_txs[0].user
+    desc = f"Clawback: {complaint.generated_id} was reopened by citizen (Premature resolution points reversed)"
+    tx = _apply_reward_transaction(
+        db,
+        handler,
+        REWARD_RULE_REOPEN_CLAWBACK,
+        -total_clawback,
+        desc,
+        complaint,
+        at=now,
+    )
+    return [tx]
 
 
 def evaluate_closure_reward(
@@ -740,6 +847,7 @@ def get_leaderboard(
             "points": int(row.period_points or 0),
             "balance": row.reward_points_balance or 0,
             "lifetime_points": row.lifetime_reward_points or 0,
+            "tier": calculate_user_tier(row.lifetime_reward_points or 0),
             "on_time_count": row.on_time_count or 0,
             "five_star_count": row.five_star_count or 0,
         })
@@ -773,8 +881,213 @@ def get_user_rewards_summary(db: Session, user_id: int) -> dict[str, Any]:
         "balance": user.reward_points_balance or 0,
         "lifetime_points": user.lifetime_reward_points or 0,
         "rank": rank,
+        "tier": calculate_user_tier(user.lifetime_reward_points or 0),
         "currency_name": settings.currency_name,
         "currency_symbol": settings.currency_symbol,
         "is_enabled": settings.is_enabled,
         "recent_transactions": [serialize_transaction(t) for t in recent_txs],
     }
+
+
+# ---------------------------------------------------------------------------
+# Perks & Rewards Redemption Catalog
+# ---------------------------------------------------------------------------
+
+DEFAULT_PERKS = [
+    {
+        "title": "Certificate of Excellence",
+        "description": "Official commendation signed by Senior Department Leadership.",
+        "points_cost": 200,
+        "category": "certificate",
+        "icon": "📜",
+    },
+    {
+        "title": "Prime Shift / Schedule Preference",
+        "description": "Priority selection of your preferred duty shift rotation for next month.",
+        "points_cost": 350,
+        "category": "perk",
+        "icon": "⏱️",
+    },
+    {
+        "title": "Cafeteria / Lunch Meal Pass",
+        "description": "Meal voucher redeemable at partner cafeteria.",
+        "points_cost": 150,
+        "category": "voucher",
+        "icon": "☕",
+    },
+    {
+        "title": "Half-Day Discretionary Rest Pass",
+        "description": "Flexible half-day compensatory leave pass with supervisor approval.",
+        "points_cost": 500,
+        "category": "leave",
+        "icon": "🏖️",
+    },
+    {
+        "title": "Amazon / Retail E-Voucher (₹500)",
+        "description": "Digital shopping gift card delivered to your registered email.",
+        "points_cost": 1000,
+        "category": "voucher",
+        "icon": "🎁",
+    },
+]
+
+
+def seed_default_perks_if_empty(db: Session) -> None:
+    count = db.query(RewardPerk).count()
+    if count == 0:
+        for p in DEFAULT_PERKS:
+            perk = RewardPerk(
+                title=p["title"],
+                description=p["description"],
+                points_cost=p["points_cost"],
+                category=p["category"],
+                icon=p["icon"],
+                is_active=True,
+                created_at=utcnow(),
+            )
+            db.add(perk)
+        db.commit()
+
+
+def list_perks(db: Session, include_inactive: bool = False) -> list[dict[str, Any]]:
+    seed_default_perks_if_empty(db)
+    query = db.query(RewardPerk)
+    if not include_inactive:
+        query = query.filter(RewardPerk.is_active == True)
+    perks = query.order_by(RewardPerk.points_cost.asc()).all()
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "description": p.description,
+            "points_cost": p.points_cost,
+            "category": p.category,
+            "icon": p.icon,
+            "is_active": p.is_active,
+            "created_at": p.created_at.isoformat(),
+        }
+        for p in perks
+    ]
+
+
+def redeem_perk(
+    db: Session, user: User, perk_id: int, notes: str | None = None,
+) -> RewardRedemption:
+    perk = db.get(RewardPerk, perk_id)
+    if not perk or not perk.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Perk not found or inactive")
+
+    current_balance = user.reward_points_balance or 0
+    if current_balance < perk.points_cost:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Insufficient points balance ({current_balance} available, {perk.points_cost} required)",
+        )
+
+    now = utcnow()
+    desc = f"Redeemed perk: {perk.title}"
+    tx = _apply_reward_transaction(
+        db,
+        user,
+        REWARD_RULE_PERK_REDEMPTION,
+        -perk.points_cost,
+        desc,
+        complaint=None,
+        at=now,
+    )
+
+    redemption = RewardRedemption(
+        user_id=user.id,
+        perk_id=perk.id,
+        points_spent=perk.points_cost,
+        status="pending" if perk.category in ("voucher", "leave") else "approved",
+        notes=notes[:500] if notes else None,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(redemption)
+    db.commit()
+    db.refresh(redemption)
+    return redemption
+
+
+def list_redemptions(
+    db: Session,
+    user_id: int | None = None,
+    status_filter: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict[str, Any]:
+    query = db.query(RewardRedemption)
+    if user_id:
+        query = query.filter(RewardRedemption.user_id == user_id)
+    if status_filter:
+        query = query.filter(RewardRedemption.status == status_filter)
+
+    total = query.count()
+    items = (
+        query.order_by(RewardRedemption.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "user_name": r.user.name if r.user else "—",
+                "user_email": r.user.email if r.user else "—",
+                "perk_id": r.perk_id,
+                "perk_title": r.perk.title if r.perk else "—",
+                "perk_icon": r.perk.icon if r.perk else "🎁",
+                "points_spent": r.points_spent,
+                "status": r.status,
+                "notes": r.notes,
+                "admin_notes": r.admin_notes,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in items
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def update_redemption_status(
+    db: Session,
+    redemption_id: int,
+    new_status: str,
+    admin_notes: str | None,
+    admin_user: User,
+) -> RewardRedemption:
+    redemption = db.get(RewardRedemption, redemption_id)
+    if not redemption:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Redemption request not found")
+
+    if new_status not in ("pending", "approved", "fulfilled", "rejected"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid status")
+
+    previous_status = redemption.status
+    redemption.status = new_status
+    redemption.admin_notes = admin_notes[:500] if admin_notes else None
+    redemption.reviewed_by_id = admin_user.id
+    redemption.updated_at = utcnow()
+
+    # If rejected, refund the points!
+    if new_status == "rejected" and previous_status != "rejected":
+        user = redemption.user
+        desc = f"Refund: Redemption #{redemption.id} ({redemption.perk.title}) was rejected"
+        _apply_reward_transaction(
+            db,
+            user,
+            REWARD_RULE_MANUAL,
+            redemption.points_spent,
+            desc,
+            complaint=None,
+        )
+
+    db.commit()
+    db.refresh(redemption)
+    return redemption

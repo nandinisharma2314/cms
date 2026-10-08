@@ -874,6 +874,8 @@ REWARD_RULE_FOUR_STAR = "four_star_rating"
 REWARD_RULE_ZERO_REOPEN = "zero_reopen"
 REWARD_RULE_STREAK = "streak_milestone"
 REWARD_RULE_MANUAL = "manual_adjustment"
+REWARD_RULE_PERK_REDEMPTION = "perk_redemption"
+REWARD_RULE_REOPEN_CLAWBACK = "reopen_clawback"
 
 REWARD_RULES = (
     REWARD_RULE_ON_TIME,
@@ -883,6 +885,8 @@ REWARD_RULES = (
     REWARD_RULE_ZERO_REOPEN,
     REWARD_RULE_STREAK,
     REWARD_RULE_MANUAL,
+    REWARD_RULE_PERK_REDEMPTION,
+    REWARD_RULE_REOPEN_CLAWBACK,
 )
 
 
@@ -925,4 +929,36 @@ class RewardTransaction(Base):
     complaint = relationship("Complaint", foreign_keys=[complaint_id], lazy="joined")
     department = relationship("Department", foreign_keys=[department_id], lazy="joined")
     location = relationship("Location", foreign_keys=[location_id], lazy="joined")
+
+
+class RewardPerk(Base):
+    __tablename__ = "reward_perks"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(100), nullable=False)
+    description = Column(String(500), nullable=False)
+    points_cost = Column(Integer, nullable=False)
+    category = Column(String(50), default="perk", nullable=False)
+    icon = Column(String(10), default="🎁", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class RewardRedemption(Base):
+    __tablename__ = "reward_redemptions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    perk_id = Column(Integer, ForeignKey("reward_perks.id", ondelete="CASCADE"), nullable=False, index=True)
+    points_spent = Column(Integer, nullable=False)
+    status = Column(String(20), default="approved", nullable=False, index=True)
+    notes = Column(String(500), nullable=True)
+    admin_notes = Column(String(500), nullable=True)
+    reviewed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    user = relationship("User", foreign_keys=[user_id], lazy="joined")
+    perk = relationship("RewardPerk", foreign_keys=[perk_id], lazy="joined")
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_id], lazy="joined")
 

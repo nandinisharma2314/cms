@@ -174,3 +174,80 @@ def manual_adjustment(
         admin_user=ctx.user,
     )
     return reward_service.serialize_transaction(tx)
+
+
+class RedeemPerkRequest(BaseModel):
+    perk_id: int
+    notes: str | None = None
+
+
+class UpdateRedemptionRequest(BaseModel):
+    status: str
+    admin_notes: str | None = None
+
+
+@router.get("/perks")
+def list_perks(
+    include_inactive: bool = False,
+    ctx: AccessContext = Depends(require_permission("rewards.view")),
+):
+    return reward_service.list_perks(ctx.db, include_inactive=include_inactive)
+
+
+@router.post("/perks/redeem", status_code=status.HTTP_201_CREATED)
+def redeem_perk(
+    payload: RedeemPerkRequest,
+    ctx: AccessContext = Depends(require_permission("rewards.view")),
+):
+    redemption = reward_service.redeem_perk(
+        ctx.db, ctx.user, payload.perk_id, payload.notes
+    )
+    return {
+        "id": redemption.id,
+        "perk_title": redemption.perk.title,
+        "points_spent": redemption.points_spent,
+        "status": redemption.status,
+        "created_at": redemption.created_at.isoformat(),
+    }
+
+
+@router.get("/admin/redemptions")
+def list_redemptions(
+    user_id: int | None = None,
+    status_filter: str | None = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    ctx: AccessContext = Depends(require_permission("rewards.view")),
+):
+    filter_user_id = user_id
+    if not ctx.has("rewards.manage") and not ctx.user.is_super_admin:
+        filter_user_id = ctx.user.id
+
+    return reward_service.list_redemptions(
+        ctx.db,
+        user_id=filter_user_id,
+        status_filter=status_filter,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.put("/admin/redemptions/{redemption_id}")
+def update_redemption(
+    redemption_id: int,
+    payload: UpdateRedemptionRequest,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    r = reward_service.update_redemption_status(
+        ctx.db,
+        redemption_id=redemption_id,
+        new_status=payload.status,
+        admin_notes=payload.admin_notes,
+        admin_user=ctx.user,
+    )
+    return {
+        "id": r.id,
+        "status": r.status,
+        "admin_notes": r.admin_notes,
+        "updated_at": r.updated_at.isoformat(),
+    }
