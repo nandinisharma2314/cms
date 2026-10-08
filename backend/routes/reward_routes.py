@@ -25,6 +25,7 @@ class RewardSettingsUpdate(BaseModel):
     streak_interval: int | None = Field(default=None, ge=1)
     streak_bonus: int | None = Field(default=None, ge=0)
     priority_multipliers: dict[str, float] | None = None
+    tier_config: list[dict[str, Any]] | None = None
 
 
 class ManualAdjustmentRequest(BaseModel):
@@ -186,12 +187,56 @@ class UpdateRedemptionRequest(BaseModel):
     admin_notes: str | None = None
 
 
+class CreatePerkRequest(BaseModel):
+    title: str
+    description: str
+    points_cost: int
+    category: str = "perk"
+    icon: str = "🎁"
+    is_active: bool = True
+
+
+class UpdatePerkRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    points_cost: int | None = None
+    category: str | None = None
+    icon: str | None = None
+    is_active: bool | None = None
+
+
 @router.get("/perks")
 def list_perks(
     include_inactive: bool = False,
     ctx: AccessContext = Depends(require_permission("rewards.view")),
 ):
     return reward_service.list_perks(ctx.db, include_inactive=include_inactive)
+
+
+@router.post("/perks", status_code=status.HTTP_201_CREATED)
+def create_perk(
+    payload: CreatePerkRequest,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    return reward_service.create_perk(ctx.db, payload.model_dump(), ctx.user)
+
+
+@router.patch("/perks/{perk_id}")
+def update_perk(
+    perk_id: int,
+    payload: UpdatePerkRequest,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    data = {k: v for k, v in payload.model_dump().items() if v is not None}
+    return reward_service.update_perk(ctx.db, perk_id, data, ctx.user)
+
+
+@router.delete("/perks/{perk_id}")
+def delete_perk(
+    perk_id: int,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    return reward_service.delete_perk(ctx.db, perk_id, ctx.user)
 
 
 @router.post("/perks/redeem", status_code=status.HTTP_201_CREATED)
