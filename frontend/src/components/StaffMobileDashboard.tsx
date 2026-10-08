@@ -155,6 +155,12 @@ export function StaffMobileDashboard() {
             >
               <span>🪙</span> {me.reward_points_balance ?? 0} pts
             </Link>
+            {me.reports_to && (
+              <>
+                <span className="text-slate-300">·</span>
+                <span className="text-slate-500 font-medium">Reports to: {me.reports_to.name}</span>
+              </>
+            )}
             {scopeText && (
               <>
                 <span className="text-slate-300">·</span>
@@ -219,7 +225,7 @@ export function StaffMobileDashboard() {
       {/* 3. Escalations Alert Banner (if any) */}
       {canAssign && (m?.escalated ?? 0) > 0 && (
         <Link
-          href="/escalated"
+          href="/escalated?escalated=any"
           className="flex items-center justify-between gap-3 rounded-2xl bg-linear-to-r from-violet-50 to-purple-50 border border-violet-100 p-3.5 shadow-xs transition-transform active:scale-[0.99]"
         >
           <div className="flex items-center gap-2.5 min-w-0">

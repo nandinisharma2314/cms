@@ -231,6 +231,74 @@ def me(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(
     return _profile(db, end_user)
 
 
+@router.get("/hierarchy")
+def get_hierarchy(end_user: EndUser = Depends(get_current_end_user), db: Session = Depends(get_db)):
+    from models import Role, User, UserScope
+    
+    agent_id = None
+    if end_user.location_id:
+        agent = (
+            db.query(User)
+            .join(Role, User.role_id == Role.id)
+            .outerjoin(UserScope, User.id == UserScope.user_id)
+            .filter(
+                User.is_active == True,
+                Role.key.in_(["agent", "supervisor", "manager"]),
+                (User.primary_location_id == end_user.location_id) | (UserScope.location_id == end_user.location_id)
+            )
+            .first()
+        )
+        if agent:
+            agent_id = agent.id
+
+    users = db.query(User).join(Role, User.role_id == Role.id).filter(User.is_active == True).all()
+    
+    all_nodes = {}
+    for u in users:
+        all_nodes[u.id] = {
+            "id": str(u.id),
+            "name": u.name,
+            "role": u.role.name,
+            "initials": "".join([n[0].upper() for n in u.name.split() if n])[:2] if u.name else "U",
+            "isMe": False,
+            "children": [],
+            "reports_to_id": u.reports_to_id
+        }
+        
+    relevant_ids = set()
+    curr_id = agent_id
+    while curr_id and curr_id in all_nodes:
+        relevant_ids.add(curr_id)
+        curr_id = all_nodes[curr_id]["reports_to_id"]
+        
+    root_nodes = []
+    for uid, node in all_nodes.items():
+        if uid not in relevant_ids:
+            continue
+            
+        parent_id = node["reports_to_id"]
+        if parent_id in relevant_ids:
+            all_nodes[parent_id]["children"].append(node)
+        else:
+            root_nodes.append(node)
+            
+    if agent_id and agent_id in all_nodes:
+        all_nodes[agent_id]["children"].append({
+            "id": f"end_user_{end_user.id}",
+            "name": end_user.name,
+            "role": "Me",
+            "initials": "".join([n[0].upper() for n in end_user.name.split() if n])[:2] if end_user.name else "U",
+            "isMe": True,
+            "children": []
+        })
+            
+    for n in all_nodes.values():
+        if "reports_to_id" in n:
+            del n["reports_to_id"]
+        
+    return root_nodes[0] if root_nodes else {}
+
+
 @router.put("/profile")
 def update_profile(
     payload: UpdateProfileRequest, request: Request,

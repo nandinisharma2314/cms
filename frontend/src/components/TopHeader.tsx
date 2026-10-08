@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Award, Bell, Camera, ChevronDown, KeyRound, LogOut, MapPin, Menu, Search, Shield } from "lucide-react";
+import { Award, Bell, Camera, ChevronDown, KeyRound, LogOut, MapPin, Menu, Search, Shield, User } from "lucide-react";
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT, resolveAvatarUrl } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatDateTime, initials } from "@/lib/format";
@@ -230,6 +230,13 @@ function UserMenu() {
               <span className="font-bold text-[11px] text-amber-700">🪙 {me.reward_points_balance ?? 0}</span>
             </Link>
           )}
+          <Link
+            href={can("settings.manage") ? "/settings" : `/users/staff/${me.id}`}
+            onClick={() => setMenuOpen(false)}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer text-left"
+          >
+            <User className="w-3.5 h-3.5" /> View Profile
+          </Link>
           <button
             onClick={() => {
               setAvatarOpen(true);
@@ -272,15 +279,19 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       ? scopeLabel(me.scopes[0])
       : `${me.scopes.length} scopes`;
 
+  const hideHamburger = ["agent", "manager", "team_lead", "supervisor", "field_worker"].includes(me.role.key);
+
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 py-3 px-4 sm:px-6 lg:px-8 bg-slate-50/95 backdrop-blur border-b border-slate-100 lg:border-0">
-      <button
-        onClick={onOpenMenu}
-        className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 cursor-pointer"
-        aria-label="Open menu"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
+      {!hideHamburger && (
+        <button
+          onClick={onOpenMenu}
+          className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 cursor-pointer"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
 
       {can("complaint.view") ? (
         <form

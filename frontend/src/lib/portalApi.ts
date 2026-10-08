@@ -568,4 +568,14 @@ export const api = {
     markAllRead: () => request("/portal/notifications/read-all", { method: "POST" }),
     clear: () => request("/portal/notifications", { method: "DELETE" }),
   },
+  hierarchy: () => request<HierarchyNode>("/portal/hierarchy"),
+};
+
+export type HierarchyNode = {
+  id: string;
+  name: string;
+  role: string;
+  initials: string;
+  isMe?: boolean;
+  children?: HierarchyNode[];
 };

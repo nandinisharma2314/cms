@@ -608,85 +608,44 @@ export default function TeamsPage() {
                     : "No members match the selected filters."}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="flex flex-col space-y-3">
                   {filteredMembers?.map((m) => (
-                    <Card
+                    <div
                       key={m.id}
-                      className="overflow-hidden flex flex-col border border-slate-200 hover:border-slate-300 transition-colors"
+                      className="flex items-center justify-between p-3 sm:p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors shadow-sm"
                     >
-                      <div className="p-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
-                        <div className="flex gap-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0">
-                            {getInitials(m.name)}
-                          </div>
-                          <div>
-                            <Link
-                              href={`/users/staff/${m.id}`}
-                              className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1"
-                            >
-                              {m.name}
-                            </Link>
-                            <div className="text-[10px] font-semibold text-blue-700 mt-0.5 mb-1">{m.role}</div>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[180px]" title={m.email}>
-                              {m.primary_location?.name || "Unassigned Location"}
-                            </div>
+                      <Link href={`/users/staff/${m.id}`} className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 group">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm sm:text-base shrink-0 group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors">
+                          {getInitials(m.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 text-sm sm:text-base truncate group-hover:text-blue-700 transition-colors">{m.name}</div>
+                          <div className="text-[11px] sm:text-xs font-semibold text-blue-600 mt-0.5 truncate">{m.role}</div>
+                          <div className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3" />
+                            {m.primary_location?.name || "Global / Multiple"}
                           </div>
                         </div>
+                      </Link>
+                      
+                      <div className="flex items-center gap-2 sm:gap-3 pl-3 border-l border-slate-100 shrink-0">
                         <button
                           type="button"
                           onClick={() => toggleAvailability(m)}
-                          title="Click to toggle availability"
-                          className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors border ${
-                            m.is_available
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                              : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                          }`}
+                          title={`Click to toggle availability. Currently ${m.is_available ? "Online" : "Away"}`}
+                          className="shrink-0 p-2 rounded-full hover:bg-slate-50 transition-colors"
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${m.is_available ? "bg-emerald-500" : "bg-amber-500"}`} />
-                          {m.is_available ? "Online" : "Away"}
+                          <span className={`flex w-3 h-3 rounded-full shadow-sm border border-white ${m.is_available ? "bg-emerald-500" : "bg-amber-500"}`} />
                         </button>
-                      </div>
-
-                      <div className="p-4 flex-1 grid grid-cols-4 gap-3 bg-white">
-                        <div className="text-center">
-                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Active</div>
-                          <div
-                            className={`font-mono text-lg font-bold rounded-md py-0.5 ${m.current_active_complaints > 8 ? "bg-rose-100 text-rose-800" : m.current_active_complaints > 4 ? "bg-amber-50 text-amber-800" : "text-slate-800"}`}
-                          >
-                            {m.current_active_complaints}
-                          </div>
-                        </div>
-                        <div className="text-center border-l border-slate-100">
-                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Done</div>
-                          <div className="text-lg font-bold text-slate-800 py-0.5">{m.resolved}</div>
-                        </div>
-                        <div className="text-center border-l border-slate-100">
-                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">SLA %</div>
-                          <div
-                            className={`text-lg font-bold py-0.5 ${m.resolution_sla_pct === null ? "text-slate-400" : m.resolution_sla_pct >= 90 ? "text-emerald-600" : m.resolution_sla_pct >= 75 ? "text-amber-600" : "text-rose-600"}`}
-                          >
-                            {m.resolution_sla_pct !== null ? `${m.resolution_sla_pct}%` : "—"}
-                          </div>
-                        </div>
-                        <div className="text-center border-l border-slate-100">
-                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Rating</div>
-                          <div className="text-lg font-bold text-slate-800 py-0.5 flex items-center justify-center gap-1">
-                            {m.avg_rating !== null ? m.avg_rating : "—"}
-                            {m.avg_rating !== null && <Star className="w-3 h-3 text-amber-400 fill-amber-400 -mt-0.5" />}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
                         <button
                           type="button"
-                          className={secondaryButtonClass + " w-full flex justify-center py-2"}
+                          className="text-[11px] sm:text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg hover:bg-slate-200 transition-colors shadow-xs"
                           onClick={() => setSelectedMember(m)}
                         >
-                          Manage Workload
+                          Manage
                         </button>
                       </div>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               )}
