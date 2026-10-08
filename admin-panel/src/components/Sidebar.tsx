@@ -50,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/my-team", label: "Teams", icon: UserCheck, anyOf: ["team.view"] },
   {
     href: "/grievances",
-    label: "Staff Grievances",
+    label: "Workplace Issues",
     icon: ShieldAlert,
     anyOf: ["grievance.file", "grievance.view_own", "grievance.manage", "grievance.view_all"],
   },

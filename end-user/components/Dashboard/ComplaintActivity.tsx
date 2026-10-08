@@ -347,9 +347,15 @@ export default function ComplaintActivity({
               />
               <p className="text-[14px] text-slate-800">{e.message}</p>
               {e.note && (
-                <p className="mt-1 rounded-lg bg-slate-50 px-2 py-1 text-[12px] text-slate-600">&ldquo;{e.note}&rdquo;</p>
+                <p className="mt-1.5 rounded-lg  px-2 py-2 text-[13px] font-medium text-red-500 ">
+                  &ldquo;{e.note}&rdquo;
+                </p>
               )}
-              <p className="mt-0.5 text-[12px] text-slate-400">
+              <p
+                className={`mt-1 text-[12px] ${
+                  e.actor_type === "staff" ? "font-medium text-blue-600" : "text-slate-400"
+                }`}
+              >
                 {e.actor_name ? `${e.actor_name} · ` : ""}
                 {formatWhen(e.created_at)}
               </p>

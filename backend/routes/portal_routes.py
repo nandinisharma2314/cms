@@ -85,12 +85,31 @@ class FeedbackRequest(BaseModel):
 
 
 def _profile(db: Session, end_user: EndUser) -> dict:
+    from models import Role, User, UserScope
     role = end_user_role(db)
     names = path_names(db, [end_user.location])
+
+    agent_name = None
+    if end_user.location_id:
+        agent = (
+            db.query(User)
+            .join(Role, User.role_id == Role.id)
+            .outerjoin(UserScope, User.id == UserScope.user_id)
+            .filter(
+                User.is_active == True,
+                Role.key.in_(["agent", "supervisor", "manager"]),
+                (User.primary_location_id == end_user.location_id) | (UserScope.location_id == end_user.location_id)
+            )
+            .first()
+        )
+        if agent:
+            agent_name = f"{agent.name} ({agent.role.name})"
+
     return {
         "id": end_user.id,
         "external_id": end_user.external_id,
         "name": end_user.name,
+        "agent_name": agent_name,
         "mobile": end_user.mobile,
         "email": end_user.email,
         "location": serialize_location(end_user.location, names),

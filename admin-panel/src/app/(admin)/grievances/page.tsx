@@ -120,8 +120,8 @@ function FileGrievanceModal({
 
   return (
     <Modal
-      title="Lodge Internal Staff Grievance"
-      description="Report misconduct, bullying, harassment, corruption, or policy violations. Strictly protected by anti-retaliation rules."
+      title="Report a Workplace Issue"
+      description="Report bad behavior, bullying, or rule-breaking. You are protected from any payback for reporting this."
       onClose={onClose}
       wide
     >
@@ -131,35 +131,35 @@ function FileGrievanceModal({
         <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 flex items-start gap-2.5">
           <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
           <div className="text-xs text-amber-900 leading-relaxed">
-            <span className="font-bold">Anti-Conflict Protection:</span> The person named in this report will{" "}
-            <strong>never</strong> see, investigate, or receive notifications regarding this grievance.
+            <span className="font-bold">Protection Guarantee:</span> The person you name will{" "}
+            <strong>never</strong> see or know about this report.
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Who is this report regarding? (Target Type)">
+          <Field label="Who is this about?">
             <select
               required
               className={inputClass}
               value={targetType}
               onChange={(e) => setTargetType(e.target.value as GrievanceTargetType)}
             >
-              <option value="colleague">A Colleague / Peer</option>
-              <option value="superior">My Superior / Manager / Team Lead</option>
+              <option value="colleague">A Co-worker</option>
+              <option value="superior">My Manager or Team Lead</option>
               <option value="management">Senior Management</option>
-              <option value="department">Department / General Policy</option>
-              <option value="other">Other / External</option>
+              <option value="department">A General Department Policy</option>
+              <option value="other">Someone Else / External</option>
             </select>
           </Field>
 
           {targetType !== "department" && targetType !== "other" && options && (
-            <Field label="Accused Staff Member">
+            <Field label="Name of Person">
               <select
                 className={inputClass}
                 value={accusedUserId}
                 onChange={(e) => setAccusedUserId(e.target.value ? Number(e.target.value) : "")}
               >
-                <option value="">Select staff member…</option>
+                <option value="">Select someone…</option>
                 {options.colleagues.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -169,7 +169,7 @@ function FileGrievanceModal({
             </Field>
           )}
 
-          <Field label="Violation Category">
+          <Field label="Type of Issue">
             <select required className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="harassment">Harassment</option>
               <option value="bullying">Bullying & Intimidation</option>
@@ -183,21 +183,21 @@ function FileGrievanceModal({
             </select>
           </Field>
 
-          <Field label="Severity Level">
+          <Field label="How Serious Is It?">
             <select
               required
               className={inputClass}
               value={severity}
               onChange={(e) => setSeverity(e.target.value as GrievanceSeverity)}
             >
-              <option value="low">Low (Minor grievance / interpersonal friction)</option>
-              <option value="medium">Medium (Recurring issue / inappropriate conduct)</option>
-              <option value="high">High (Severe misconduct / intimidation / financial)</option>
-              <option value="critical">Critical (Immediate safety / severe corruption / violence)</option>
+              <option value="low">Low (minor issue or disagreement)</option>
+              <option value="medium">Medium (happens often or is wrong)</option>
+              <option value="high">High (severe bad behavior or money issues)</option>
+              <option value="critical">Critical (safety risk, violence, severe rule-breaking)</option>
             </select>
           </Field>
 
-          <Field label="Approximate Date of Incident (optional)">
+          <Field label="When did this happen? (optional)">
             <input
               type="date"
               max={new Date().toISOString().split("T")[0]}
@@ -208,7 +208,7 @@ function FileGrievanceModal({
           </Field>
 
           {options && (
-            <Field label="Related Department (optional)">
+            <Field label="Which Department? (optional)">
               <select
                 className={inputClass}
                 value={departmentId}
@@ -225,24 +225,24 @@ function FileGrievanceModal({
           )}
         </div>
 
-        <Field label="Grievance Title / Summary">
+        <Field label="Short Title / Summary">
           <input
             required
             maxLength={200}
             className={inputClass}
-            placeholder="Brief headline summarizing the issue"
+            placeholder="A short sentence about what happened"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
           />
         </Field>
 
-        <Field label="Detailed Description & Evidence">
+        <Field label="What Happened?">
           <textarea
             required
             rows={4}
             maxLength={5000}
             className={inputClass}
-            placeholder="Describe what occurred, dates, locations, witnesses, and any direct quotes or details."
+            placeholder="Tell us the details: what happened, where, who else was there, etc."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -259,18 +259,22 @@ function FileGrievanceModal({
           <div className="text-xs">
             <span className="font-bold text-slate-800 flex items-center gap-1.5">
               {isAnonymous ? <EyeOff className="w-3.5 h-3.5 text-slate-700" /> : <Eye className="w-3.5 h-3.5 text-slate-500" />}
-              Submit as Anonymous Whistleblower
+              Keep My Name Secret (Anonymous)
             </span>
             <p className="text-slate-500 mt-0.5">
-              When checked, your name and email are completely hidden from regular viewers and investigators, displayed as
-              &quot;Anonymous Staff Member&quot;.
+              We will hide your name and email from everyone checking this report. You will be shown as &quot;Anonymous&quot;.
             </p>
           </div>
         </label>
 
         {/* Evidence Attachments */}
-        <Field label="Confidential Attachments / Evidence (Screenshots, Emails, PDFs, Audio)">
-          <input type="file" multiple className={inputClass} onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+        <Field label="Files or Proof (Screenshots, Emails, PDFs, Audio)">
+          <input
+            type="file"
+            multiple
+            className="w-full text-xs text-slate-500 bg-white border border-slate-200 rounded-lg cursor-pointer file:cursor-pointer file:border-0 file:py-2 file:px-4 file:mr-4 file:bg-blue-50 file:text-blue-700 file:font-semibold hover:file:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            onChange={(e) => setFiles(Array.from(e.target.files || []))}
+          />
         </Field>
 
         <div className="pt-2 flex justify-end gap-2">
@@ -278,7 +282,7 @@ function FileGrievanceModal({
             Cancel
           </button>
           <button type="submit" className={primaryButtonClass} disabled={submitting}>
-            {submitting ? "Submitting…" : "Lodge Grievance"}
+            {submitting ? "Submitting…" : "Submit Report"}
           </button>
         </div>
       </form>
@@ -720,11 +724,11 @@ export default function GrievancesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Staff Grievances & Whistleblower System"
-        description="Confidential reporting portal for workplace misconduct, harassment, bullying, and ethical violations."
+        title="Workplace Issues"
+        description="A safe and private place to report bad behavior, bullying, or rule-breaking at work."
         actions={
           <button className={primaryButtonClass} onClick={() => setCreating(true)}>
-            <Plus className="w-3.5 h-3.5" /> Lodge a Grievance
+            <Plus className="w-3.5 h-3.5" /> Report an Issue
           </button>
         }
       />
@@ -745,7 +749,7 @@ export default function GrievancesPage() {
               setPage(1);
             }}
           >
-            My Filed Grievances
+            My Reports
           </button>
           {canManage && (
             <>
@@ -761,7 +765,7 @@ export default function GrievancesPage() {
                   setPage(1);
                 }}
               >
-                Assigned Investigations
+                Issues I'm Checking
               </button>
               <button
                 type="button"
@@ -773,7 +777,7 @@ export default function GrievancesPage() {
                   setPage(1);
                 }}
               >
-                All Grievances Queue
+                All Reports
               </button>
             </>
           )}
@@ -821,13 +825,13 @@ export default function GrievancesPage() {
         <table className="w-full min-w-215 text-left text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider bg-slate-50/50">
-              <th className="px-5 py-3 font-semibold">Tracking ID & Subject</th>
-              <th className="px-3 py-3 font-semibold">Category & Severity</th>
-              <th className="px-3 py-3 font-semibold">Target / Accused</th>
+              <th className="px-5 py-3 font-semibold">ID & Subject</th>
+              <th className="px-3 py-3 font-semibold">Type & Seriousness</th>
+              <th className="px-3 py-3 font-semibold">Person Reported</th>
               {view !== "my_filed" && <th className="px-3 py-3 font-semibold">Reporter</th>}
               <th className="px-3 py-3 font-semibold">Status</th>
-              <th className="px-3 py-3 font-semibold">Investigator</th>
-              <th className="px-3 py-3 font-semibold">Lodged</th>
+              <th className="px-3 py-3 font-semibold">Checked By</th>
+              <th className="px-3 py-3 font-semibold">Date Reported</th>
               <th className="px-5 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -836,7 +840,7 @@ export default function GrievancesPage() {
               <TableMessage colSpan={8}>Loading grievance records…</TableMessage>
             ) : !data || data.items.length === 0 ? (
               <TableMessage colSpan={8}>
-                {view === "my_filed" ? "You have not filed any grievances." : "No grievances matching the selected filters."}
+                {view === "my_filed" ? "You have not reported any issues." : "No reports matching the selected filters."}
               </TableMessage>
             ) : (
               data.items.map((g) => (

@@ -52,6 +52,7 @@ export interface Profile {
   id: number;
   external_id: string | null;
   name: string;
+  agent_name?: string | null;
   mobile: string;
   email: string;
   location: LocationRef | null;
@@ -126,7 +127,7 @@ export interface Complaint {
 export type EndUserAction = "comment" | "confirm" | "reopen" | "feedback";
 
 export interface ComplaintDetail extends Complaint {
-  timeline: { id: number; type: string; message: string; note: string | null; actor_name: string | null; created_at: string }[];
+  timeline: { id: number; type: string; message: string; note: string | null; actor_type: string | null; actor_name: string | null; created_at: string }[];
   comments: {
     id: number;
     author_type: "staff" | "end_user";
