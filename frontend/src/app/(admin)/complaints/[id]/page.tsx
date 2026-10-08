@@ -41,6 +41,7 @@ import {
   Spinner,
   StatusBadge,
   textareaClass,
+  tabClass,
 } from "@/components/ui";
 
 type Update = (detail: ComplaintDetail) => void;
@@ -139,29 +140,21 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
     return <p className="text-xs text-slate-400">No workflow actions are available to you for this complaint right now.</p>;
   }
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-3 max-w-full">
+      <select
+        className={`${inputClass} w-full max-w-full truncate`}
+        disabled={busy}
+        value={pending?.key ?? ""}
+        onChange={(e) => {
+          setError(null);
+          setPending(e.target.value ? detail.actions.find(a => a.key === e.target.value)! : null);
+        }}
+      >
+        <option value="">Select a workflow action...</option>
         {detail.actions.map((action) => (
-          <button
-            key={action.key}
-            disabled={busy}
-            aria-expanded={pending?.key === action.key}
-            onClick={() => {
-              setError(null);
-              setPending(pending?.key === action.key ? null : action);
-            }}
-            className={
-              action.key === "reject"
-                ? `${secondaryButtonClass} border-rose-200 text-rose-600 hover:bg-rose-50`
-                : pending?.key === action.key
-                  ? primaryButtonClass
-                  : secondaryButtonClass
-            }
-          >
-            {action.label}
-          </button>
+          <option key={action.key} value={action.key}>{action.label}</option>
         ))}
-      </div>
+      </select>
       {pending && (
         <form
           className="space-y-2"
@@ -247,8 +240,8 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
 
   if (!open) {
     return (
-      <button className={secondaryButtonClass} onClick={() => setOpen(true)}>
-        <PencilLine className="w-3.5 h-3.5" /> Change department, category, location or priority
+      <button className={`${secondaryButtonClass} w-full flex items-center justify-center whitespace-normal text-center h-auto`} onClick={() => setOpen(true)}>
+        <PencilLine className="w-3.5 h-3.5 shrink-0" /> <span className="flex-1">Change department, category, location or priority</span>
       </button>
     );
   }
@@ -663,7 +656,7 @@ function Timeline({ detail }: { detail: ComplaintDetail }) {
           />
           <div className="text-xs text-slate-800">{e.message}</div>
           {e.note && (
-            <div className="mt-1 text-[11px] text-slate-600 bg-slate-50 rounded-md px-2 py-1 whitespace-pre-wrap">
+            <div className="mt-1 text-[11px] text-red-600 bg-slate-50 rounded-md px-2 py-1 whitespace-pre-wrap">
               &ldquo;{e.note}&rdquo;
             </div>
           )}
@@ -685,6 +678,7 @@ function ComplaintView() {
   const { ui } = useConfig();
   const { me } = useSession();
   const { data: detail, error, setData, reload } = useApiData(() => api.complaints.get(complaintId), [complaintId]);
+  const [activeTab, setActiveTab] = useState<"details" | "actions" | "conversation">("details");
 
   // Keep the page current while it is open (others may act on the complaint too).
   useEffect(() => {
@@ -717,6 +711,42 @@ function ComplaintView() {
       </div>
       {error && <ErrorBanner message={error} />}
 
+      <div className="flex gap-2 mt-5 mb-5 overflow-x-auto pb-1">
+        <button
+          className={tabClass(activeTab === "details")}
+          onClick={() => setActiveTab("details")}
+        >
+          Details
+        </button>
+        <button
+          className={tabClass(activeTab === "actions")}
+          onClick={() => setActiveTab("actions")}
+        >
+          Actions & Timeline
+        </button>
+        <button
+          className={tabClass(activeTab === "conversation")}
+          onClick={() => setActiveTab("conversation")}
+        >
+          Conversation
+        </button>
+      </div>
+
+      {activeTab === "details" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className="lg:col-span-8 space-y-5">
+            <Card className="p-5 space-y-2">
+              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap wrap-break-word">{detail.description}</p>
+              {detail.additional_details && <p className="text-xs text-slate-500">{detail.additional_details}</p>}
+              <AttachmentLinks attachments={detail.attachments.filter((a) => a.comment_id === null)} />
+              {detail.resolution_note && (
+                <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-xs">
+                  <div className="font-semibold text-emerald-800">Resolution</div>
+                  <p className="text-emerald-900 mt-0.5 whitespace-pre-wrap">{detail.resolution_note}</p>
+                </div>
+              )}
+            </Card>
+          </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         <div className="lg:col-span-8 space-y-5">
           <Card className="p-5 space-y-2">
@@ -756,69 +786,92 @@ function ComplaintView() {
           </Card>
         </div>
 
-        <div className="lg:col-span-4 space-y-5">
-          <Card className="p-5 grid grid-cols-2 gap-4">
-            <DetailRow label="Department">{detail.department}</DetailRow>
-            <DetailRow label="Category">{detail.category ?? "Not set"}</DetailRow>
-            <div className="col-span-2">
-              <DetailRow label="Location">
-                <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                  <MapPin className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-                  {detail.location_detail.label.split(" > ").map((part, index, array) => (
-                    <React.Fragment key={index}>
-                      <span className="bg-slate-50 text-slate-700 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border border-slate-200 shadow-sm">
-                        {part}
-                      </span>
-                      {index < array.length - 1 && <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </DetailRow>
-            </div>
-            {me.is_super_admin && (
-              <>
-                <DetailRow label="Reported by">{detail.end_user?.name ?? detail.end_user_name ?? "—"}</DetailRow>
-                <DetailRow label="Contact">
-                  {detail.end_user ? `${detail.end_user.mobile} · ${detail.end_user.email}` : (detail.end_user_phone ?? "—")}
-                </DetailRow>
-              </>
-            )}
-            <DetailRow label="Registered">{formatDateTime(detail.created_at)}</DetailRow>
-            <DetailRow label="First response">{formatDateTime(detail.acknowledged_at)}</DetailRow>
-            <DetailRow label="Resolved">{formatDateTime(detail.resolved_at)}</DetailRow>
-            <DetailRow label="Closed">{formatDateTime(detail.closed_at)}</DetailRow>
-            {detail.feedback_rating !== null && (
+          <div className="lg:col-span-4 space-y-5">
+            <Card className="p-5 grid grid-cols-2 gap-4">
+              <DetailRow label="Department">{detail.department}</DetailRow>
+              <DetailRow label="Category">{detail.category ?? "Not set"}</DetailRow>
               <div className="col-span-2">
-                <DetailRow label="End user rating">
-                  <span className="flex items-center gap-0.5" aria-label={`${detail.feedback_rating} out of 5`}>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <Star
-                        key={n}
-                        className={`w-3.5 h-3.5 ${n <= (detail.feedback_rating ?? 0) ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
-                        aria-hidden="true"
-                      />
-                    ))}
-                  </span>
-                  {detail.feedback_comment && (
-                    <span className="block font-normal text-slate-600 mt-1">{detail.feedback_comment}</span>
-                  )}
+                <DetailRow label="Location">
+                  <div className="flex items-start gap-1.5 mt-1  rounded-lg ">
+                    
+                    <div className="text-[12px] leading-relaxed text-slate-600">
+                      {detail.location_detail.label.split(" > ").map((part, index, array) => (
+                        <React.Fragment key={index}>
+                          <span className={index === array.length - 1 ? "font-bold text-slate-800" : ""}>
+                            {part}
+                          </span>
+                          {index < array.length - 1 && <span className="mx-1.5 text-slate-300">›</span>}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
                 </DetailRow>
               </div>
+              {me.is_super_admin && (
+                <>
+                  <DetailRow label="Reported by">{detail.end_user?.name ?? detail.end_user_name ?? "—"}</DetailRow>
+                  <DetailRow label="Contact">
+                    {detail.end_user ? `${detail.end_user.mobile} · ${detail.end_user.email}` : (detail.end_user_phone ?? "—")}
+                  </DetailRow>
+                </>
+              )}
+              <DetailRow label="Registered">{formatDateTime(detail.created_at)}</DetailRow>
+              <DetailRow label="First response">{formatDateTime(detail.acknowledged_at)}</DetailRow>
+              <DetailRow label="Resolved">{formatDateTime(detail.resolved_at)}</DetailRow>
+              <DetailRow label="Closed">{formatDateTime(detail.closed_at)}</DetailRow>
+              {detail.feedback_rating !== null && (
+                <div className="col-span-2">
+                  <DetailRow label="End user rating">
+                    <span className="flex items-center gap-0.5" aria-label={`${detail.feedback_rating} out of 5`}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          className={`w-3.5 h-3.5 ${n <= (detail.feedback_rating ?? 0) ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
+                          aria-hidden="true"
+                        />
+                      ))}
+                    </span>
+                    {detail.feedback_comment && (
+                      <span className="block font-normal text-slate-600 mt-1">{detail.feedback_comment}</span>
+                    )}
+                  </DetailRow>
+                </div>
+              )}
+            </Card>
+
+            <Card className="p-5">
+              <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                <Timer className="w-4 h-4 text-slate-400" aria-hidden="true" /> SLA
+              </h2>
+              <SlaPanel detail={detail} />
+            </Card>
+
+            <Card className="p-5">
+              <h2 className="text-sm font-bold text-slate-800 mb-3">Assignment</h2>
+              <AssignmentPanel detail={detail} onUpdate={setData} />
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "actions" && (
+        <div className="space-y-5 max-w-full">
+          <Card className="p-5 space-y-4 max-w-full">
+            <h2 className="text-sm font-bold text-slate-800">Actions</h2>
+            
+            <ActionsPanel detail={detail} onUpdate={setData} />
+            
+            {detail.can_reclassify && (
+              <ReclassifyPanel
+                key={`${detail.department_id}-${detail.category_id}-${detail.location_detail.id}-${detail.priority.id}`}
+                detail={detail}
+                onUpdate={setData}
+              />
             )}
+            
+            <RejectionPanel detail={detail} onUpdate={setData} />
           </Card>
-
-          <Card className="p-5">
-            <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-              <Timer className="w-4 h-4 text-slate-400" aria-hidden="true" /> SLA
-            </h2>
-            <SlaPanel detail={detail} />
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-sm font-bold text-slate-800 mb-3">Assignment</h2>
-            <AssignmentPanel detail={detail} onUpdate={setData} />
-          </Card>
-
+          
           <Card className="p-5">
             <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
               <History className="w-4 h-4 text-slate-400" aria-hidden="true" /> Timeline
@@ -826,7 +879,18 @@ function ComplaintView() {
             <Timeline detail={detail} />
           </Card>
         </div>
-      </div>
+      )}
+
+      {activeTab === "conversation" && (
+        <div className="max-w-4xl">
+          <Card className="p-5">
+            <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4 text-slate-400" aria-hidden="true" /> Conversation
+            </h2>
+            <Conversation detail={detail} onUpdate={setData} />
+          </Card>
+        </div>
+      )}
     </>
   );
 }

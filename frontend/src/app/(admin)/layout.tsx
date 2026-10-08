@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         />
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
           <TopHeader onOpenMenu={() => setMenuOpenOn(pathname)} />
-          <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7 space-y-6 max-w-[1600px] w-full mx-auto pb-24 md:pb-7">
+          <main className="flex-1 px-4  sm:px-6 lg:px-8 lg:py-7 space-y-6 max-w-[1600px] w-full mx-auto pb-24 md:pb-7">
             {children}
           </main>
         </div>

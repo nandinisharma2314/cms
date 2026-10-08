@@ -85,7 +85,7 @@ export function StaffMobileDashboard() {
         },
         {
           label: "Escalated",
-          count: m?.escalated ?? 0,
+          count: pending?.escalated_to_me ?? 0,
           tile: "bg-violet-50",
           value: "text-violet-600",
           caption: "text-violet-900/60",
@@ -119,7 +119,7 @@ export function StaffMobileDashboard() {
         },
         {
           label: "Escalated",
-          count: m?.escalated ?? 0,
+          count: pending?.escalated_to_me ?? 0,
           tile: "bg-violet-50",
           value: "text-violet-600",
           caption: "text-violet-900/60",
@@ -147,25 +147,11 @@ export function StaffMobileDashboard() {
           <h1 className="mt-0.5 text-[22px] font-bold leading-tight tracking-tight text-slate-900 truncate">
             {me.name} <span aria-hidden="true">👋</span>
           </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px]">
+          <div className="mt-1 flex flex-col items-start gap-0.5 text-[12px]">
             <span className="font-semibold text-blue-600">{me.role.name}</span>
-            <Link
-              href="/rewards"
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200/80 text-amber-900 font-semibold text-[11px]"
-            >
-              <span>🪙</span> {me.reward_points_balance ?? 0} pts
-            </Link>
+            
             {me.reports_to && (
-              <>
-                <span className="text-slate-300">·</span>
-                <span className="text-slate-500 font-medium">Reports to: {me.reports_to.name}</span>
-              </>
-            )}
-            {scopeText && (
-              <>
-                <span className="text-slate-300">·</span>
-                <span className="text-slate-500 truncate max-w-[200px]">{scopeText}</span>
-              </>
+              <span className="text-amber-500 font-medium">Reports to: {me.reports_to.name}</span>
             )}
           </div>
         </div>
@@ -184,18 +170,7 @@ export function StaffMobileDashboard() {
             <span className={`h-2 w-2 rounded-full ${me.is_available ? "bg-emerald-500" : "bg-slate-400"}`} />
             {me.is_available ? "Available" : "Off duty"}
           </button>
-          <button
-            type="button"
-            onClick={() => setAvatarOpen(true)}
-            aria-label="Profile photo"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-xs overflow-hidden shadow-xs cursor-pointer"
-          >
-            {me.avatar_url ? (
-              <img src={resolveAvatarUrl(me.avatar_url)!} alt={me.name} className="w-full h-full object-cover" />
-            ) : (
-              initials(me.name)
-            )}
-          </button>
+         
         </div>
       </div>
 
@@ -223,9 +198,9 @@ export function StaffMobileDashboard() {
       </section>
 
       {/* 3. Escalations Alert Banner (if any) */}
-      {canAssign && (m?.escalated ?? 0) > 0 && (
+      {canAssign && (pending?.escalated_to_me ?? 0) > 0 && (
         <Link
-          href="/escalated?escalated=any"
+          href="/escalated"
           className="flex items-center justify-between gap-3 rounded-2xl bg-linear-to-r from-violet-50 to-purple-50 border border-violet-100 p-3.5 shadow-xs transition-transform active:scale-[0.99]"
         >
           <div className="flex items-center gap-2.5 min-w-0">
@@ -234,7 +209,7 @@ export function StaffMobileDashboard() {
             </span>
             <div className="min-w-0">
               <div className="text-[13.5px] font-bold text-violet-950 truncate">
-                {m?.escalated} escalated {m?.escalated === 1 ? "complaint" : "complaints"}
+                {pending?.escalated_to_me} escalated {pending?.escalated_to_me === 1 ? "complaint" : "complaints"}
               </div>
               <p className="text-[11.5px] text-violet-700">Requires review or reassignment</p>
             </div>
