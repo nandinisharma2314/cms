@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BellRing, Eye, EyeOff, HelpCircle, KeyRound, ListChecks, Lock, UserRound } from "lucide-react";
 import { AccountChoice, api, OtpChallenge, OtpChannel } from "@/lib/portalApi";
 import { api as staffApi } from "@/lib/api";
@@ -129,6 +129,9 @@ function Showcase() {
 export function LoginFlow() {
   useDocumentTitle("Sign in");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
   const { phone, otp, product_name } = useConfig();
   const [step, setStep] = useState<Step>("welcome");
   const [channel, setChannel] = useState<OtpChannel>(otp.channels[0]);
@@ -225,7 +228,7 @@ export function LoginFlow() {
     setError("");
     try {
       const me = await staffApi.auth.login(identifier.trim(), password);
-      router.replace(me.must_change_password ? "/change-password" : "/");
+      router.replace(me.must_change_password ? "/change-password" : safeNext || "/");
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -276,7 +279,7 @@ export function LoginFlow() {
         setChoice(result);
         setStep("choose");
       } else {
-        router.replace("/dashboard");
+        router.replace(safeNext?.startsWith("/dashboard") ? safeNext : "/dashboard");
       }
     } catch (err) {
       setError((err as Error).message);
@@ -290,7 +293,7 @@ export function LoginFlow() {
     setStep("verifying");
     try {
       await api.auth.selectAccount(choice.selection_token, endUserId);
-      router.replace("/dashboard");
+      router.replace(safeNext?.startsWith("/dashboard") ? safeNext : "/dashboard");
     } catch (err) {
       setError((err as Error).message);
       setStep("choose");
