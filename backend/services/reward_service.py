@@ -10,7 +10,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from models import (
-    Complaint, Department, Location, Priority, Role, User, ComplaintEvent,
+    Complaint, Department, Location, Priority, Role, User, UserScope, ComplaintEvent,
     RewardSettings, RewardTransaction, RewardPerk, RewardRedemption,
     REWARD_RULE_RESOLUTION, REWARD_RULE_ON_TIME, REWARD_RULE_SPEED_BONUS, REWARD_RULE_FIVE_STAR,
     REWARD_RULE_FOUR_STAR, REWARD_RULE_ZERO_REOPEN, REWARD_RULE_STREAK,
@@ -36,6 +36,49 @@ DEFAULT_TIERS = [
     {"name": "Platinum Legend", "badge": "💎", "min_points": 5000, "max_points": None},
 ]
 TIERS = DEFAULT_TIERS
+
+DEFAULT_QUESTS = [
+    {
+        "id": "speed_sprint",
+        "title": "Speed Demon Sprint",
+        "description": "Resolve 5 complaints in under 50% of the SLA target time window.",
+        "icon": "⚡",
+        "metric": "speed_bonus",
+        "target": 5,
+        "reward_points": 150,
+        "is_active": True,
+    },
+    {
+        "id": "citizen_hero",
+        "title": "Citizen Favorite",
+        "description": "Earn 3 top five-star reviews directly from citizens on resolved tickets.",
+        "icon": "⭐",
+        "metric": "five_star",
+        "target": 3,
+        "reward_points": 200,
+        "is_active": True,
+    },
+    {
+        "id": "clean_sweep",
+        "title": "Flawless First-Time Fix",
+        "description": "Close 10 complaints with zero citizen reopens.",
+        "icon": "🎯",
+        "metric": "zero_reopen",
+        "target": 10,
+        "reward_points": 250,
+        "is_active": True,
+    },
+]
+
+DEFAULT_CHAMPIONSHIP = {
+    "title": "Inter-Department Championship Cup",
+    "description": "Department-wide aggregated rewards, SLA compliance speed, and top citizen redressal contributors.",
+    "trophies": ["🏆", "🥈", "🥉", "🎖️"],
+    "points_weight": 1.0,
+    "sla_weight": 0.5,
+    "season": "monthly",
+    "is_enabled": True,
+}
 
 
 def get_tiers(db: Session | None = None) -> list[dict[str, Any]]:
@@ -141,6 +184,16 @@ def serialize_reward_settings(s: RewardSettings) -> dict[str, Any]:
     except Exception:
         tier_config = DEFAULT_TIERS
 
+    try:
+        quest_config = json.loads(s.quest_config) if s.quest_config else DEFAULT_QUESTS
+    except Exception:
+        quest_config = DEFAULT_QUESTS
+
+    try:
+        championship_config = json.loads(s.championship_config) if s.championship_config else DEFAULT_CHAMPIONSHIP
+    except Exception:
+        championship_config = DEFAULT_CHAMPIONSHIP
+
     return {
         "id": s.id,
         "is_enabled": s.is_enabled,
@@ -156,6 +209,8 @@ def serialize_reward_settings(s: RewardSettings) -> dict[str, Any]:
         "streak_bonus": s.streak_bonus,
         "priority_multipliers": priority_multipliers,
         "tier_config": tier_config,
+        "quest_config": quest_config,
+        "championship_config": championship_config,
         "updated_at": s.updated_at.isoformat() if s.updated_at else None,
         "updated_by": {"id": s.updated_by.id, "name": s.updated_by.name} if s.updated_by else None,
     }
@@ -204,6 +259,14 @@ def update_reward_settings(db: Session, data: dict[str, Any], user: User) -> dic
                 })
             cleaned_tiers.sort(key=lambda x: x["min_points"])
             settings.tier_config = json.dumps(cleaned_tiers)
+    if "quest_config" in data:
+        quests = data["quest_config"]
+        if isinstance(quests, list):
+            settings.quest_config = json.dumps(quests)
+    if "championship_config" in data:
+        champ = data["championship_config"]
+        if isinstance(champ, dict):
+            settings.championship_config = json.dumps(champ)
 
     settings.updated_at = utcnow()
     settings.updated_by_id = user.id
@@ -726,7 +789,25 @@ def _apply_reward_filters(
             descendant_ids = [
                 l.id for l in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
             ]
-            query = query.filter(RewardTransaction.location_id.in_(descendant_ids))
+            scoped_user_ids = [
+                r[0]
+                for r in db.query(UserScope.user_id)
+                .filter(UserScope.location_id.in_(descendant_ids))
+                .distinct()
+                .all()
+            ]
+            query = query.filter(
+                or_(
+                    RewardTransaction.location_id.in_(descendant_ids),
+                    (
+                        RewardTransaction.location_id.is_(None)
+                        & (
+                            RewardTransaction.user.has(User.primary_location_id.in_(descendant_ids))
+                            | RewardTransaction.user_id.in_(scoped_user_ids)
+                        )
+                    ),
+                )
+            )
 
     if manager_id:
         subordinates = get_all_subordinates(db, manager_id)
@@ -961,6 +1042,14 @@ def get_leaderboard(
     else:
         start = None
 
+    descendant_ids = None
+    if location_id:
+        loc = db.get(Location, location_id)
+        if loc:
+            descendant_ids = [
+                l.id for l in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
+            ]
+
     query = (
         db.query(
             User.id,
@@ -983,22 +1072,42 @@ def get_leaderboard(
         .join(User.role)
         .outerjoin(User.primary_department)
         .outerjoin(User.primary_location)
-        .outerjoin(RewardTransaction, RewardTransaction.user_id == User.id)
     )
 
-    if start:
-        query = query.filter(or_(RewardTransaction.created_at.is_(None), RewardTransaction.created_at >= start))
+    if descendant_ids is not None:
+        scoped_user_ids = [
+            r[0]
+            for r in db.query(UserScope.user_id)
+            .filter(UserScope.location_id.in_(descendant_ids))
+            .distinct()
+            .all()
+        ]
+        tx_user_ids = [
+            r[0]
+            for r in db.query(RewardTransaction.user_id)
+            .filter(RewardTransaction.location_id.in_(descendant_ids))
+            .distinct()
+            .all()
+        ]
+        eligible_user_ids = list(set(scoped_user_ids + tx_user_ids))
+        query = query.filter(
+            or_(
+                User.primary_location_id.in_(descendant_ids),
+                User.id.in_(eligible_user_ids) if eligible_user_ids else False,
+            )
+        )
+        tx_join = (RewardTransaction.user_id == User.id) & (RewardTransaction.location_id.in_(descendant_ids))
+        if start:
+            tx_join = tx_join & (RewardTransaction.created_at >= start)
+        query = query.outerjoin(RewardTransaction, tx_join)
+    else:
+        tx_join = RewardTransaction.user_id == User.id
+        if start:
+            tx_join = tx_join & (RewardTransaction.created_at >= start)
+        query = query.outerjoin(RewardTransaction, tx_join)
 
     if department_id:
         query = query.filter(User.primary_department_id == department_id)
-
-    if location_id:
-        loc = db.get(Location, location_id)
-        if loc:
-            descendant_ids = [
-                l.id for l in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
-            ]
-            query = query.filter(User.primary_location_id.in_(descendant_ids))
 
     results = (
         query.group_by(
@@ -1370,12 +1479,121 @@ def update_redemption_status(
     return redemption
 
 
+def get_quests_config(db: Session) -> list[dict[str, Any]]:
+    settings = get_reward_settings(db)
+    try:
+        if settings.quest_config:
+            quests = json.loads(settings.quest_config)
+            if isinstance(quests, list) and len(quests) > 0:
+                return quests
+    except Exception:
+        pass
+    return DEFAULT_QUESTS
+
+
+def save_quests_config(db: Session, quests: list[dict[str, Any]], user: User) -> list[dict[str, Any]]:
+    settings = get_reward_settings(db)
+    settings.quest_config = json.dumps(quests)
+    settings.updated_at = utcnow()
+    settings.updated_by_id = user.id
+    db.commit()
+    db.refresh(settings)
+    return get_quests_config(db)
+
+
+def create_quest(db: Session, data: dict[str, Any], user: User) -> dict[str, Any]:
+    import uuid
+    quests = list(get_quests_config(db))
+    quest_id = data.get("id") or f"quest_{uuid.uuid4().hex[:8]}"
+    new_quest = {
+        "id": str(quest_id).strip(),
+        "title": str(data.get("title", "")).strip()[:100],
+        "description": str(data.get("description", "")).strip()[:255],
+        "icon": str(data.get("icon", "🎯")).strip()[:10],
+        "metric": str(data.get("metric", "speed_bonus")).strip(),
+        "target": max(1, int(data.get("target", 5))),
+        "reward_points": max(1, int(data.get("reward_points", 100))),
+        "is_active": bool(data.get("is_active", True)),
+    }
+    existing_ids = {q.get("id") for q in quests}
+    if new_quest["id"] in existing_ids:
+        new_quest["id"] = f"{new_quest['id']}_{uuid.uuid4().hex[:4]}"
+    quests.append(new_quest)
+    save_quests_config(db, quests, user)
+    return new_quest
+
+
+def update_quest(db: Session, quest_id: str, data: dict[str, Any], user: User) -> dict[str, Any]:
+    quests = list(get_quests_config(db))
+    found = None
+    for q in quests:
+        if q.get("id") == quest_id:
+            if "title" in data:
+                q["title"] = str(data["title"]).strip()[:100]
+            if "description" in data:
+                q["description"] = str(data["description"]).strip()[:255]
+            if "icon" in data:
+                q["icon"] = str(data["icon"]).strip()[:10]
+            if "metric" in data:
+                q["metric"] = str(data["metric"]).strip()
+            if "target" in data:
+                q["target"] = max(1, int(data["target"]))
+            if "reward_points" in data:
+                q["reward_points"] = max(1, int(data["reward_points"]))
+            if "is_active" in data:
+                q["is_active"] = bool(data["is_active"])
+            found = q
+            break
+    if not found:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Quest not found")
+    save_quests_config(db, quests, user)
+    return found
+
+
+def delete_quest(db: Session, quest_id: str, user: User) -> dict[str, Any]:
+    quests = list(get_quests_config(db))
+    updated = [q for q in quests if q.get("id") != quest_id]
+    if len(updated) == len(quests):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Quest not found")
+    save_quests_config(db, updated, user)
+    return {"success": True, "id": quest_id}
+
+
+def get_championship_config(db: Session) -> dict[str, Any]:
+    settings = get_reward_settings(db)
+    try:
+        if settings.championship_config:
+            conf = json.loads(settings.championship_config)
+            if isinstance(conf, dict):
+                return {**DEFAULT_CHAMPIONSHIP, **conf}
+    except Exception:
+        pass
+    return DEFAULT_CHAMPIONSHIP
+
+
+def update_championship_config(db: Session, data: dict[str, Any], user: User) -> dict[str, Any]:
+    settings = get_reward_settings(db)
+    current = get_championship_config(db)
+    for k, v in data.items():
+        if v is not None:
+            current[k] = v
+    settings.championship_config = json.dumps(current)
+    settings.updated_at = utcnow()
+    settings.updated_by_id = user.id
+    db.commit()
+    db.refresh(settings)
+    return current
+
+
 def get_monthly_quests(db: Session, user_id: int) -> list[dict[str, Any]]:
     """Calculates active monthly gamification missions/quests for staff."""
     now = utcnow()
     month_start = datetime(now.year, now.month, 1)
 
-    # 1. Speed Demon Quest (Target: 5 fast resolutions <= 50% SLA)
+    quests = get_quests_config(db)
+    active_quests = [q for q in quests if q.get("is_active", True)]
+
+    # Pre-calculate counts for supported metrics this month for user_id
     speed_count = (
         db.query(func.count(RewardTransaction.id))
         .filter(
@@ -1387,7 +1605,6 @@ def get_monthly_quests(db: Session, user_id: int) -> list[dict[str, Any]]:
         or 0
     )
 
-    # 2. Citizen Favorite Quest (Target: 3 5-star ratings)
     star_count = (
         db.query(func.count(RewardTransaction.id))
         .filter(
@@ -1399,7 +1616,28 @@ def get_monthly_quests(db: Session, user_id: int) -> list[dict[str, Any]]:
         or 0
     )
 
-    # 3. Clean Sweep Quest (Target: 10 zero-reopen resolutions)
+    four_star_count = (
+        db.query(func.count(RewardTransaction.id))
+        .filter(
+            RewardTransaction.user_id == user_id,
+            RewardTransaction.rule_type == REWARD_RULE_FOUR_STAR,
+            RewardTransaction.created_at >= month_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    on_time_count = (
+        db.query(func.count(RewardTransaction.id))
+        .filter(
+            RewardTransaction.user_id == user_id,
+            RewardTransaction.rule_type == REWARD_RULE_ON_TIME,
+            RewardTransaction.created_at >= month_start,
+        )
+        .scalar()
+        or 0
+    )
+
     clean_count = (
         db.query(func.count(RewardTransaction.id))
         .filter(
@@ -1411,85 +1649,120 @@ def get_monthly_quests(db: Session, user_id: int) -> list[dict[str, Any]]:
         or 0
     )
 
-    return [
-        {
-            "id": "speed_sprint",
-            "title": "Speed Demon Sprint",
-            "description": "Resolve 5 complaints in under 50% of the SLA target time window.",
-            "icon": "⚡",
-            "current": min(5, speed_count),
-            "target": 5,
-            "reward_points": 150,
-            "completed": speed_count >= 5,
-            "progress_pct": min(100, int((speed_count / 5) * 100)),
-        },
-        {
-            "id": "citizen_hero",
-            "title": "Citizen Favorite",
-            "description": "Earn 3 top five-star reviews directly from citizens on resolved tickets.",
-            "icon": "⭐",
-            "current": min(3, star_count),
-            "target": 3,
-            "reward_points": 200,
-            "completed": star_count >= 3,
-            "progress_pct": min(100, int((star_count / 3) * 100)),
-        },
-        {
-            "id": "clean_sweep",
-            "title": "Flawless First-Time Fix",
-            "description": "Close 10 complaints with zero citizen reopens.",
-            "icon": "🎯",
-            "current": min(10, clean_count),
-            "target": 10,
-            "reward_points": 250,
-            "completed": clean_count >= 10,
-            "progress_pct": min(100, int((clean_count / 10) * 100)),
-        },
-    ]
+    resolved_count = (
+        db.query(func.count(Complaint.id))
+        .filter(
+            Complaint.assigned_to_id == user_id,
+            Complaint.status.in_(["RESOLVED", "CLOSED"]),
+            Complaint.resolved_at >= month_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    total_pts_earned = (
+        db.query(func.sum(RewardTransaction.points))
+        .filter(
+            RewardTransaction.user_id == user_id,
+            RewardTransaction.points > 0,
+            RewardTransaction.created_at >= month_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    metric_counts = {
+        "speed_bonus": speed_count,
+        "five_star": star_count,
+        "four_star": four_star_count,
+        "on_time": on_time_count,
+        "zero_reopen": clean_count,
+        "total_resolved": resolved_count,
+        "total_points": int(total_pts_earned),
+    }
+
+    result = []
+    for q in active_quests:
+        target = max(1, int(q.get("target", 1)))
+        metric = q.get("metric", "speed_bonus")
+        current_val = metric_counts.get(metric, 0)
+        completed = current_val >= target
+        pct = min(100, int((current_val / target) * 100))
+
+        result.append({
+            "id": q.get("id"),
+            "title": q.get("title"),
+            "description": q.get("description"),
+            "icon": q.get("icon", "🎯"),
+            "metric": metric,
+            "current": min(target, current_val),
+            "target": target,
+            "reward_points": int(q.get("reward_points", 100)),
+            "completed": completed,
+            "progress_pct": pct,
+            "is_active": q.get("is_active", True),
+        })
+
+    return result
 
 
-def get_department_leaderboard(db: Session) -> list[dict[str, Any]]:
-    """Ranks departments by total reward points and SLA compliance for Department Cup competition."""
+def get_department_leaderboard(
+    db: Session,
+    location_id: int | None = None,
+) -> list[dict[str, Any]]:
+    """Ranks departments by total reward points and SLA compliance for Department Cup competition.
+    Optionally filters by location subtree."""
+    champ_conf = get_championship_config(db)
+
+    descendant_ids = None
+    if location_id:
+        loc = db.get(Location, location_id)
+        if loc:
+            descendant_ids = [
+                l.id for l in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
+            ]
+
     departments = db.query(Department).all()
     results = []
 
     for dept in departments:
         # Total points in this department
-        total_pts = (
-            db.query(func.sum(RewardTransaction.points))
-            .filter(RewardTransaction.department_id == dept.id)
-            .scalar()
-            or 0
-        )
+        pts_q = db.query(func.sum(RewardTransaction.points)).filter(RewardTransaction.department_id == dept.id)
+        if descendant_ids is not None:
+            pts_q = pts_q.filter(RewardTransaction.location_id.in_(descendant_ids))
+        total_pts = pts_q.scalar() or 0
         total_pts = max(0, int(total_pts))
 
         # Total resolved complaints
-        total_resolved = (
-            db.query(func.count(Complaint.id))
-            .filter(Complaint.department_id == dept.id, Complaint.status.in_(["RESOLVED", "CLOSED"]))
-            .scalar()
-            or 0
+        res_q = db.query(func.count(Complaint.id)).filter(
+            Complaint.department_id == dept.id,
+            Complaint.status.in_(["RESOLVED", "CLOSED"]),
         )
+        if descendant_ids is not None:
+            res_q = res_q.filter(Complaint.location_id.in_(descendant_ids))
+        total_resolved = res_q.scalar() or 0
 
         # On-time resolutions
-        on_time_count = (
-            db.query(func.count(RewardTransaction.id))
-            .filter(
-                RewardTransaction.department_id == dept.id,
-                RewardTransaction.rule_type == REWARD_RULE_ON_TIME,
-            )
-            .scalar()
-            or 0
+        ontime_q = db.query(func.count(RewardTransaction.id)).filter(
+            RewardTransaction.department_id == dept.id,
+            RewardTransaction.rule_type == REWARD_RULE_ON_TIME,
         )
+        if descendant_ids is not None:
+            ontime_q = ontime_q.filter(RewardTransaction.location_id.in_(descendant_ids))
+        on_time_count = ontime_q.scalar() or 0
 
         sla_pct = int(round((on_time_count / total_resolved) * 100)) if total_resolved > 0 else 100
 
         # Find top agent in this department
-        top_user_row = (
+        top_user_q = (
             db.query(User.name, func.sum(RewardTransaction.points).label("pts"))
             .join(RewardTransaction, User.id == RewardTransaction.user_id)
             .filter(RewardTransaction.department_id == dept.id)
-            .group_by(User.id)
+        )
+        if descendant_ids is not None:
+            top_user_q = top_user_q.filter(RewardTransaction.location_id.in_(descendant_ids))
+        top_user_row = (
+            top_user_q.group_by(User.id)
             .order_by(func.sum(RewardTransaction.points).desc())
             .first()
         )
@@ -1509,7 +1782,7 @@ def get_department_leaderboard(db: Session) -> list[dict[str, Any]]:
     results.sort(key=lambda x: x["total_points"], reverse=True)
 
     # Assign ranks & trophies
-    trophies = ["🏆", "🥈", "🥉"]
+    trophies = champ_conf.get("trophies", ["🏆", "🥈", "🥉", "🎖️"])
     for idx, item in enumerate(results):
         item["rank"] = idx + 1
         item["trophy"] = trophies[idx] if idx < len(trophies) else f"#{idx + 1}"

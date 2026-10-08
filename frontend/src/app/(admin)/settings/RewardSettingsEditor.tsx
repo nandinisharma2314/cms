@@ -1,8 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Award, Plus, Shield, Sparkles, Trash2 } from "lucide-react";
-import { api, BadgeTier, RewardSettings, RoleDetail } from "@/lib/api";
+import { Award, Plus, Shield, Sparkles, Target, Trash2, Trophy } from "lucide-react";
+import {
+  api,
+  BadgeTier,
+  ChampionshipConfig,
+  QuestConfig,
+  QuestMetric,
+  RewardSettings,
+  RoleDetail,
+} from "@/lib/api";
 import { useAction, useApiData } from "@/lib/hooks";
 import {
   Card,
@@ -28,6 +36,49 @@ const DEFAULT_TIERS: BadgeTier[] = [
   { name: "Gold Champion", badge: "🥇", min_points: 2000, max_points: 4999 },
   { name: "Platinum Legend", badge: "💎", min_points: 5000, max_points: null },
 ];
+
+const DEFAULT_QUESTS: QuestConfig[] = [
+  {
+    id: "speed_demon",
+    title: "Speed Demon",
+    description: "Resolve 5 complaints under 2 hours this month",
+    icon: "⚡",
+    metric: "speed_bonus",
+    target: 5,
+    reward_points: 250,
+    is_active: true,
+  },
+  {
+    id: "five_star_hero",
+    title: "Citizen Hero",
+    description: "Earn 10 five-star ratings from citizens",
+    icon: "⭐",
+    metric: "five_star",
+    target: 10,
+    reward_points: 500,
+    is_active: true,
+  },
+  {
+    id: "perfect_streak",
+    title: "Perfectionist",
+    description: "Resolve 15 complaints with zero re-openings",
+    icon: "🛡️",
+    metric: "zero_reopen",
+    target: 15,
+    reward_points: 400,
+    is_active: true,
+  },
+];
+
+const DEFAULT_CHAMPIONSHIP: ChampionshipConfig = {
+  title: "Inter-Department Championship Cup",
+  description: "Department-wide aggregated rewards, SLA compliance speed, and top citizen redressal contributors.",
+  trophies: ["🏆", "🥈", "🥉", "🏅", "🎖️"],
+  points_weight: 1.0,
+  sla_weight: 1.0,
+  season: "Current Season",
+  is_enabled: true,
+};
 
 function RewardSettingsForm({
   initial,
@@ -84,6 +135,45 @@ function RewardSettingsForm({
     if (currentTiers.length <= 1) return;
     const updated = currentTiers.filter((_, i) => i !== idx);
     setForm({ ...form, tier_config: updated });
+  };
+
+  const currentQuests = form.quest_config && form.quest_config.length > 0 ? form.quest_config : DEFAULT_QUESTS;
+
+  const updateQuestItem = (idx: number, patch: Partial<QuestConfig>) => {
+    const updated = currentQuests.map((q, i) => (i === idx ? { ...q, ...patch } : q));
+    setForm({ ...form, quest_config: updated });
+  };
+
+  const addQuestItem = () => {
+    const newQuest: QuestConfig = {
+      id: `quest_${Date.now()}`,
+      title: `Quest ${currentQuests.length + 1}`,
+      description: "Monthly resolution challenge",
+      icon: "🎯",
+      metric: "total_resolved",
+      target: 10,
+      reward_points: 200,
+      is_active: true,
+    };
+    setForm({ ...form, quest_config: [...currentQuests, newQuest] });
+  };
+
+  const removeQuestItem = (idx: number) => {
+    if (currentQuests.length <= 1) return;
+    const updated = currentQuests.filter((_, i) => i !== idx);
+    setForm({ ...form, quest_config: updated });
+  };
+
+  const currentChampionship = form.championship_config || DEFAULT_CHAMPIONSHIP;
+
+  const updateChampionship = (patch: Partial<ChampionshipConfig>) => {
+    setForm({ ...form, championship_config: { ...currentChampionship, ...patch } });
+  };
+
+  const updateChampTrophy = (idx: number, val: string) => {
+    const list = [...(currentChampionship.trophies || ["🏆", "🥈", "🥉", "🏅", "🎖️"])];
+    list[idx] = val;
+    updateChampionship({ trophies: list });
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -392,6 +482,215 @@ function RewardSettingsForm({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Monthly Performance Quests & Missions */}
+        <div className="pt-4 border-t border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                <Target className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Monthly Milestone Quests & Challenges
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Target metrics, threshold counts, and points rewards reset on the 1st of every month.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={addQuestItem}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Quest
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {currentQuests.map((quest, idx) => (
+              <div
+                key={quest.id}
+                className="p-3.5 rounded-2xl border border-slate-200/80 bg-white grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center"
+              >
+                <div className="lg:col-span-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Icon</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    className={`${inputClass} text-center font-bold text-lg p-1`}
+                    value={quest.icon}
+                    onChange={(e) => updateQuestItem(idx, { icon: e.target.value })}
+                  />
+                </div>
+
+                <div className="lg:col-span-3">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Title</label>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={quest.title}
+                    onChange={(e) => updateQuestItem(idx, { title: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="lg:col-span-3">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Target Metric</label>
+                  <select
+                    className={inputClass}
+                    value={quest.metric}
+                    onChange={(e) => updateQuestItem(idx, { metric: e.target.value as QuestMetric })}
+                  >
+                    <option value="speed_bonus">Speed Bonus (&lt;2h resolution)</option>
+                    <option value="five_star">5-Star Citizen Ratings</option>
+                    <option value="four_star">High Ratings (4★ or 5★)</option>
+                    <option value="on_time">On-Time Redressals</option>
+                    <option value="zero_reopen">Zero-Reopen Cases</option>
+                    <option value="total_resolved">Total Resolved Complaints</option>
+                    <option value="total_points">Total Points Earned</option>
+                  </select>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Target Count</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className={inputClass}
+                    value={quest.target}
+                    onChange={(e) => updateQuestItem(idx, { target: Math.max(1, Number(e.target.value) || 1) })}
+                    required
+                  />
+                </div>
+
+                <div className="lg:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Reward (pts)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className={`${inputClass} font-bold text-amber-700`}
+                    value={quest.reward_points}
+                    onChange={(e) => updateQuestItem(idx, { reward_points: Math.max(0, Number(e.target.value) || 0) })}
+                    required
+                  />
+                </div>
+
+                <div className="lg:col-span-1 flex items-center justify-end gap-2 self-end lg:self-center">
+                  <button
+                    type="button"
+                    onClick={() => updateQuestItem(idx, { is_active: !quest.is_active })}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                      quest.is_active ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {quest.is_active ? "Active" : "Paused"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeQuestItem(idx)}
+                    disabled={currentQuests.length <= 1}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition disabled:opacity-30 cursor-pointer"
+                    title="Remove quest"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Inter-Department Championship Cup */}
+        <div className="pt-4 border-t border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                <Trophy className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Inter-Department Championship Cup
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Configure cup title, seasonal label, trophies, and tournament active status.
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-amber-50/60 border border-amber-200 cursor-pointer text-xs font-bold text-amber-900">
+              <input
+                type="checkbox"
+                checked={currentChampionship.is_enabled}
+                onChange={(e) => updateChampionship({ is_enabled: e.target.checked })}
+                className="w-4 h-4 text-amber-600 rounded"
+              />
+              <span>{currentChampionship.is_enabled ? "Tournament Active" : "Tournament Inactive"}</span>
+            </label>
+          </div>
+
+          <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/40 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Field label="Championship Title" hint="Display tournament name">
+                <input
+                  className={inputClass}
+                  value={currentChampionship.title}
+                  onChange={(e) => updateChampionship({ title: e.target.value })}
+                  required
+                />
+              </Field>
+
+              <Field label="Season Label" hint="e.g. Q1 2026, Annual Cup 2026">
+                <input
+                  className={inputClass}
+                  value={currentChampionship.season}
+                  onChange={(e) => updateChampionship({ season: e.target.value })}
+                />
+              </Field>
+
+              <Field label="Points Multiplier Weight" hint="Scoring points formula weighting">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  className={inputClass}
+                  value={currentChampionship.points_weight}
+                  onChange={(e) => updateChampionship({ points_weight: Number(e.target.value) || 1.0 })}
+                />
+              </Field>
+            </div>
+
+            <Field label="Tournament Description" hint="Summary banner note">
+              <textarea
+                rows={2}
+                className={inputClass}
+                value={currentChampionship.description}
+                onChange={(e) => updateChampionship({ description: e.target.value })}
+                required
+              />
+            </Field>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                Trophy Badges (1st to 5th Place)
+              </label>
+              <div className="grid grid-cols-5 gap-2 max-w-sm">
+                {[0, 1, 2, 3, 4].map((idx) => (
+                  <div key={idx} className="text-center">
+                    <span className="block text-[10px] text-slate-400 font-bold mb-0.5">#{idx + 1}</span>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      className={`${inputClass} text-center text-lg font-bold p-1`}
+                      value={currentChampionship.trophies?.[idx] || (idx === 0 ? "🏆" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "🏅")}
+                      onChange={(e) => updateChampTrophy(idx, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 

@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Edit2,
   Edit3,
   Filter,
   Flame,
@@ -23,6 +24,7 @@ import {
   Printer,
   RotateCcw,
   Search,
+  Settings,
   Trash2,
   TrendingUp,
   Trophy,
@@ -32,12 +34,15 @@ import {
 import { toast } from "@/components/Toast";
 import {
   api,
+  ChampionshipConfig,
   Department,
   DepartmentCupEntry,
   LeaderboardEntry,
   LocationNode,
   Paged,
   PublicScorecard,
+  QuestConfig,
+  QuestMetric,
   RewardPerk,
   RewardQuest,
   RewardRedemption,
@@ -47,6 +52,7 @@ import {
   StaffUser,
   resolveAvatarUrl,
 } from "@/lib/api";
+import { LocationHierarchyFilter } from "@/components/LocationHierarchyFilter";
 import { formatDateTime, initials } from "@/lib/format";
 import { useAction, useApiData } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
@@ -865,6 +871,399 @@ function RedemptionReviewModal({
 }
 
 // ---------------------------------------------------------------------------
+// Quest Edit / Create Modal (Super Admin & Managers)
+// ---------------------------------------------------------------------------
+function QuestModal({
+  isOpen,
+  onClose,
+  editingQuest,
+  form,
+  setForm,
+  onSubmit,
+  busy,
+  error,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  editingQuest: QuestConfig | null;
+  form: {
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    metric: QuestMetric;
+    target: number;
+    reward_points: number;
+    is_active: boolean;
+  };
+  setForm: React.Dispatch<
+    React.SetStateAction<{
+      id: string;
+      title: string;
+      description: string;
+      icon: string;
+      metric: QuestMetric;
+      target: number;
+      reward_points: number;
+      is_active: boolean;
+    }>
+  >;
+  onSubmit: (e: React.FormEvent) => void;
+  busy: boolean;
+  error?: string | null;
+}) {
+  if (!isOpen) return null;
+
+  const quickIcons = ["🎯", "⚡", "⭐", "🚀", "🛡️", "⏱️", "🔥", "💎", "🥇", "🏆", "🌟", "💪"];
+
+  const metricOptions: { value: QuestMetric; label: string }[] = [
+    { value: "speed_bonus", label: "Speed Bonus (Under 2h Resolution)" },
+    { value: "five_star", label: "5-Star Citizen Ratings" },
+    { value: "four_star", label: "High Ratings (4★ or 5★)" },
+    { value: "on_time", label: "On-Time Redressals" },
+    { value: "zero_reopen", label: "Zero-Reopen Cases" },
+    { value: "total_resolved", label: "Total Complaints Resolved" },
+    { value: "total_points", label: "Total Reward Points Earned" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🎯</span>
+            <h3 className="text-sm font-bold text-slate-900">
+              {editingQuest ? `Edit Quest: ${editingQuest.title}` : "Create Monthly Milestone Quest"}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="p-6 space-y-4">
+          <ErrorBanner message={error} />
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-start">
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Quest Icon</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  maxLength={4}
+                  className={`${inputClass} text-center text-xl font-bold p-2`}
+                  value={form.icon}
+                  onChange={(e) => setForm((prev) => ({ ...prev, icon: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {quickIcons.map((ic) => (
+                  <button
+                    key={ic}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, icon: ic }))}
+                    className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center border hover:bg-slate-100 cursor-pointer ${
+                      form.icon === ic ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-400" : "border-slate-200"
+                    }`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sm:col-span-3 space-y-3">
+              <Field label="Quest Title" hint="e.g. Rapid Resolver, 5-Star Champion">
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Rapid Resolver"
+                  value={form.title}
+                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                  required
+                />
+              </Field>
+
+              <Field label="Target Metric Rule" hint="Which rule measures achievement">
+                <select
+                  className={inputClass}
+                  value={form.metric}
+                  onChange={(e) => setForm((prev) => ({ ...prev, metric: e.target.value as QuestMetric }))}
+                >
+                  {metricOptions.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          <Field label="Description" hint="Clear instructions shown to staff">
+            <textarea
+              rows={2}
+              className={inputClass}
+              placeholder="e.g. Resolve 5 critical complaints within 2 hours of registration"
+              value={form.description}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+              required
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Monthly Target Count" hint="Goal threshold to complete">
+              <input
+                type="number"
+                min={1}
+                className={inputClass}
+                value={form.target}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    target: Math.max(1, Number(e.target.value) || 1),
+                  }))
+                }
+                required
+              />
+            </Field>
+
+            <Field label="Reward Points" hint="Points awarded upon completion">
+              <div className="relative">
+                <input
+                  type="number"
+                  min={1}
+                  className={`${inputClass} font-bold text-amber-700`}
+                  value={form.reward_points}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      reward_points: Math.max(1, Number(e.target.value) || 0),
+                    }))
+                  }
+                  required
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-amber-600">🪙 pts</span>
+              </div>
+            </Field>
+          </div>
+
+          {/* Active Status Toggle */}
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-800">Quest Status</p>
+              <p className="text-[11px] text-slate-400">
+                {form.is_active ? "Active for all staff this month" : "Disabled / Draft (hidden from staff)"}
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+            <button type="button" onClick={onClose} className={secondaryButtonClass} disabled={busy}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !form.title.trim()}
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs cursor-pointer disabled:opacity-50 transition-all"
+            >
+              {busy ? "Saving…" : editingQuest ? "Update Quest" : "Create Quest"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Championship Cup Configuration Modal (Super Admin)
+// ---------------------------------------------------------------------------
+function ChampionshipConfigModal({
+  isOpen,
+  onClose,
+  form,
+  setForm,
+  onSubmit,
+  busy,
+  error,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  form: ChampionshipConfig;
+  setForm: React.Dispatch<React.SetStateAction<ChampionshipConfig>>;
+  onSubmit: (e: React.FormEvent) => void;
+  busy: boolean;
+  error?: string | null;
+}) {
+  if (!isOpen) return null;
+
+  const updateTrophy = (idx: number, icon: string) => {
+    const list = [...(form.trophies || ["🏆", "🥈", "🥉", "🏅", "🎖️"])];
+    list[idx] = icon;
+    setForm((prev) => ({ ...prev, trophies: list }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-amber-50/60">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🏆</span>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Configure Inter-Department Championship Cup</h3>
+              <p className="text-[11px] text-slate-500">Customize tournament title, season label, trophies, and scoring weights</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="p-6 space-y-4">
+          <ErrorBanner message={error} />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Championship Title" hint="Public tournament title">
+              <input
+                className={inputClass}
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                required
+              />
+            </Field>
+
+            <Field label="Season Label" hint="e.g. Q1 2026, Annual Cup 2026">
+              <input
+                className={inputClass}
+                placeholder="e.g. Annual Cup 2026"
+                value={form.season}
+                onChange={(e) => setForm((prev) => ({ ...prev, season: e.target.value }))}
+              />
+            </Field>
+          </div>
+
+          <Field label="Tournament Description" hint="Summary displayed in header banner">
+            <textarea
+              rows={2}
+              className={inputClass}
+              value={form.description}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+              required
+            />
+          </Field>
+
+          {/* Trophy Icons for 1st, 2nd, 3rd, 4th, 5th place */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Rank Trophy Badges (1st, 2nd, 3rd, 4th, 5th)
+            </label>
+            <div className="grid grid-cols-5 gap-2">
+              {[0, 1, 2, 3, 4].map((idx) => (
+                <div key={idx} className="text-center">
+                  <span className="block text-[10px] text-slate-400 font-bold mb-1">#{idx + 1}</span>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    className={`${inputClass} text-center text-lg font-bold p-1`}
+                    value={form.trophies?.[idx] || (idx === 0 ? "🏆" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "🏅")}
+                    onChange={(e) => updateTrophy(idx, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Weighting controls */}
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+            <Field label="Points Weight" hint="Multiplier for staff points">
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                className={inputClass}
+                value={form.points_weight}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    points_weight: Number(e.target.value) || 1.0,
+                  }))
+                }
+              />
+            </Field>
+
+            <Field label="SLA Compliance Weight" hint="Multiplier for on-time %">
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                className={inputClass}
+                value={form.sla_weight}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    sla_weight: Number(e.target.value) || 1.0,
+                  }))
+                }
+              />
+            </Field>
+          </div>
+
+          {/* Active Status Toggle */}
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-800">Championship Status</p>
+              <p className="text-[11px] text-slate-400">
+                {form.is_enabled ? "Tournament active and visible" : "Disabled (rankings hidden)"}
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_enabled}
+                onChange={(e) => setForm((prev) => ({ ...prev, is_enabled: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+            <button type="button" onClick={onClose} className={secondaryButtonClass} disabled={busy}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !form.title.trim()}
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs cursor-pointer disabled:opacity-50 transition-all"
+            >
+              {busy ? "Saving…" : "Save Cup Settings"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Rewards Page Component
 // ---------------------------------------------------------------------------
 export default function RewardsPage() {
@@ -881,9 +1280,157 @@ export default function RewardsPage() {
   const { data: mySummary, reload: reloadMySummary } = useApiData<RewardUserSummary>(() => api.rewards.myRewards(), [me.id]);
 
   // Quests, Department Cup & Public Scorecard
+  const [cupLoc, setCupLoc] = useState<number | undefined>(undefined);
   const { data: quests, reload: reloadQuests } = useApiData<RewardQuest[]>(() => api.rewards.listQuests(), [me.id]);
-  const { data: deptCup, loading: deptCupLoading, reload: reloadDeptCup } = useApiData<DepartmentCupEntry[]>(() => api.rewards.departmentLeaderboard(), []);
+  const { data: questsConfig, reload: reloadQuestsConfig } = useApiData<QuestConfig[]>(
+    () => (canManage ? api.rewards.getQuestsConfig() : Promise.resolve([])),
+    [canManage],
+  );
+  const { data: championshipConfig, reload: reloadChampionshipConfig } = useApiData<ChampionshipConfig>(
+    () => api.rewards.getChampionshipConfig(),
+    [],
+  );
+  const { data: deptCup, loading: deptCupLoading, reload: reloadDeptCup } = useApiData<DepartmentCupEntry[]>(
+    () => api.rewards.departmentLeaderboard({ location_id: cupLoc }),
+    [cupLoc],
+  );
   const { data: scorecard, loading: scorecardLoading, reload: reloadScorecard } = useApiData<PublicScorecard>(() => api.publicScorecard(), []);
+
+  // Quest Management Modal State
+  const [questModalOpen, setQuestModalOpen] = useState(false);
+  const [editingQuest, setEditingQuest] = useState<QuestConfig | null>(null);
+  const [questForm, setQuestForm] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    metric: QuestMetric;
+    target: number;
+    reward_points: number;
+    is_active: boolean;
+  }>({
+    id: "",
+    title: "",
+    description: "",
+    icon: "⚡",
+    metric: "speed_bonus",
+    target: 5,
+    reward_points: 250,
+    is_active: true,
+  });
+  const questAction = useAction();
+
+  const openCreateQuest = () => {
+    setEditingQuest(null);
+    setQuestForm({
+      id: `quest_${Date.now()}`,
+      title: "",
+      description: "",
+      icon: "🎯",
+      metric: "total_resolved",
+      target: 10,
+      reward_points: 200,
+      is_active: true,
+    });
+    setQuestModalOpen(true);
+  };
+
+  const openEditQuest = (q: RewardQuest) => {
+    const cfg = questsConfig?.find((c) => c.id === q.id);
+    setEditingQuest(
+      cfg || {
+        id: q.id,
+        title: q.title,
+        description: q.description,
+        icon: q.icon,
+        metric: "total_resolved",
+        target: q.target,
+        reward_points: q.reward_points,
+        is_active: true,
+      },
+    );
+    setQuestForm({
+      id: q.id,
+      title: cfg?.title || q.title,
+      description: cfg?.description || q.description,
+      icon: cfg?.icon || q.icon,
+      metric: cfg?.metric || "total_resolved",
+      target: cfg?.target || q.target,
+      reward_points: cfg?.reward_points || q.reward_points,
+      is_active: cfg ? cfg.is_active : true,
+    });
+    setQuestModalOpen(true);
+  };
+
+  const handleSaveQuest = (e: React.FormEvent) => {
+    e.preventDefault();
+    questAction.run(async () => {
+      if (editingQuest) {
+        await api.rewards.updateQuest(editingQuest.id, questForm);
+        toast.success("Quest Updated", `Saved changes for "${questForm.title}".`);
+      } else {
+        await api.rewards.createQuest(questForm);
+        toast.success("Quest Created", `Added "${questForm.title}" challenge.`);
+      }
+      setQuestModalOpen(false);
+      reloadQuests();
+      if (canManage) reloadQuestsConfig();
+    });
+  };
+
+  const handleDeleteQuest = (questId: string, questTitle: string) => {
+    if (!confirm(`Are you sure you want to delete quest "${questTitle}"?`)) return;
+    questAction.run(async () => {
+      await api.rewards.deleteQuest(questId);
+      toast.success("Quest Deleted", `Quest "${questTitle}" has been removed.`);
+      reloadQuests();
+      if (canManage) reloadQuestsConfig();
+    });
+  };
+
+  // Championship Config Modal State
+  const [champModalOpen, setChampModalOpen] = useState(false);
+  const [champForm, setChampForm] = useState<ChampionshipConfig>({
+    title: "Inter-Department Championship Cup",
+    description: "Department-wide aggregated rewards, SLA compliance speed, and top citizen redressal contributors.",
+    trophies: ["🏆", "🥈", "🥉", "🏅", "🎖️"],
+    points_weight: 1.0,
+    sla_weight: 1.0,
+    season: "Current Season",
+    is_enabled: true,
+  });
+  const champAction = useAction();
+
+  const openEditChampionship = () => {
+    if (championshipConfig) {
+      setChampForm({
+        title: championshipConfig.title || "Inter-Department Championship Cup",
+        description:
+          championshipConfig.description ||
+          "Department-wide aggregated rewards, SLA compliance speed, and top citizen redressal contributors.",
+        trophies:
+          championshipConfig.trophies && championshipConfig.trophies.length > 0
+            ? championshipConfig.trophies
+            : ["🏆", "🥈", "🥉", "🏅", "🎖️"],
+        points_weight: championshipConfig.points_weight ?? 1.0,
+        sla_weight: championshipConfig.sla_weight ?? 1.0,
+        season: championshipConfig.season || "Current Season",
+        is_enabled: championshipConfig.is_enabled ?? true,
+      });
+    }
+    setChampModalOpen(true);
+  };
+
+  const handleSaveChampionship = (e: React.FormEvent) => {
+    e.preventDefault();
+    champAction.run(async () => {
+      await api.rewards.updateChampionshipConfig(champForm);
+      toast.success("Championship Cup Updated", "Saved championship configuration.");
+      setChampModalOpen(false);
+      reloadChampionshipConfig();
+      reloadDeptCup();
+    });
+  };
 
   // Support / Option data
   const { data: departments } = useApiData<Department[]>(() => api.departments.list(), []);
@@ -1313,60 +1860,116 @@ export default function RewardsPage() {
         )}
 
         {/* Monthly Performance Quests & Missions */}
-        {quests && quests.length > 0 && (
+        {((quests && quests.length > 0) || canManage) && (
           <Card className="p-4 rounded-2xl border-indigo-100/80 bg-gradient-to-r from-blue-50/50 via-indigo-50/30 to-purple-50/40 shadow-xs">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-2">
                 <span className="text-base">🎯</span>
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                  Monthly Milestone Quests & Challenges
-                </h3>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                    Monthly Milestone Quests & Challenges
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Complete monthly challenges to earn bonus tokens and gamified badges.
+                  </p>
+                </div>
               </div>
-              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                Resets on 1st of month
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                  Resets on 1st of month
+                </span>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={openCreateQuest}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-xs cursor-pointer transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Quest
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {quests.map((q) => (
-                <div
-                  key={q.id}
-                  className={`p-3.5 rounded-xl border bg-white flex flex-col justify-between transition-all ${
-                    q.completed ? "border-emerald-300 ring-2 ring-emerald-400/30 shadow-xs" : "border-slate-200/80"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-2xl">{q.icon}</span>
-                        <div>
-                          <h4 className="text-xs font-bold text-slate-800">{q.title}</h4>
-                          <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{q.description}</p>
+
+            {!quests || quests.length === 0 ? (
+              <div className="p-6 text-center bg-white/70 rounded-xl border border-dashed border-indigo-200">
+                <p className="text-xs text-slate-500">No monthly quests currently active.</p>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={openCreateQuest}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-indigo-700"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Create First Quest
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {quests.map((q) => (
+                  <div
+                    key={q.id}
+                    className={`p-3.5 rounded-xl border bg-white flex flex-col justify-between transition-all relative ${
+                      q.completed ? "border-emerald-300 ring-2 ring-emerald-400/30 shadow-xs" : "border-slate-200/80"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-2xl">{q.icon}</span>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-800">{q.title}</h4>
+                            <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{q.description}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 shrink-0">
+                            +{q.reward_points} 🪙
+                          </span>
+                          {canManage && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openEditQuest(q)}
+                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition cursor-pointer"
+                                title="Edit quest"
+                                aria-label="Edit quest"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQuest(q.id, q.title)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
+                                title="Delete quest"
+                                aria-label="Delete quest"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 shrink-0">
-                        +{q.reward_points} 🪙
-                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[10px] text-slate-600 font-semibold mb-1">
+                        <span>{q.completed ? "Completed! 🏆" : "Progress"}</span>
+                        <span>
+                          {q.current} / {q.target}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-500 ${
+                            q.completed ? "bg-emerald-500" : "bg-blue-600"
+                          }`}
+                          style={{ width: `${Math.min(100, q.progress_pct)}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-slate-600 font-semibold mb-1">
-                      <span>{q.completed ? "Completed! 🏆" : "Progress"}</span>
-                      <span>
-                        {q.current} / {q.target}
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className={`h-1.5 rounded-full transition-all duration-500 ${
-                          q.completed ? "bg-emerald-500" : "bg-blue-600"
-                        }`}
-                        style={{ width: `${Math.min(100, q.progress_pct)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
         )}
 
@@ -1468,18 +2071,13 @@ export default function RewardsPage() {
                   ))}
                 </select>
 
-                <select
-                  value={lbLoc ?? ""}
-                  onChange={(e) => setLbLoc(e.target.value ? Number(e.target.value) : undefined)}
-                  className="h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-700 max-w-xs truncate"
-                >
-                  <option value="">All Locations</option>
-                  {flattenLocationsList.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
+                <LocationHierarchyFilter
+                  tree={locationNodes}
+                  value={lbLoc}
+                  onChange={setLbLoc}
+                  layout="horizontal"
+                  compact
+                />
               </div>
             </div>
 
@@ -1669,19 +2267,59 @@ export default function RewardsPage() {
                   🏆
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900">Inter-Department Championship Cup</h3>
-                  <p className="text-xs text-slate-600">
-                    Department-wide aggregated rewards, SLA compliance speed, and top citizen redressal contributors.
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-900">
+                      {championshipConfig?.title || "Inter-Department Championship Cup"}
+                    </h3>
+                    {championshipConfig?.season && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900 border border-amber-300">
+                        {championshipConfig.season}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {championshipConfig?.description ||
+                      "Department-wide aggregated rewards, SLA compliance speed, and top citizen redressal contributors."}
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => reloadDeptCup()}
-                className="px-3 py-1.5 rounded-xl border border-amber-300 bg-white text-xs font-bold text-amber-900 hover:bg-amber-50 cursor-pointer shadow-2xs"
-              >
-                Refresh Rankings
-              </button>
+              <div className="flex items-center gap-2">
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={openEditChampionship}
+                    className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-900 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-amber-700" /> Configure Championship Cup
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => reloadDeptCup()}
+                  className="px-3 py-1.5 rounded-xl border border-amber-300 bg-white text-xs font-bold text-amber-900 hover:bg-amber-50 cursor-pointer shadow-2xs"
+                >
+                  Refresh Rankings
+                </button>
+              </div>
+            </div>
+
+            {/* Department Cup Region / Location Filter */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-indigo-600" /> Filter Region:
+                </span>
+                <LocationHierarchyFilter
+                  tree={locationNodes}
+                  value={cupLoc}
+                  onChange={setCupLoc}
+                  layout="horizontal"
+                  compact
+                />
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                Aggregating points & SLA performance across selected jurisdiction
+              </div>
             </div>
 
             {deptCupLoading ? (
@@ -1699,12 +2337,12 @@ export default function RewardsPage() {
                     <Card className="p-5 rounded-2xl border-slate-200 bg-gradient-to-t from-slate-50 via-white to-white flex flex-col items-center text-center order-2 md:order-1 relative shadow-xs">
                       <div className="absolute top-3 left-3 text-sm font-bold text-slate-400">#2</div>
                       <div className="w-16 h-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-3xl mb-2 shadow-xs">
-                        {deptCup[1].trophy}
+                        {championshipConfig?.trophies?.[1] || deptCup[1].trophy}
                       </div>
                       <h4 className="text-sm font-extrabold text-slate-800">{deptCup[1].department_name}</h4>
                       <p className="text-[11px] text-slate-500">{deptCup[1].total_resolved} resolved ({deptCup[1].sla_compliance_pct}% on-time)</p>
                       <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-full text-xs font-black text-slate-800">
-                        🥈 {deptCup[1].total_points} pts
+                        {championshipConfig?.trophies?.[1] || "🥈"} {deptCup[1].total_points} pts
                       </div>
                       {deptCup[1].top_performer && (
                         <p className="text-[10px] text-slate-400 mt-2">
@@ -1719,12 +2357,12 @@ export default function RewardsPage() {
                         🏆 Cup Leader
                       </div>
                       <div className="w-20 h-20 rounded-2xl bg-amber-100 border-3 border-amber-400 flex items-center justify-center text-4xl mb-2 shadow-sm">
-                        {deptCup[0].trophy}
+                        {championshipConfig?.trophies?.[0] || deptCup[0].trophy}
                       </div>
                       <h4 className="text-base font-black text-slate-900">{deptCup[0].department_name}</h4>
                       <p className="text-xs text-amber-700 font-medium">{deptCup[0].total_resolved} resolved ({deptCup[0].sla_compliance_pct}% on-time)</p>
                       <div className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-100 text-amber-900 rounded-full text-sm font-black shadow-xs">
-                        🥇 {deptCup[0].total_points} pts
+                        {championshipConfig?.trophies?.[0] || "🥇"} {deptCup[0].total_points} pts
                       </div>
                       {deptCup[0].top_performer && (
                         <p className="text-[11px] text-amber-800 mt-2 font-medium">
@@ -1737,12 +2375,12 @@ export default function RewardsPage() {
                     <Card className="p-5 rounded-2xl border-amber-200/50 bg-gradient-to-t from-amber-50/30 via-white to-white flex flex-col items-center text-center order-3 relative shadow-xs">
                       <div className="absolute top-3 left-3 text-sm font-bold text-amber-700/60">#3</div>
                       <div className="w-16 h-16 rounded-2xl bg-amber-50 border-2 border-amber-300/80 flex items-center justify-center text-3xl mb-2 shadow-xs">
-                        {deptCup[2].trophy}
+                        {championshipConfig?.trophies?.[2] || deptCup[2].trophy}
                       </div>
                       <h4 className="text-sm font-extrabold text-slate-800">{deptCup[2].department_name}</h4>
                       <p className="text-[11px] text-slate-500">{deptCup[2].total_resolved} resolved ({deptCup[2].sla_compliance_pct}% on-time)</p>
                       <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 bg-amber-50 rounded-full text-xs font-black text-amber-900">
-                        🥉 {deptCup[2].total_points} pts
+                        {championshipConfig?.trophies?.[2] || "🥉"} {deptCup[2].total_points} pts
                       </div>
                       {deptCup[2].top_performer && (
                         <p className="text-[10px] text-slate-400 mt-2">
@@ -1779,7 +2417,7 @@ export default function RewardsPage() {
                         {deptCup.map((dept) => (
                           <tr key={dept.department_id} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-3 px-4 font-bold text-slate-700 text-sm">
-                              {dept.trophy} #{dept.rank}
+                              {(championshipConfig?.trophies && championshipConfig.trophies[dept.rank - 1]) || dept.trophy} #{dept.rank}
                             </td>
                             <td className="py-3 px-4 font-bold text-slate-800">
                               {dept.department_name}
@@ -2374,23 +3012,18 @@ export default function RewardsPage() {
                 </div>
 
                 {/* Location Filter */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Location Subtree</label>
-                  <select
-                    value={filterLoc ?? ""}
-                    onChange={(e) => {
-                      setFilterLoc(e.target.value ? Number(e.target.value) : undefined);
+                <div className="sm:col-span-2 lg:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Location Hierarchy</label>
+                  <LocationHierarchyFilter
+                    tree={locationNodes}
+                    value={filterLoc}
+                    onChange={(id) => {
+                      setFilterLoc(id);
                       setAuditPage(1);
                     }}
-                    className={inputClass}
-                  >
-                    <option value="">All Locations</option>
-                    {flattenLocationsList.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.label}
-                      </option>
-                    ))}
-                  </select>
+                    layout="horizontal"
+                    compact
+                  />
                 </div>
 
                 {/* Rule / Trigger Filter */}
@@ -2721,6 +3354,33 @@ export default function RewardsPage() {
             onSubmit={handleSaveReview}
             busy={reviewAction.busy}
             error={reviewAction.error}
+          />
+        )}
+
+        {/* Quest Create / Edit Modal */}
+        {questModalOpen && (
+          <QuestModal
+            isOpen={questModalOpen}
+            onClose={() => setQuestModalOpen(false)}
+            editingQuest={editingQuest}
+            form={questForm}
+            setForm={setQuestForm}
+            onSubmit={handleSaveQuest}
+            busy={questAction.busy}
+            error={questAction.error}
+          />
+        )}
+
+        {/* Championship Cup Config Modal */}
+        {champModalOpen && (
+          <ChampionshipConfigModal
+            isOpen={champModalOpen}
+            onClose={() => setChampModalOpen(false)}
+            form={champForm}
+            setForm={setChampForm}
+            onSubmit={handleSaveChampionship}
+            busy={champAction.busy}
+            error={champAction.error}
           />
         )}
       </div>

@@ -3,7 +3,7 @@ A test in tests/test_platform.py checks it matches migrations/versions."""
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
-EXPECTED_REVISION = "0009"
+EXPECTED_REVISION = "0010"
 
 
 def schema_problem(engine: Engine) -> str | None:

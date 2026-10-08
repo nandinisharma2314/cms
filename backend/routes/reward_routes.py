@@ -26,6 +26,8 @@ class RewardSettingsUpdate(BaseModel):
     streak_bonus: int | None = Field(default=None, ge=0)
     priority_multipliers: dict[str, float] | None = None
     tier_config: list[dict[str, Any]] | None = None
+    quest_config: list[dict[str, Any]] | None = None
+    championship_config: dict[str, Any] | None = None
 
 
 class ManualAdjustmentRequest(BaseModel):
@@ -305,6 +307,36 @@ def backfill_rewards(
     return reward_service.backfill_historical_rewards(ctx.db)
 
 
+class QuestCreateRequest(BaseModel):
+    title: str
+    description: str
+    icon: str = "🎯"
+    metric: str = "speed_bonus"
+    target: int = 5
+    reward_points: int = 100
+    is_active: bool = True
+
+
+class QuestUpdateRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    icon: str | None = None
+    metric: str | None = None
+    target: int | None = None
+    reward_points: int | None = None
+    is_active: bool | None = None
+
+
+class ChampionshipConfigUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    trophies: list[str] | None = None
+    points_weight: float | None = None
+    sla_weight: float | None = None
+    season: str | None = None
+    is_enabled: bool | None = None
+
+
 @router.get("/quests")
 def get_user_quests(
     ctx: AccessContext = Depends(require_permission("rewards.view")),
@@ -312,10 +344,60 @@ def get_user_quests(
     return reward_service.get_monthly_quests(ctx.db, ctx.user.id)
 
 
-@router.get("/departments")
-def get_department_leaderboard(
+@router.get("/quests/config")
+def get_quests_config(
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    return reward_service.get_quests_config(ctx.db)
+
+
+@router.post("/quests", status_code=status.HTTP_201_CREATED)
+def create_quest(
+    payload: QuestCreateRequest,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    return reward_service.create_quest(ctx.db, payload.model_dump(), ctx.user)
+
+
+@router.patch("/quests/{quest_id}")
+def update_quest(
+    quest_id: str,
+    payload: QuestUpdateRequest,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    data = {k: v for k, v in payload.model_dump().items() if v is not None}
+    return reward_service.update_quest(ctx.db, quest_id, data, ctx.user)
+
+
+@router.delete("/quests/{quest_id}")
+def delete_quest(
+    quest_id: str,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    return reward_service.delete_quest(ctx.db, quest_id, ctx.user)
+
+
+@router.get("/championship/config")
+def get_championship_config(
     ctx: AccessContext = Depends(require_permission("rewards.view")),
 ):
-    return reward_service.get_department_leaderboard(ctx.db)
+    return reward_service.get_championship_config(ctx.db)
+
+
+@router.put("/championship/config")
+def update_championship_config(
+    payload: ChampionshipConfigUpdate,
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    data = {k: v for k, v in payload.model_dump().items() if v is not None}
+    return reward_service.update_championship_config(ctx.db, data, ctx.user)
+
+
+@router.get("/departments")
+def get_department_leaderboard(
+    location_id: int | None = Query(None),
+    ctx: AccessContext = Depends(require_permission("rewards.view")),
+):
+    return reward_service.get_department_leaderboard(ctx.db, location_id=location_id)
 
 

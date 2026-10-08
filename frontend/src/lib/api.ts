@@ -585,6 +585,36 @@ export interface PerformanceRow {
   recent_complaints?: ComplaintData[];
 }
 
+export type QuestMetric =
+  | "speed_bonus"
+  | "five_star"
+  | "four_star"
+  | "on_time"
+  | "zero_reopen"
+  | "total_resolved"
+  | "total_points";
+
+export interface QuestConfig {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  metric: QuestMetric;
+  target: number;
+  reward_points: number;
+  is_active: boolean;
+}
+
+export interface ChampionshipConfig {
+  title: string;
+  description: string;
+  trophies: string[];
+  points_weight: number;
+  sla_weight: number;
+  season: string;
+  is_enabled: boolean;
+}
+
 export interface RewardQuest {
   id: string;
   title: string;
@@ -809,6 +839,8 @@ export interface RewardSettings {
   streak_bonus: number;
   priority_multipliers: Record<string, number>;
   tier_config?: BadgeTier[];
+  quest_config?: QuestConfig[];
+  championship_config?: ChampionshipConfig;
   updated_at: string | null;
   updated_by: { id: number; name: string } | null;
 }
@@ -1686,7 +1718,18 @@ export const api = {
         { method: "POST" },
       ),
     listQuests: () => request<RewardQuest[]>("/rewards/quests"),
-    departmentLeaderboard: () => request<DepartmentCupEntry[]>("/rewards/departments"),
+    getQuestsConfig: () => request<QuestConfig[]>("/rewards/quests/config"),
+    createQuest: (data: Omit<QuestConfig, "id"> & { id?: string }) =>
+      request<QuestConfig>("/rewards/quests", { method: "POST", body: data }),
+    updateQuest: (questId: string, data: Partial<QuestConfig>) =>
+      request<QuestConfig>(`/rewards/quests/${questId}`, { method: "PATCH", body: data }),
+    deleteQuest: (questId: string) =>
+      request<{ success: boolean; id: string }>(`/rewards/quests/${questId}`, { method: "DELETE" }),
+    getChampionshipConfig: () => request<ChampionshipConfig>("/rewards/championship/config"),
+    updateChampionshipConfig: (data: Partial<ChampionshipConfig>) =>
+      request<ChampionshipConfig>("/rewards/championship/config", { method: "PUT", body: data }),
+    departmentLeaderboard: (query: { location_id?: number } = {}) =>
+      request<DepartmentCupEntry[]>("/rewards/departments", { query }),
   },
   publicScorecard: () => request<PublicScorecard>("/scorecard"),
 };

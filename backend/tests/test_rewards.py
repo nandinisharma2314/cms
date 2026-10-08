@@ -427,3 +427,82 @@ def test_potential_duplicates_and_scorecard(client, login, end_user_login):
     assert c1 in found_ids
 
 
+def test_quests_and_championship_config_and_location_filtering(client, login):
+    admin = login(SUPER_ADMIN)
+    agent = login(ELEC_AGENT)
+
+    # 1. Championship Quests CRUD
+    create_res = client.post(
+        "/rewards/quests",
+        headers=admin,
+        json={
+            "title": "Weekend Emergency Champion",
+            "description": "Resolve 3 critical complaints during off-peak hours",
+            "icon": "🔥",
+            "metric": "speed_bonus",
+            "target": 3,
+            "reward_points": 300,
+            "is_active": True,
+        },
+    )
+    assert create_res.status_code == 201, create_res.text
+    new_quest = create_res.json()
+    assert new_quest["title"] == "Weekend Emergency Champion"
+    quest_id = new_quest["id"]
+
+    # Verify quest appears in user quests list
+    quests_res = client.get("/rewards/quests", headers=agent)
+    assert quests_res.status_code == 200
+    q_titles = [q["title"] for q in quests_res.json()]
+    assert "Weekend Emergency Champion" in q_titles
+
+    # Update quest
+    patch_res = client.patch(
+        f"/rewards/quests/{quest_id}",
+        headers=admin,
+        json={"reward_points": 450, "target": 4},
+    )
+    assert patch_res.status_code == 200
+    assert patch_res.json()["reward_points"] == 450
+
+    # Delete quest
+    del_res = client.delete(f"/rewards/quests/{quest_id}", headers=admin)
+    assert del_res.status_code == 200
+
+    # 2. Championship Cup Config
+    champ_get = client.get("/rewards/championship/config", headers=admin)
+    assert champ_get.status_code == 200
+    assert "title" in champ_get.json()
+
+    champ_update = client.put(
+        "/rewards/championship/config",
+        headers=admin,
+        json={"title": "City Civic Excellence Cup", "season": "quarterly"},
+    )
+    assert champ_update.status_code == 200
+    assert champ_update.json()["title"] == "City Civic Excellence Cup"
+
+    # Reset championship title
+    client.put(
+        "/rewards/championship/config",
+        headers=admin,
+        json={"title": "Inter-Department Championship Cup", "season": "monthly"},
+    )
+
+    # 3. Location filtering in leaderboard and departments
+    # Fetch a location
+    locs_res = client.get("/locations/nodes", headers=admin)
+    assert locs_res.status_code == 200
+    nodes = locs_res.json()
+    if nodes:
+        first_loc_id = nodes[0]["id"]
+        # Leaderboard with location_id
+        lb_loc_res = client.get(f"/rewards/leaderboard?location_id={first_loc_id}", headers=agent)
+        assert lb_loc_res.status_code == 200
+
+        # Department Cup with location_id
+        dept_loc_res = client.get(f"/rewards/departments?location_id={first_loc_id}", headers=agent)
+        assert dept_loc_res.status_code == 200
+
+
+
