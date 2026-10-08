@@ -131,8 +131,8 @@ function FileGrievanceModal({
         <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 flex items-start gap-2.5">
           <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
           <div className="text-xs text-amber-900 leading-relaxed">
-            <span className="font-bold">Protection Guarantee:</span> The person you name will{" "}
-            <strong>never</strong> see or know about this report.
+            <span className="font-bold">Protection Guarantee:</span> The person you name will <strong>never</strong> see or know
+            about this report.
           </div>
         </div>
 
@@ -765,7 +765,7 @@ export default function GrievancesPage() {
                   setPage(1);
                 }}
               >
-                Issues I'm Checking
+                Issues I&apos;m Checking
               </button>
               <button
                 type="button"

@@ -1016,7 +1016,13 @@ const id = (value: string) => encodeURIComponent(value);
 export const api = {
   config: () => publicRequest<PublicConfig>("/public/config"),
   checkIdentifier: (identifier: string) =>
-    publicRequest<{ method: "password" | "otp" }>("/public/auth/check-identifier", {
+    publicRequest<{
+      status: "found" | "not_found" | "deactivated";
+      method: "password" | "otp" | null;
+      role: "staff" | "end_user" | null;
+      channel?: "sms" | "email";
+      message?: string;
+    }>("/public/auth/check-identifier", {
       method: "POST",
       body: { identifier },
     }),
@@ -1252,8 +1258,15 @@ export const api = {
     list: (query: { search?: string; page?: number; page_size?: number } = {}) =>
       request<Paged<EndUserRow>>("/end-users/", { query }),
     profile: (endUserId: number) => request<EndUserProfileResponse>(`/end-users/${endUserId}/profile`),
-    create: (data: { external_id: string | null; name: string; mobile: string; email: string; aadhar: string; pan_card: string; location_id: number | null }) =>
-      request<EndUserRow>("/end-users/", { method: "POST", body: data }),
+    create: (data: {
+      external_id: string | null;
+      name: string;
+      mobile: string;
+      email: string;
+      aadhar: string;
+      pan_card: string;
+      location_id: number | null;
+    }) => request<EndUserRow>("/end-users/", { method: "POST", body: data }),
     update: (
       endUserId: number,
       data: Partial<{

@@ -1,10 +1,13 @@
 import { Suspense } from "react";
-import { AdminLogin } from "@/components/AdminLogin";
+import { LoginFlow } from "@/components/portal/Login/LoginFlow";
+import { ConfigProvider } from "@/lib/portalConfig";
 
 export default function LoginPage() {
   return (
-    <Suspense>
-      <AdminLogin />
-    </Suspense>
+    <ConfigProvider>
+      <Suspense>
+        <LoginFlow />
+      </Suspense>
+    </ConfigProvider>
   );
 }

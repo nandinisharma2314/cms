@@ -28,9 +28,9 @@ function SupportLine() {
   );
 }
 
-function ResetRequestDialog({ onClose }: { onClose: () => void }) {
+export function ResetRequestDialog({ initialIdentifier = "", onClose }: { initialIdentifier?: string; onClose: () => void }) {
   const { limits } = useConfig();
-  const [identifier, setIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState(initialIdentifier);
   const [reason, setReason] = useState("");
   const [ticket, setTicket] = useState<string | null>(null);
   const { busy, error, run } = useAction();

@@ -336,7 +336,10 @@ function UserForm({
               maxLength={10}
               value={form.pan_card}
               onChange={(e) => {
-                const val = e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 10);
+                const val = e.target.value
+                  .replace(/[^A-Za-z0-9]/g, "")
+                  .toUpperCase()
+                  .slice(0, 10);
                 setForm({ ...form, pan_card: val });
                 setPanError(val && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val) ? "Invalid PAN format." : null);
               }}

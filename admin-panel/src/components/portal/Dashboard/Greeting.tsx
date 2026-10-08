@@ -23,6 +23,11 @@ export default function Greeting() {
         <h1 className="mt-0.5 text-[24px] font-bold leading-tight tracking-tight text-gray-800">
           {profile.name} <span aria-hidden="true">👋</span>
         </h1>
+        {profile.agent_name && (
+          <p className="mt-1 text-[13px] font-medium text-amber-500">
+            Supervisor: <span className="text-amber-500">{profile.agent_name}</span>
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-3">
         <Link

@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Me, UNAUTHORIZED_EVENT } from "./api";
+import { api as portalApi } from "./portalApi";
 
 interface Session {
   me: Me;
@@ -48,8 +49,23 @@ export function SessionProvider({
       (loaded) => active && setMe(loaded),
       (err: Error & { status?: number }) => {
         if (!active) return;
-        if (err.status === 401) router.replace(loginPath(window.location.pathname));
-        else setError(err.message);
+        if (err.status === 401) {
+          portalApi.auth
+            .restore()
+            .then((isEndUser) => {
+              if (!active) return;
+              if (isEndUser) {
+                router.replace("/dashboard");
+              } else {
+                router.replace(loginPath(window.location.pathname));
+              }
+            })
+            .catch(() => {
+              if (active) router.replace(loginPath(window.location.pathname));
+            });
+        } else {
+          setError(err.message);
+        }
       },
     );
     return () => {
