@@ -706,7 +706,7 @@ export default function RewardsPage() {
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Current Standing</p>
                 <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-slate-800">#{mySummary.rank ?? "—"}</span>
+                  <span className="text-2xl font-black text-slate-800">{mySummary.rank ?? "—"}</span>
                   <span className="text-xs font-semibold text-slate-500">on leaderboard</span>
                 </div>
               </div>

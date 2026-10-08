@@ -313,6 +313,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       <div className="flex-1 sm:hidden" />
 
       <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+        
         <div
           className="hidden xl:flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl"
           title={me.scopes.map(scopeLabel).join("\n") || scopeSummary}
@@ -328,7 +329,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
         {can("rewards.view") && (
           <Link
             href="/rewards"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200/80 text-amber-900 transition-colors cursor-pointer text-xs font-semibold shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200/80 text-amber-900 transition-colors cursor-pointer text-xs font-semibold shadow-xs pointer-events-none md:pointer-events-auto"
             title={`Reward Points: ${me.reward_points_balance ?? 0}`}
           >
             <span className="text-sm">🪙</span>
