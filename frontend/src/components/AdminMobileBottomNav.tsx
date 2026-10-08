@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpCircle, BarChart3, Bell, FileText, Home, Plus, Settings, User } from "lucide-react";
+import { ArrowUpCircle, BarChart3, Bell, FileText, Home, Plus, Settings, User, Users } from "lucide-react";
 import { useSession } from "@/lib/session";
 
 type NavIcon = React.ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -40,11 +40,9 @@ export function AdminMobileBottomNav() {
       ? { name: "Reports", icon: BarChart3, href: "/reports" }
       : { name: "Notifications", icon: Bell, href: "/notifications" };
 
-  const profileHref = can("settings.manage") ? "/settings" : `/users/staff/${me.id}`;
-
   const rightItems: NavItem[] = [
     middleItem,
-    { name: "Settings", icon: can("settings.manage") ? Settings : User, href: profileHref },
+    { name: "Teams", icon: Users, href: "/my-team" },
   ];
 
   const renderItem = (item: NavItem) => {

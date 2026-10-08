@@ -18,6 +18,14 @@ function greetingFor(hour: number) {
 export default function Greeting() {
   const { profile } = useEndUser();
 
+  let assignedRole = "Representative";
+  let assignedName = profile.agent_name;
+  if (profile.agent_name && profile.agent_name.includes(" (")) {
+    const parts = profile.agent_name.split(" (");
+    assignedName = parts[0];
+    assignedRole = parts[1].replace(")", "");
+  }
+
   return (
     <div className="flex items-start justify-between gap-4 px-2">
       <div className="min-w-0">
@@ -27,7 +35,7 @@ export default function Greeting() {
         </h1>
         {profile.agent_name && (
           <p className="mt-1 text-[13px] font-medium text-amber-500">
-            Supervisor: <span className="text-amber-500">{profile.agent_name}</span>
+            {assignedRole}: <span className="text-amber-500">{assignedName}</span>
           </p>
         )}
       </div>

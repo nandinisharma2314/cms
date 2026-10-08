@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, FileText, Home, Plus, User } from "lucide-react";
+import { Bell, FileText, Home, Plus, Users } from "lucide-react";
 import { api, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/portalApi";
 import { useConfig } from "@/lib/portalConfig";
 import { useEndUser } from "@/lib/portalSession";
@@ -34,7 +34,7 @@ const LEFT_ITEMS: NavItem[] = [
 
 const RIGHT_ITEMS: NavItem[] = [
   { name: "Notifications", icon: Bell, href: "/dashboard/notifications" },
-  { name: "Profile", icon: User, href: "/dashboard/profile" },
+  { name: "Teams", icon: Users, href: "/dashboard/teams" },
 ];
 
 /** Bottom tab bar on phones; the tabs follow the URL. */
