@@ -1,13 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   Award,
   Building2,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -231,6 +232,68 @@ function CertificateModal({
 // ---------------------------------------------------------------------------
 // Manual Point Adjustment Modal (Add & Deduct Modes)
 // ---------------------------------------------------------------------------
+function SearchableStaffSelect({ users, value, onChange }: { users: StaffUser[], value: number | "", onChange: (v: number | "") => void }) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const selected = value ? users.find((u) => u.id === value) : null;
+  const filtered = users.filter((u) => (u.name + " " + u.email + " " + u.role.name).toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="relative" ref={ref}>
+      <div 
+        className={`${inputClass} flex items-center justify-between cursor-pointer ${!selected ? "text-slate-500" : "text-slate-800"}`} 
+        onClick={() => setOpen(!open)}
+      >
+        <span className="truncate block font-medium">{selected ? `${selected.name} (${selected.role.name} — ${selected.email})` : "Select staff recipient…"}</span>
+        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+      </div>
+      {open && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] max-h-64 flex flex-col overflow-hidden">
+          <div className="p-2 border-b border-slate-100 shrink-0">
+            <input 
+              autoFocus
+              type="text" 
+              className="w-full h-8 px-3 text-[13px] bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="Search by name, role or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="p-3 text-[13px] text-center text-slate-500">No staff found</div>
+            ) : (
+              filtered.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  className={`w-full text-left px-3.5 py-2.5 text-[13px] hover:bg-slate-50 transition-colors ${u.id === value ? "bg-blue-50/50" : ""}`}
+                  onClick={() => {
+                    onChange(u.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <div className={`font-semibold ${u.id === value ? "text-blue-700" : "text-slate-800"}`}>{u.name}</div>
+                  <div className={`text-[11px] mt-0.5 ${u.id === value ? "text-blue-500" : "text-slate-500"}`}>{u.role.name} — {u.email}</div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ManualAdjustmentModal({
   users,
   onClose,
@@ -323,19 +386,11 @@ function ManualAdjustmentModal({
 
           {/* Staff User */}
           <Field label="Staff Member">
-            <select
-              className={inputClass}
+            <SearchableStaffSelect
+              users={users}
               value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value === "" ? "" : Number(e.target.value))}
-              required
-            >
-              <option value="">Select staff recipient…</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.role.name} — {u.email})
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setSelectedUserId(v)}
+            />
           </Field>
 
           {/* Points Amount with clear +/- indicator */}
@@ -360,30 +415,34 @@ function ManualAdjustmentModal({
 
           {/* Preset Reason Category */}
           <Field label="Reason Category">
-            <select
+            <input
+              type="text"
+              list="preset-reasons"
               className={inputClass}
+              placeholder="Select or type a custom category..."
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               required
-            >
+            />
+            <datalist id="preset-reasons">
               {mode === "add" ? (
                 <>
-                  <option value="Exceptional Performance Bonus">Exceptional Performance Bonus</option>
-                  <option value="Emergency / Night Shift Heroics">Emergency / Night Shift Heroics</option>
-                  <option value="Citizen Commendation">Exemplary Citizen Feedback</option>
-                  <option value="Management Discretionary Award">Management Discretionary Award</option>
-                  <option value="Other">Other Custom Award</option>
+                  <option value="Exceptional Performance Bonus" />
+                  <option value="Emergency / Night Shift Heroics" />
+                  <option value="Citizen Commendation" />
+                  <option value="Management Discretionary Award" />
+                  <option value="Other Custom Award" />
                 </>
               ) : (
                 <>
-                  <option value="SLA Negligence / Delay">SLA Negligence / Delay Penalty</option>
-                  <option value="Premature Resolution Correction">Premature Resolution Correction</option>
-                  <option value="Citizen Misconduct Penalty">Citizen Misconduct Penalty</option>
-                  <option value="Administrative Error Correction">Administrative Error Correction</option>
-                  <option value="Other">Other Custom Penalty</option>
+                  <option value="SLA Negligence / Delay Penalty" />
+                  <option value="Premature Resolution Correction" />
+                  <option value="Citizen Misconduct Penalty" />
+                  <option value="Administrative Error Correction" />
+                  <option value="Other Custom Penalty" />
                 </>
               )}
-            </select>
+            </datalist>
           </Field>
 
           {/* Details / Justification */}

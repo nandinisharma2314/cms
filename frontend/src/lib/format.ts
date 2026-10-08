@@ -76,7 +76,8 @@ export function channelNames(channels: ("sms" | "email")[]): string {
 
 export const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-export function initials(name: string): string {
+export function initials(name?: string | null): string {
+  if (!name) return "";
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return (parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : name.slice(0, 2)).toUpperCase();
 }
