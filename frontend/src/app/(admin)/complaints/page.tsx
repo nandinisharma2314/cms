@@ -55,7 +55,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
   };
 
   const { data: facets } = useApiData(() => api.complaints.facets(), []);
-  const { data, error, loading, refreshing } = useApiData(
+  const { data, error, loading, refreshing, reload } = useApiData(
     () =>
       api.complaints.list({
         search: search || undefined,
@@ -345,6 +345,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
               complaints={data?.items ?? []}
               loading={loading}
               emptyText={filters.escalated === "any" ? "No escalated complaints found." : "No complaints match your filters."}
+              onActionCompleted={reload}
             />
           </Card>
         )}

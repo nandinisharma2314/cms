@@ -14,6 +14,8 @@ import { scopeLabel } from "./ScopeEditor";
 import { QuickActionsBar } from "./QuickActionsBar";
 import { ChangePasswordModal } from "./ChangePasswordForm";
 import { ChangeAvatarModal } from "./ChangeAvatarModal";
+import { openCommandPalette } from "./CommandPalette";
+import { SystemHealthPill } from "./SystemHealthPill";
 
 /** Closes a popover on outside click or Escape. */
 function usePopover() {
@@ -294,24 +296,19 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       )}
 
       {can("complaint.view") ? (
-        <form
-          role="search"
-          className="relative flex-1 max-w-lg hidden sm:block"
-          onSubmit={(e) => {
-            e.preventDefault();
-            router.push(`/complaints?search=${encodeURIComponent(search.trim())}`);
-          }}
+        <div
+          onClick={openCommandPalette}
+          className="relative flex-1 max-w-lg hidden sm:flex items-center h-11 pl-10 pr-3.5 bg-white border border-slate-200/90 rounded-xl hover:border-slate-300 hover:shadow-xs transition-all cursor-pointer group select-none"
+          title="Open Command Palette (Ctrl + Space)"
         >
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search complaints by ID, title or area"
-            aria-label="Search complaints"
-            className="w-full h-11 pl-10 pr-4 text-sm text-slate-800 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
-          />
-        </form>
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors pointer-events-none" />
+          <span className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors flex-1 truncate">
+            Search tickets, navigate, or run commands…
+          </span>
+          <kbd className="hidden md:inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-mono font-bold text-slate-500 shadow-2xs group-hover:bg-slate-200/80 transition-colors">
+            Ctrl + Space
+          </kbd>
+        </div>
       ) : null}
       <div className="flex-1 sm:hidden" />
 
@@ -339,6 +336,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
             <span className="hidden sm:inline text-[11px] text-amber-700 font-medium">pts</span>
           </Link>
         )}
+        <SystemHealthPill />
         <Notifications />
         <QuickActionsBar />
         <UserMenu />

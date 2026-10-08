@@ -6,6 +6,8 @@ import { SessionProvider } from "@/lib/session";
 import { Sidebar } from "@/components/Sidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { AdminMobileBottomNav } from "@/components/AdminMobileBottomNav";
+import { CommandPalette } from "@/components/CommandPalette";
+import { ToastContainer } from "@/components/Toast";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,6 +32,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </main>
         </div>
         <AdminMobileBottomNav />
+        <CommandPalette />
+        <ToastContainer />
       </div>
     </SessionProvider>
   );

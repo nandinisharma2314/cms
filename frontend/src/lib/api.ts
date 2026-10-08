@@ -1339,6 +1339,20 @@ export const api = {
     }) => request<{ id: string; assignee: string | null }>("/complaints/quick-create", { method: "POST", body: data }),
     potentialDuplicates: (id: string | number) =>
       request<PotentialDuplicate[]>(`/complaints/${encodeURIComponent(String(id))}/potential-duplicates`),
+    bulkAction: (data: {
+      complaint_ids: string[];
+      action_type: "assign" | "status" | "priority";
+      assignee_id?: number | null;
+      assignee_reason?: string | null;
+      workflow_action?: string | null;
+      workflow_note?: string | null;
+      priority_id?: number | null;
+      priority_reason?: string | null;
+    }) =>
+      request<{ updated_count: number; updated_ids: string[]; failed: { id: string; error: string }[] }>(
+        "/complaints/bulk-action",
+        { method: "POST", body: data },
+      ),
   },
   users: {
     list: (query: { search?: string; role_id?: number; page?: number; page_size?: number } = {}) =>

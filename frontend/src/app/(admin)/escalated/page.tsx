@@ -54,7 +54,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
   };
 
   const { data: facets } = useApiData(() => api.complaints.facets(), []);
-  const { data, error, loading, refreshing } = useApiData(
+  const { data, error, loading, refreshing, reload } = useApiData(
     () =>
       api.complaints.list({
         search: search || undefined,
@@ -336,6 +336,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
               emptyText={
                 filters.escalated === "any" ? "No escalated complaints found." : "No complaints are currently escalated to you."
               }
+              onActionCompleted={reload}
             />
           </Card>
         )}

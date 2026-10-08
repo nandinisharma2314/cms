@@ -495,3 +495,73 @@ def get_potential_duplicates(
     from services.complaint_service import find_potential_duplicates
     return find_potential_duplicates(ctx.db, complaint)
 
+
+class BulkActionRequest(BaseModel):
+    complaint_ids: list[str]
+    action_type: str  # "assign" | "status" | "priority"
+    assignee_id: int | None = None
+    assignee_reason: str | None = None
+    workflow_action: str | None = None
+    workflow_note: str | None = None
+    priority_id: int | None = None
+    priority_reason: str | None = None
+
+
+@router.post("/bulk-action")
+def bulk_complaint_action(
+    payload: BulkActionRequest,
+    request: Request,
+    ctx: AccessContext = Depends(require_permission("complaint.view")),
+):
+    """Executes bulk assignment, status updates, or priority changes across multiple complaints."""
+    updated: list[str] = []
+    failed: list[dict[str, str]] = []
+
+    for cid in payload.complaint_ids:
+        try:
+            complaint = _get_scoped(ctx, cid)
+            if payload.action_type == "assign":
+                if not (ctx.has("complaint.assign") or ctx.has("complaint.reassign")):
+                    raise HTTPException(status.HTTP_403_FORBIDDEN, "Missing permission to assign complaints")
+                if payload.assignee_id is not None:
+                    assignee = routing_service.manual_assign(ctx, complaint, payload.assignee_id, payload.assignee_reason or "Bulk reassignment")
+                    audit_service.record(
+                        ctx.db, actor=ctx.user, action="complaint.reassign", entity_type="complaint",
+                        entity_id=complaint.generated_id, summary=f"{complaint.generated_id} bulk assigned to {assignee.name}",
+                        request=request
+                    )
+            elif payload.action_type == "status":
+                if payload.workflow_action:
+                    old_status = complaint.status
+                    workflow_service.apply_staff_action(ctx, complaint, payload.workflow_action, payload.workflow_note)
+                    audit_service.record(
+                        ctx.db, actor=ctx.user, action=f"complaint.{payload.workflow_action}", entity_type="complaint",
+                        entity_id=complaint.generated_id,
+                        summary=f"{complaint.generated_id}: {status_label(old_status)} -> {status_label(complaint.status)}",
+                        changes={"status": [old_status, complaint.status]}, request=request,
+                    )
+            elif payload.action_type == "priority":
+                if not ctx.has("complaint.reclassify"):
+                    raise HTTPException(status.HTTP_403_FORBIDDEN, "Missing permission to reclassify priority")
+                if payload.priority_id is not None:
+                    reclassify(
+                        ctx, complaint,
+                        department_id=complaint.department_id,
+                        category_id=complaint.category_id,
+                        location_id=complaint.location_id,
+                        priority_id=payload.priority_id,
+                        reason=payload.priority_reason or "Bulk priority adjustment",
+                    )
+                    audit_service.record(
+                        ctx.db, actor=ctx.user, action="complaint.reclassify", entity_type="complaint",
+                        entity_id=complaint.generated_id,
+                        summary=f"{complaint.generated_id} bulk priority updated to {complaint.priority.name if complaint.priority else ''}",
+                        request=request,
+                    )
+            updated.append(cid)
+        except Exception as e:
+            failed.append({"id": cid, "error": str(e)})
+
+    ctx.db.commit()
+    return {"updated_count": len(updated), "updated_ids": updated, "failed": failed}
+
