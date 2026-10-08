@@ -30,7 +30,7 @@ from services.location_service import create_location, find_child, is_usable, lo
 from services.phone_service import phone_format
 from utils.security import normalize_email, utcnow
 
-END_USER_COLUMNS = ["user_id", "name", "mobile", "email"]
+END_USER_COLUMNS = ["user_id", "name", "mobile", "email", "aadhar", "pan_card"]
 # Every column the end-user import reads besides the location levels ("external_id" is accepted for "user_id").
 END_USER_KEY_COLUMNS = (*END_USER_COLUMNS, "external_id")
 LOOKUP_CHUNK = 500

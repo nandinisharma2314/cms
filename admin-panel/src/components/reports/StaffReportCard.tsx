@@ -67,7 +67,16 @@ export function StaffReportCard({ staff, config, type = "agents" }: { staff: Per
   const strokeDashoffset = circumference - (ratingOutOf5 / 5.0) * circumference;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 print:p-0 font-sans text-slate-800 page-break">
+    <table className="w-full page-break">
+      <thead className="hidden print:table-header-group">
+        <tr>
+          <td><div className="h-10"></div></td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <div className="max-w-4xl mx-auto p-6 print:px-8 print:py-0 font-sans text-slate-800">
       <div className="flex items-start justify-between border-b-2 border-slate-200 pb-4 mb-4">
         <div className="flex items-center">
           <div>
@@ -85,13 +94,6 @@ export function StaffReportCard({ staff, config, type = "agents" }: { staff: Per
           </div>
         </div>
         <div className="text-right flex flex-col items-end gap-1">
-          {type === "agents" ? (
-            <div className="text-sm font-medium text-slate-500 uppercase">Ref: {staff.emp_id || `Emp_${staff.id}`}</div>
-          ) : type === "departments" ? (
-            <div className="text-sm font-medium text-slate-500 uppercase">Ref: DEPT_{staff.id}</div>
-          ) : (
-            <div className="text-sm font-medium text-slate-500 uppercase">Ref: LOC_{staff.id}</div>
-          )}
           <div className="text-sm font-bold text-red-600 tracking-wider">CONFIDENTIAL</div>
         </div>
       </div>
@@ -260,9 +262,64 @@ export function StaffReportCard({ staff, config, type = "agents" }: { staff: Per
         </div>
       </div>
 
+      <StaffComplaints complaints={staff.recent_complaints} />
+
       <div className="mt-8 flex justify-between items-center text-[9px] font-semibold text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4">
         <div>Generated: {new Date().toLocaleString()}</div>
         <div>{config.organisation_name || "KVON TECH"} ERP • PERFORMANCE REVIEW</div>
+      </div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot className="hidden print:table-footer-group">
+        <tr>
+          <td><div className="h-10"></div></td>
+        </tr>
+      </tfoot>
+    </table>
+  );
+}
+
+function StaffComplaints({ complaints }: { complaints?: any[] }) {
+  if (!complaints) return null;
+
+  return (
+    <div className="border border-slate-200 rounded-lg p-5 mb-4 bg-white shadow-sm mt-6 print:break-before-page">
+      <h3 className="text-lg font-bold text-slate-900 mb-4">Assigned Complaints</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">ID</th>
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Title</th>
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Status</th>
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {complaints.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-4 text-center text-slate-500 text-sm">
+                  No complaints assigned in this period.
+                </td>
+              </tr>
+            ) : (
+              complaints.map((c: any) => (
+                <tr key={c.id} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 text-slate-500">{c.generated_id}</td>
+                  <td className="py-2 font-medium text-slate-900">{c.title}</td>
+                  <td className="py-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                      {c.status_label || c.status}
+                    </span>
+                  </td>
+                  <td className="py-2 text-slate-500">{new Date(c.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

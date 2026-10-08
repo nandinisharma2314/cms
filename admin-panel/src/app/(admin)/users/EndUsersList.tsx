@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Download, FileSpreadsheet, Pencil, Power, UserPlus } from "lucide-react";
+import { Download, FileSpreadsheet, Pencil, Power, UserPlus, Search } from "lucide-react";
 import Link from "next/link";
 import { api, EndUserRow } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
@@ -206,7 +206,14 @@ export function EndUsersList() {
   const { can } = useSession();
   const { ui, otp } = useConfig();
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const pageParam = searchParams.get("page");
+  const page = pageParam ? parseInt(pageParam, 10) : 1;
+  const setPage = (p: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (p === 1) params.delete("page");
+    else params.set("page", p.toString());
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState<{ editing: EndUserRow | null } | null>(null);
   // The "Import end users" quick action links here with ?import=1
@@ -248,12 +255,27 @@ export function EndUsersList() {
   };
 
   return (
-    <>
-      <PageHeader
+    <div className="flex flex-col h-full">
+      <div className="shrink-0">
+        <PageHeader
         title="End users"
         description={`People who sign in to the end-user portal with a one-time code sent to their ${channelNames(otp.channels)}.`}
         actions={
           <>
+            <div className="relative group">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" />
+              <input
+                type="search"
+                className={`${inputClass} pl-9 pr-4 py-2 w-56 focus:w-72 transition-all bg-white shadow-sm border-slate-200`}
+                placeholder="Search users..."
+                aria-label="Search end users"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
             <button className={secondaryButtonClass} onClick={() => run(() => api.endUsers.exportCsv(term || undefined))}>
               <Download className="w-3.5 h-3.5" /> Export CSV
             </button>
@@ -270,23 +292,14 @@ export function EndUsersList() {
           </>
         }
       />
-      <input
-        type="search"
-        className={`${inputClass} sm:max-w-xs my-6`}
-        placeholder="Search name, mobile, email or user ID"
-        aria-label="Search end users"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setPage(1);
-        }}
-      />
       <ErrorBanner message={actionError ?? loadError ?? referenceError} />
       <Notice message={notice} />
 
-      <Card className="relative overflow-x-auto">
-        <table className="w-full min-w-215 text-left text-xs">
-          <thead>
+      </div>
+
+      <Card className="mt-4 overflow-x-auto overflow-y-auto flex-1 min-h-0 mb-4 relative">
+        <table className="w-full min-w-215 text-left text-xs relative">
+          <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
             <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider">
               <th className="px-4 py-5 font-semibold">Name</th>
               <th className="px-4 py-5 font-semibold">Mobile</th>
@@ -350,7 +363,11 @@ export function EndUsersList() {
           </tbody>
         </table>
       </Card>
-      {data && <Pagination page={page} pageSize={data.page_size} total={data.total} noun="end users" onPage={setPage} />}
+      {data && (
+        <div className="shrink-0 mt-2 mb-4">
+          <Pagination page={page} pageSize={data.page_size} total={data.total} noun="end users" onPage={setPage} />
+        </div>
+      )}
 
       {form && reference && (
         <EndUserForm
@@ -379,6 +396,6 @@ export function EndUsersList() {
           />
         </Modal>
       )}
-    </>
+    </div>
   );
 }

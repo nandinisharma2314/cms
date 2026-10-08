@@ -4,12 +4,56 @@
 import React, { useEffect, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, Printer } from "lucide-react";
-import { api, PerformanceRow } from "@/lib/api";
+import { api, PerformanceRow, ComplaintData } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatHours } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
 import { RequirePermission } from "@/components/RequirePermission";
 import { ErrorBanner, Spinner } from "@/components/ui";
+
+function StaffComplaints({ complaints }: { complaints?: ComplaintData[] }) {
+  if (!complaints) return null;
+
+  return (
+    <div className="border border-slate-200 rounded-lg p-5 mb-4 bg-white shadow-sm mt-6 print:break-before-page">
+      <h3 className="text-lg font-bold text-slate-900 mb-4">Assigned Complaints</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">ID</th>
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Title</th>
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Status</th>
+              <th className="pb-2 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {complaints.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-4 text-center text-slate-500 text-sm">
+                  No complaints assigned in this period.
+                </td>
+              </tr>
+            ) : (
+              complaints.map((c: ComplaintData) => (
+                <tr key={c.id} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 text-slate-500">{c.generated_id}</td>
+                  <td className="py-2 font-medium text-slate-900">{c.title}</td>
+                  <td className="py-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                      {c.status_label || c.status}
+                    </span>
+                  </td>
+                  <td className="py-2 text-slate-500">{new Date(c.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function ReportContent({ id }: { id: number }) {
   const searchParams = useSearchParams();
@@ -74,7 +118,14 @@ function ReportContent({ id }: { id: number }) {
         </button>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6 print:p-0 font-sans text-slate-800">
+      <table className="w-full">
+        <thead className="hidden print:table-header-group">
+          <tr><td><div className="h-10"></div></td></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div className="max-w-4xl mx-auto p-6 print:px-8 print:py-0 font-sans text-slate-800">
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-slate-200 pb-4 mb-4">
           <div className="flex items-center">
@@ -93,7 +144,6 @@ function ReportContent({ id }: { id: number }) {
             </div>
           </div>
           <div className="text-right flex flex-col items-end gap-1">
-            <div className="text-sm font-medium text-slate-500 uppercase">Ref: {staff.emp_id || `Emp_${staff.id}`}</div>
             <div className="text-sm font-bold text-red-600 tracking-wider">CONFIDENTIAL</div>
           </div>
         </div>
@@ -255,36 +305,44 @@ function ReportContent({ id }: { id: number }) {
           </div>
         </div>
 
+        <StaffComplaints complaints={staff.recent_complaints} />
+
         {/* Footer */}
         <div className="mt-6 flex justify-between items-center text-[9px] font-semibold text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4">
           <div>Generated: {new Date().toLocaleString()}</div>
           <div>{config.organisation_name || "KVON TECH"} ERP • PERFORMANCE REVIEW</div>
         </div>
-      </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot className="hidden print:table-footer-group">
+          <tr><td><div className="h-10"></div></td></tr>
+        </tfoot>
+      </table>
 
       {/* Print specific styles */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
         @media print {
-          body * {
-            visibility: hidden;
+          aside, header {
+            display: none !important;
           }
           .print\\:hidden {
             display: none !important;
           }
-          .max-w-4xl, .max-w-4xl * {
-            visibility: visible;
+          html, body, .h-screen, .overflow-hidden, .overflow-y-auto, [class*="overflow-"] {
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
           }
           .max-w-4xl {
-            position: absolute;
-            left: 0;
-            top: 0;
             width: 100%;
             padding: 10px 20px;
             box-shadow: none !important;
           }
-          @page { margin: 0.5cm; }
+          @page { margin: 0; }
           .bg-white, .bg-slate-50 {
             background-color: white !important;
             -webkit-print-color-adjust: exact;

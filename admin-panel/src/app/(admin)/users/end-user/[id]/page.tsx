@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, Mail, MapPin, Phone, ShieldAlert, User as UserIcon, XCircle, CreditCard } from "lucide-react";
 import { api, EndUserProfileResponse } from "@/lib/api";
@@ -55,6 +55,7 @@ function KpiTile({
 
 function EndUserProfileContent() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params.id);
 
   const [statusFilter, setStatusFilter] = useState("all");
@@ -92,7 +93,7 @@ function EndUserProfileContent() {
     return (
       <div className="p-8 max-w-lg mx-auto">
         <ErrorBanner message={error ?? "Failed to load profile"} />
-        <Link href="/users" className="text-sm text-sky-600 hover:underline mt-4 inline-block">
+        <Link href="/users?tab=end-users" className="text-sm text-sky-600 hover:underline mt-4 inline-block">
           &larr; Back to users
         </Link>
       </div>
@@ -105,12 +106,12 @@ function EndUserProfileContent() {
     <div className="flex flex-col h-[calc(100vh-8.5rem)]">
       {/* Header & Navigation */}
       <div className="flex-none flex items-center gap-4 pb-4">
-        <Link
-          href="/users"
+        <button
+          onClick={() => router.back()}
           className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-        </Link>
+        </button>
         <div>
           <h1 className="text-2xl font-bold text-slate-900 leading-tight">{user.name}</h1>
           <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">

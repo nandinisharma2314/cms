@@ -562,7 +562,14 @@ function UsersList() {
   const { ui } = useConfig();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
+  const pageParam = searchParams.get("page");
+  const page = pageParam ? parseInt(pageParam, 10) : 1;
+  const setPage = (p: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (p === 1) params.delete("page");
+    else params.set("page", p.toString());
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<StaffUser | null>(null);
@@ -791,8 +798,10 @@ function UsersList() {
   );
 }
 
-export default function UsersPage() {
-  const [activeTab, setActiveTab] = useState<"staff" | "end-users">("staff");
+function UsersPageContent() {
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") === "end-users" ? "end-users" : "staff";
+  const [activeTab, setActiveTab] = useState<"staff" | "end-users">(defaultTab);
 
   return (
     <div className="flex flex-col h-[calc(100vh-130px)] -mt-5 sm:-mt-2">
@@ -835,5 +844,13 @@ export default function UsersPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense>
+      <UsersPageContent />
+    </Suspense>
   );
 }

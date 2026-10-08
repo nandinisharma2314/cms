@@ -578,6 +578,7 @@ export interface PerformanceRow {
   sla_breaches: number;
   avg_rating: number | null;
   reopened: number;
+  recent_complaints?: ComplaintData[];
 }
 
 export type ReportQuery = {
@@ -1096,7 +1097,7 @@ export const api = {
       filters: {
         status_filter?: string;
         group?: StatusGroup | "";
-        assigned?: "me" | "unassigned" | "";
+        assigned?: "me" | "unassigned" | string;
         priority_ids?: string;
         department_id?: number;
         location_id?: number;

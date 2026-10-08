@@ -286,7 +286,7 @@ function Reports() {
   const trend = overview.data?.trend;
 
   return (
-    <div className="space-y-4 -mt-5 sm:-mt-2">
+    <div id="reports-dashboard" className="space-y-4 -mt-5 sm:-mt-2">
       <PageHeader
         title="Reports"
         description="Complaints submitted in the chosen period, inside your department and location scope."
@@ -523,7 +523,7 @@ function Reports() {
 
       {/* Print-only layout */}
       {(printStaffId !== null || printAllStaff) && table.data && (
-        <div className="hidden print:block absolute top-0 left-0 w-full bg-white z-50">
+        <div className="hidden print:block w-full bg-white z-50">
           {printAllStaff
             ? table.data
                 .filter((r) => r.id !== null)
@@ -536,9 +536,15 @@ function Reports() {
               __html: `
             @page { margin: 0; }
             @media print {
-              body * { visibility: hidden; }
-              .print\\:block, .print\\:block * { visibility: visible; }
-              .print\\:block { position: absolute; left: 0; top: 0; width: 100%; padding: 1cm; }
+              aside, header, nav { display: none !important; }
+              #reports-dashboard > :not(.print\\:block) { display: none !important; }
+              html, body, .h-screen, .overflow-hidden, .overflow-y-auto, [class*="overflow-"] {
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                position: static !important;
+              }
+              .print\\:block { width: 100%; }
               .page-break { page-break-after: always; break-after: page; }
               .page-break:last-child { page-break-after: auto; break-after: auto; }
               /* Hide Next.js dev overlay just in case */

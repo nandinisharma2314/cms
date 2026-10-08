@@ -11,7 +11,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isHome = usePathname() === "/dashboard";
   return (
     <div className="relative mx-auto flex w-full max-w-6xl flex-1 overflow-hidden bg-white font-sans">
-      <main className="relative z-10 flex h-full flex-1 flex-col overflow-y-auto pb-20 md:pb-0">
+      <main className="relative z-10 flex h-full flex-1 flex-col overflow-y-auto pb-32 md:pb-0">
         <TopHeader hideOnMobile={isHome} />
         {children}
       </main>

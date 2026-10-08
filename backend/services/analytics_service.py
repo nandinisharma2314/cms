@@ -114,6 +114,8 @@ class Row:
     escalated: bool
     rating: int | None
     reopen_count: int
+    generated_id: str
+    title: str
     response_breached: bool = False
     resolution_breached: bool = False
 
@@ -126,6 +128,7 @@ def load_rows(ctx: AccessContext, filters: Filters) -> list[Row]:
             Complaint.status, Complaint.created_at, Complaint.acknowledged_at, Complaint.resolved_at,
             Complaint.response_due_at, Complaint.resolution_due_at, Complaint.sla_paused_at,
             Complaint.escalated_to_id, Complaint.feedback_rating, Complaint.reopen_count,
+            Complaint.generated_id, Complaint.title,
         )
         .join(Location, Complaint.location_id == Location.id)
         .filter(Complaint.created_at >= filters.start, Complaint.created_at < filters.end)
@@ -143,7 +146,7 @@ def load_rows(ctx: AccessContext, filters: Filters) -> list[Row]:
             id=r[0], department_id=r[1], location_id=r[2], location_path=r[3], assignee_id=r[4], status=r[5],
             created_at=r[6], acknowledged_at=r[7], resolved_at=r[8], response_due_at=r[9],
             resolution_due_at=r[10], sla_paused=r[11] is not None, escalated=r[12] is not None,
-            rating=r[13], reopen_count=r[14],
+            rating=r[13], reopen_count=r[14], generated_id=r[15], title=r[16]
         )
         for r in query.all()
     ]
@@ -346,6 +349,16 @@ def by_agent(db: Session, rows: list[Row]) -> list[dict]:
                 "location": loc_str,
                 "emp_id": f"Emp_{user.id}",
                 "superior_name": user.reports_to.name if user.reports_to else None,
+                "recent_complaints": [
+                    {
+                        "id": c.id,
+                        "generated_id": c.generated_id,
+                        "title": c.title,
+                        "status": c.status,
+                        "status_label": c.status.replace("_", " ").title(),
+                        "created_at": c.created_at.isoformat()
+                    } for c in group
+                ]
             }))
     return sorted(result, key=lambda r: (r["id"] is None, -r["total"]))
 

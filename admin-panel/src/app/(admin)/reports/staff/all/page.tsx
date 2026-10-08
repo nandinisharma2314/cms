@@ -93,7 +93,6 @@ function StaffReportCard({ staff, config }: { staff: PerformanceRow; config: any
           </div>
         </div>
         <div className="text-right flex flex-col items-end gap-1">
-          <div className="text-sm font-medium text-slate-500 uppercase">Ref: {staff.emp_id || `Emp_${staff.id}`}</div>
           <div className="text-sm font-bold text-red-600 tracking-wider">CONFIDENTIAL</div>
         </div>
       </div>
@@ -303,19 +302,18 @@ function AllReportsContent() {
         dangerouslySetInnerHTML={{
           __html: `
         @media print {
-          body * {
-            visibility: hidden;
+          aside, header {
+            display: none !important;
           }
           .print\\:hidden {
             display: none !important;
           }
-          .print-container, .print-container * {
-            visibility: visible;
+          html, body, .h-screen, .overflow-hidden, .overflow-y-auto, [class*="overflow-"] {
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
           }
           .print-container {
-            position: absolute;
-            left: 0;
-            top: 0;
             width: 100%;
           }
           .page-break {
@@ -329,7 +327,7 @@ function AllReportsContent() {
             page-break-after: auto;
             break-after: auto;
           }
-          @page { margin: 0.5cm; }
+          @page { margin: 0; }
           .bg-white, .bg-slate-50 {
             background-color: white !important;
             -webkit-print-color-adjust: exact;
