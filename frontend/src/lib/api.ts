@@ -585,6 +585,55 @@ export interface PerformanceRow {
   recent_complaints?: ComplaintData[];
 }
 
+export interface RewardQuest {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  current: number;
+  target: number;
+  reward_points: number;
+  completed: boolean;
+  progress_pct: number;
+}
+
+export interface DepartmentCupEntry {
+  department_id: number;
+  department_name: string;
+  total_points: number;
+  total_resolved: number;
+  on_time_count: number;
+  sla_compliance_pct: number;
+  top_performer: string | null;
+  rank: number;
+  trophy: string;
+}
+
+export interface PublicScorecard {
+  citywide_sla_compliance_pct: number;
+  total_complaints_registered: number;
+  total_complaints_resolved: number;
+  average_turnaround_hours: number;
+  citizen_satisfaction_rating: number;
+  departments: {
+    name: string;
+    total_complaints: number;
+    resolved_complaints: number;
+    resolution_rate_pct: number;
+  }[];
+}
+
+export interface PotentialDuplicate {
+  id: number;
+  generated_id: string;
+  title: string;
+  status: string;
+  location_name: string | null;
+  created_at: string | null;
+  similarity_score: number;
+  matching_terms: string[];
+}
+
 export type ReportQuery = {
   date_from?: string;
   date_to?: string;
@@ -1288,6 +1337,8 @@ export const api = {
       end_user_name: string | null;
       end_user_phone: string | null;
     }) => request<{ id: string; assignee: string | null }>("/complaints/quick-create", { method: "POST", body: data }),
+    potentialDuplicates: (id: string | number) =>
+      request<PotentialDuplicate[]>(`/complaints/${encodeURIComponent(String(id))}/potential-duplicates`),
   },
   users: {
     list: (query: { search?: string; role_id?: number; page?: number; page_size?: number } = {}) =>
@@ -1591,5 +1642,8 @@ export const api = {
         "/rewards/admin/backfill",
         { method: "POST" },
       ),
+    listQuests: () => request<RewardQuest[]>("/rewards/quests"),
+    departmentLeaderboard: () => request<DepartmentCupEntry[]>("/rewards/departments"),
   },
+  publicScorecard: () => request<PublicScorecard>("/scorecard"),
 };

@@ -5,7 +5,9 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Award,
+  Building2,
   Calendar,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -14,7 +16,9 @@ import {
   Flame,
   Gift,
   MapPin,
+  Minus,
   Plus,
+  Printer,
   RotateCcw,
   Search,
   TrendingUp,
@@ -25,10 +29,13 @@ import {
 import {
   api,
   Department,
+  DepartmentCupEntry,
   LeaderboardEntry,
   LocationNode,
   Paged,
+  PublicScorecard,
   RewardPerk,
+  RewardQuest,
   RewardRedemption,
   RewardStats,
   RewardTransaction,
@@ -88,6 +95,13 @@ function RuleBadge({ rule }: { rule: string }) {
   );
 }
 
+function formatPoints(points: number | string): string {
+  const n = Number(points);
+  if (isNaN(n) || n === 0) return "0";
+  if (n > 0) return `+${n}`;
+  return `-${Math.abs(n)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Celebration Modal
 // ---------------------------------------------------------------------------
@@ -125,7 +139,97 @@ function CelebrationModal({
 }
 
 // ---------------------------------------------------------------------------
-// Manual Point Adjustment Modal
+// Certificate of Excellence Modal
+// ---------------------------------------------------------------------------
+function CertificateModal({
+  userName,
+  tier,
+  onClose,
+}: {
+  userName: string;
+  tier: { current_tier: string; badge: string };
+  onClose: () => void;
+}) {
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const todayStr = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs print:p-0 print:bg-white animate-in fade-in">
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-4 border-amber-300 p-8 relative overflow-hidden print:border-none print:shadow-none print:p-4">
+        <div className="absolute top-3 left-3 text-2xl select-none opacity-40">⚜️</div>
+        <div className="absolute top-3 right-3 text-2xl select-none opacity-40">⚜️</div>
+        <div className="absolute bottom-3 left-3 text-2xl select-none opacity-40">⚜️</div>
+        <div className="absolute bottom-3 right-3 text-2xl select-none opacity-40">⚜️</div>
+
+        <div className="text-center space-y-1">
+          <p className="text-[11px] font-black uppercase tracking-widest text-amber-700">CivicCare Municipal Service Excellence</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">CERTIFICATE OF RECOGNITION</h2>
+          <p className="text-xs text-slate-500 italic">Official Performance & Public Redressal Honor</p>
+        </div>
+
+        <div className="w-24 h-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full mx-auto my-4" />
+
+        <div className="text-center my-6 space-y-3">
+          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">This certificate is proudly awarded to</p>
+          <h3 className="text-3xl font-black text-slate-900 underline decoration-amber-400 decoration-wavy decoration-1 underline-offset-8">
+            {userName}
+          </h3>
+          <p className="text-xs text-slate-600 max-w-md mx-auto pt-2 leading-relaxed">
+            In recognition of exemplary commitment to citizen complaint resolution, continuous high SLA turnaround, and attaining the elite standing of:
+          </p>
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-50 border border-amber-300/80 shadow-xs">
+            <span className="text-2xl">{tier.badge}</span>
+            <span className="text-lg font-black text-amber-900">{tier.current_tier}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-6 text-xs text-slate-500">
+          <div>
+            <p className="font-bold text-slate-700">CivicCare Commission</p>
+            <p className="text-[10px] text-slate-400">Public Grievance Redressal</p>
+          </div>
+          <div className="text-center">
+            <div className="w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-400 flex items-center justify-center text-lg mx-auto mb-1">
+              🎖️
+            </div>
+            <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Verified & Certified</p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-slate-700">Date Issued</p>
+            <p className="text-[10px] text-slate-400">{todayStr}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 mt-8 pt-4 border-t border-slate-100 print:hidden">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Printer className="w-4 h-4" /> Print / Save PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Manual Point Adjustment Modal (Add & Deduct Modes)
 // ---------------------------------------------------------------------------
 function ManualAdjustmentModal({
   users,
@@ -137,19 +241,33 @@ function ManualAdjustmentModal({
   onAdjusted: () => void;
 }) {
   const [selectedUserId, setSelectedUserId] = useState<number | "">("");
-  const [points, setPoints] = useState<number>(50);
-  const [description, setDescription] = useState("");
+  const [mode, setMode] = useState<"add" | "deduct">("add");
+  const [amount, setAmount] = useState<number>(50);
+  const [category, setCategory] = useState<string>("Exceptional Performance Bonus");
+  const [notes, setNotes] = useState<string>("");
   const action = useAction();
+
+  const handleModeChange = (newMode: "add" | "deduct") => {
+    setMode(newMode);
+    if (newMode === "add") {
+      setCategory("Exceptional Performance Bonus");
+    } else {
+      setCategory("SLA Negligence / Delay");
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUserId || !description.trim()) return;
+    if (!selectedUserId || !notes.trim()) return;
+
+    const signedPoints = mode === "deduct" ? -Math.abs(amount) : Math.abs(amount);
+    const fullDesc = category ? `${category}: ${notes.trim()}` : notes.trim();
 
     action.run(async () => {
       await api.rewards.adjustPoints({
         user_id: Number(selectedUserId),
-        points: Number(points),
-        description: description.trim(),
+        points: signedPoints,
+        description: fullDesc,
       });
       onAdjusted();
       onClose();
@@ -157,21 +275,53 @@ function ManualAdjustmentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-amber-600" />
-            <h3 className="text-sm font-bold text-slate-900">Manual Reward / Point Adjustment</h3>
+            <h3 className="text-sm font-bold text-slate-900">Manual Point Adjustment</h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 cursor-pointer">
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <ErrorBanner message={action.error} />
 
+          {/* Action Mode Toggle */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Adjustment Action</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleModeChange("add")}
+                className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                  mode === "add"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 ring-2 ring-emerald-400/50 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <Plus className="w-4 h-4 text-emerald-600" />
+                <span>Add Points (Bonus)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange("deduct")}
+                className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                  mode === "deduct"
+                    ? "bg-rose-50 text-rose-800 border-rose-300 ring-2 ring-rose-400/50 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <Minus className="w-4 h-4 text-rose-600" />
+                <span>Deduct Points (Penalty)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Staff User */}
           <Field label="Staff Member">
             <select
               className={inputClass}
@@ -188,22 +338,61 @@ function ManualAdjustmentModal({
             </select>
           </Field>
 
-          <Field label="Points to Grant / Deduct" hint="Positive to award, negative to deduct">
-            <input
-              type="number"
-              className={inputClass}
-              value={points}
-              onChange={(e) => setPoints(Number(e.target.value))}
-              required
-            />
+          {/* Points Amount with clear +/- indicator */}
+          <Field
+            label={mode === "add" ? "Points to Add" : "Points to Deduct"}
+            hint={mode === "add" ? "Points will be credited to balance & lifetime" : "Points will be deducted and tier/badge will recalibrate"}
+          >
+            <div className="relative">
+              <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-black text-sm ${mode === "add" ? "text-emerald-600" : "text-rose-600"}`}>
+                {mode === "add" ? "+" : "-"}
+              </div>
+              <input
+                type="number"
+                min="1"
+                className={`${inputClass} pl-8 font-bold text-slate-800`}
+                value={amount}
+                onChange={(e) => setAmount(Math.max(1, Math.abs(Number(e.target.value) || 0)))}
+                required
+              />
+            </div>
           </Field>
 
-          <Field label="Reason / Justification" hint="Required for audit and recipient notification">
+          {/* Preset Reason Category */}
+          <Field label="Reason Category">
+            <select
+              className={inputClass}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              required
+            >
+              {mode === "add" ? (
+                <>
+                  <option value="Exceptional Performance Bonus">Exceptional Performance Bonus</option>
+                  <option value="Emergency / Night Shift Heroics">Emergency / Night Shift Heroics</option>
+                  <option value="Citizen Commendation">Exemplary Citizen Feedback</option>
+                  <option value="Management Discretionary Award">Management Discretionary Award</option>
+                  <option value="Other">Other Custom Award</option>
+                </>
+              ) : (
+                <>
+                  <option value="SLA Negligence / Delay">SLA Negligence / Delay Penalty</option>
+                  <option value="Premature Resolution Correction">Premature Resolution Correction</option>
+                  <option value="Citizen Misconduct Penalty">Citizen Misconduct Penalty</option>
+                  <option value="Administrative Error Correction">Administrative Error Correction</option>
+                  <option value="Other">Other Custom Penalty</option>
+                </>
+              )}
+            </select>
+          </Field>
+
+          {/* Details / Justification */}
+          <Field label="Detailed Explanation" hint="Recorded in permanent audit log and sent to employee">
             <input
               className={inputClass}
-              placeholder="e.g. Outstanding work during emergency night flood response"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              placeholder={mode === "add" ? "e.g. Cleared emergency flood complaints during storm warning" : "e.g. Marked ticket resolved before actual repairs were verified"}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               required
             />
           </Field>
@@ -212,8 +401,16 @@ function ManualAdjustmentModal({
             <button type="button" onClick={onClose} className={secondaryButtonClass} disabled={action.busy}>
               Cancel
             </button>
-            <button type="submit" className={primaryButtonClass} disabled={action.busy || !selectedUserId}>
-              {action.busy ? "Granting…" : "Apply Adjustment"}
+            <button
+              type="submit"
+              disabled={action.busy || !selectedUserId}
+              className={`py-2 px-4 rounded-xl text-xs font-bold text-white shadow-xs cursor-pointer disabled:opacity-50 transition-all ${
+                mode === "add"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-rose-600 hover:bg-rose-700"
+              }`}
+            >
+              {action.busy ? "Applying…" : mode === "add" ? "Add Points" : "Deduct Points"}
             </button>
           </div>
         </form>
@@ -230,12 +427,18 @@ export default function RewardsPage() {
   const isSuperAdmin = me.is_super_admin;
   const canManage = can("rewards.manage") || isSuperAdmin;
 
-  const [activeTab, setActiveTab] = useState<"leaderboard" | "perks" | "audit">("leaderboard");
+  const [activeTab, setActiveTab] = useState<"leaderboard" | "department_cup" | "scorecard" | "perks" | "audit">("leaderboard");
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [certificateOpen, setCertificateOpen] = useState(false);
   const [celebration, setCelebration] = useState<{ title: string; message: string; badge?: string } | null>(null);
 
   // My Summary
   const { data: mySummary, reload: reloadMySummary } = useApiData<RewardUserSummary>(() => api.rewards.myRewards(), [me.id]);
+
+  // Quests, Department Cup & Public Scorecard
+  const { data: quests, reload: reloadQuests } = useApiData<RewardQuest[]>(() => api.rewards.listQuests(), [me.id]);
+  const { data: deptCup, loading: deptCupLoading, reload: reloadDeptCup } = useApiData<DepartmentCupEntry[]>(() => api.rewards.departmentLeaderboard(), []);
+  const { data: scorecard, loading: scorecardLoading, reload: reloadScorecard } = useApiData<PublicScorecard>(() => api.publicScorecard(), []);
 
   // Support / Option data
   const { data: departments } = useApiData<Department[]>(() => api.departments.list(), []);
@@ -385,6 +588,9 @@ export default function RewardsPage() {
     reloadLeaderboard();
     reloadAudit();
     reloadStats();
+    reloadQuests();
+    reloadDeptCup();
+    reloadScorecard();
     setCelebration({
       title: "Adjustment Applied!",
       message: "Points have been successfully recorded in the audit trail.",
@@ -532,21 +738,111 @@ export default function RewardsPage() {
                     <span className="text-purple-700 font-bold">Top Tier Reached! 👑</span>
                   )}
                 </div>
+                <div className="mt-2 pt-2 border-t border-indigo-100/80 flex items-center justify-between">
+                  <span className="text-[10px] text-indigo-700 font-semibold">Excellence Award</span>
+                  <button
+                    type="button"
+                    onClick={() => setCertificateOpen(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 cursor-pointer hover:underline"
+                  >
+                    <span>📜 Certificate</span>
+                  </button>
+                </div>
               </Card>
             )}
           </div>
         )}
 
+        {/* Monthly Performance Quests & Missions */}
+        {quests && quests.length > 0 && (
+          <Card className="p-4 rounded-2xl border-indigo-100/80 bg-gradient-to-r from-blue-50/50 via-indigo-50/30 to-purple-50/40 shadow-xs">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎯</span>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Monthly Milestone Quests & Challenges
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                Resets on 1st of month
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {quests.map((q) => (
+                <div
+                  key={q.id}
+                  className={`p-3.5 rounded-xl border bg-white flex flex-col justify-between transition-all ${
+                    q.completed ? "border-emerald-300 ring-2 ring-emerald-400/30 shadow-xs" : "border-slate-200/80"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">{q.icon}</span>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-800">{q.title}</h4>
+                          <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{q.description}</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 shrink-0">
+                        +{q.reward_points} 🪙
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[10px] text-slate-600 font-semibold mb-1">
+                      <span>{q.completed ? "Completed! 🏆" : "Progress"}</span>
+                      <span>
+                        {q.current} / {q.target}
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-1.5 rounded-full transition-all duration-500 ${
+                          q.completed ? "bg-emerald-500" : "bg-blue-600"
+                        }`}
+                        style={{ width: `${Math.min(100, q.progress_pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* 2. Main Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
           <button
             type="button"
             onClick={() => setActiveTab("leaderboard")}
             className={tabClass(activeTab === "leaderboard")}
           >
             <span className="flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
+              <Trophy className="w-4 h-4 text-amber-600" />
               Leaderboard & Rankings
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("department_cup")}
+            className={tabClass(activeTab === "department_cup")}
+          >
+            <span className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-indigo-600" />
+              Department Cup
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("scorecard")}
+            className={tabClass(activeTab === "scorecard")}
+          >
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Civic Scorecard
             </span>
           </button>
 
@@ -557,7 +853,7 @@ export default function RewardsPage() {
           >
             <span className="flex items-center gap-2">
               <Gift className="w-4 h-4 text-fuchsia-600" />
-              Perks & Rewards Redemption
+              Perks Redemption
             </span>
           </button>
 
@@ -568,8 +864,8 @@ export default function RewardsPage() {
               className={tabClass(activeTab === "audit")}
             >
               <span className="flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Super Admin Rewards Audit
+                <Filter className="w-4 h-4 text-blue-600" />
+                Rewards Audit & Intelligence
               </span>
             </button>
           )}
@@ -761,7 +1057,7 @@ export default function RewardsPage() {
                             <td className="py-3 px-4 text-center text-slate-700 font-semibold">{row.on_time_count}</td>
                             <td className="py-3 px-4 text-center text-amber-600 font-semibold">{row.five_star_count}</td>
                             <td className="py-3 px-4 text-right font-black text-amber-700 text-sm">
-                              +{row.points} 🪙
+                              {formatPoints(row.points)} 🪙
                             </td>
                           </tr>
                         );
@@ -793,12 +1089,309 @@ export default function RewardsPage() {
                         </div>
                       </div>
                       <span className={`font-black text-sm ${t.points >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                        {t.points >= 0 ? `+${t.points}` : t.points} 🪙
+                        {formatPoints(t.points)} 🪙
                       </span>
                     </div>
                   ))}
                 </div>
               </Card>
+            )}
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* TAB 2: INTER-DEPARTMENT CHAMPIONSHIP CUP                          */}
+        {/* ================================================================= */}
+        {activeTab === "department_cup" && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-100/30 to-amber-50/10 border border-amber-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-xs">
+                  🏆
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Inter-Department Championship Cup</h3>
+                  <p className="text-xs text-slate-600">
+                    Department-wide aggregated rewards, SLA compliance speed, and top citizen redressal contributors.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => reloadDeptCup()}
+                className="px-3 py-1.5 rounded-xl border border-amber-300 bg-white text-xs font-bold text-amber-900 hover:bg-amber-50 cursor-pointer shadow-2xs"
+              >
+                Refresh Rankings
+              </button>
+            </div>
+
+            {deptCupLoading ? (
+              <div className="p-12"><Spinner /></div>
+            ) : !deptCup || deptCup.length === 0 ? (
+              <div className="p-16 text-center text-slate-400 text-xs">
+                No department reward statistics recorded yet.
+              </div>
+            ) : (
+              <>
+                {/* Department Podium (if >= 3 depts) */}
+                {deptCup.length >= 3 && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    {/* 2nd Place */}
+                    <Card className="p-5 rounded-2xl border-slate-200 bg-gradient-to-t from-slate-50 via-white to-white flex flex-col items-center text-center order-2 md:order-1 relative shadow-xs">
+                      <div className="absolute top-3 left-3 text-sm font-bold text-slate-400">#2</div>
+                      <div className="w-16 h-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-3xl mb-2 shadow-xs">
+                        {deptCup[1].trophy}
+                      </div>
+                      <h4 className="text-sm font-extrabold text-slate-800">{deptCup[1].department_name}</h4>
+                      <p className="text-[11px] text-slate-500">{deptCup[1].total_resolved} resolved ({deptCup[1].sla_compliance_pct}% on-time)</p>
+                      <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-full text-xs font-black text-slate-800">
+                        🥈 {deptCup[1].total_points} pts
+                      </div>
+                      {deptCup[1].top_performer && (
+                        <p className="text-[10px] text-slate-400 mt-2">
+                          Star MVP: <strong className="text-slate-700">{deptCup[1].top_performer}</strong>
+                        </p>
+                      )}
+                    </Card>
+
+                    {/* 1st Place */}
+                    <Card className="p-6 rounded-2xl border-amber-300 bg-gradient-to-t from-amber-50/70 via-white to-amber-50/30 flex flex-col items-center text-center order-1 md:order-2 relative shadow-md scale-102">
+                      <div className="absolute -top-3.5 px-3 py-0.5 rounded-full bg-amber-500 text-white font-extrabold text-[11px] shadow-sm flex items-center gap-1">
+                        🏆 Cup Leader
+                      </div>
+                      <div className="w-20 h-20 rounded-2xl bg-amber-100 border-3 border-amber-400 flex items-center justify-center text-4xl mb-2 shadow-sm">
+                        {deptCup[0].trophy}
+                      </div>
+                      <h4 className="text-base font-black text-slate-900">{deptCup[0].department_name}</h4>
+                      <p className="text-xs text-amber-700 font-medium">{deptCup[0].total_resolved} resolved ({deptCup[0].sla_compliance_pct}% on-time)</p>
+                      <div className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-100 text-amber-900 rounded-full text-sm font-black shadow-xs">
+                        🥇 {deptCup[0].total_points} pts
+                      </div>
+                      {deptCup[0].top_performer && (
+                        <p className="text-[11px] text-amber-800 mt-2 font-medium">
+                          Star MVP: <strong className="text-amber-950 font-bold">{deptCup[0].top_performer}</strong>
+                        </p>
+                      )}
+                    </Card>
+
+                    {/* 3rd Place */}
+                    <Card className="p-5 rounded-2xl border-amber-200/50 bg-gradient-to-t from-amber-50/30 via-white to-white flex flex-col items-center text-center order-3 relative shadow-xs">
+                      <div className="absolute top-3 left-3 text-sm font-bold text-amber-700/60">#3</div>
+                      <div className="w-16 h-16 rounded-2xl bg-amber-50 border-2 border-amber-300/80 flex items-center justify-center text-3xl mb-2 shadow-xs">
+                        {deptCup[2].trophy}
+                      </div>
+                      <h4 className="text-sm font-extrabold text-slate-800">{deptCup[2].department_name}</h4>
+                      <p className="text-[11px] text-slate-500">{deptCup[2].total_resolved} resolved ({deptCup[2].sla_compliance_pct}% on-time)</p>
+                      <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 bg-amber-50 rounded-full text-xs font-black text-amber-900">
+                        🥉 {deptCup[2].total_points} pts
+                      </div>
+                      {deptCup[2].top_performer && (
+                        <p className="text-[10px] text-slate-400 mt-2">
+                          Star MVP: <strong className="text-slate-700">{deptCup[2].top_performer}</strong>
+                        </p>
+                      )}
+                    </Card>
+                  </div>
+                )}
+
+                {/* Full Department Cup Table */}
+                <Card className="rounded-2xl border border-slate-100 overflow-hidden shadow-xs">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-amber-600" />
+                      Department Leaderboard Standings
+                    </h3>
+                    <span className="text-xs text-slate-400">{deptCup.length} departments competing</span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                          <th className="py-3 px-4 w-16">Rank</th>
+                          <th className="py-3 px-4">Department</th>
+                          <th className="py-3 px-4 text-center">Complaints Resolved</th>
+                          <th className="py-3 px-4 text-center">On-Time SLA %</th>
+                          <th className="py-3 px-4">Department Star Performer</th>
+                          <th className="py-3 px-4 text-right">Department Total Points</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {deptCup.map((dept) => (
+                          <tr key={dept.department_id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-3 px-4 font-bold text-slate-700 text-sm">
+                              {dept.trophy} #{dept.rank}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-slate-800">
+                              {dept.department_name}
+                            </td>
+                            <td className="py-3 px-4 text-center text-slate-700 font-semibold">
+                              {dept.total_resolved}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  dept.sla_compliance_pct >= 90
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : dept.sla_compliance_pct >= 75
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {dept.sla_compliance_pct}%
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              {dept.top_performer ? (
+                                <span className="font-bold text-slate-800">{dept.top_performer}</span>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right font-black text-amber-700 text-sm">
+                              {dept.total_points} 🪙
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* TAB 3: PUBLIC CIVIC SCORECARD                                     */}
+        {/* ================================================================= */}
+        {activeTab === "scorecard" && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-100/30 to-emerald-50/10 border border-emerald-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-xl shadow-xs">
+                  📊
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Citywide Transparency Scorecard</h3>
+                  <p className="text-xs text-slate-600">
+                    Real-time citizen grievance turnaround metrics, public satisfaction rating, and department efficiency scores.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => reloadScorecard()}
+                className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-white text-xs font-bold text-emerald-900 hover:bg-emerald-50 cursor-pointer shadow-2xs"
+              >
+                Refresh Metrics
+              </button>
+            </div>
+
+            {scorecardLoading ? (
+              <div className="p-12"><Spinner /></div>
+            ) : !scorecard ? (
+              <div className="p-16 text-center text-slate-400 text-xs">
+                Unable to load civic scorecard data.
+              </div>
+            ) : (
+              <>
+                {/* 4 Macro Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <Card className="p-4 rounded-2xl border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Grievances</p>
+                      <p className="text-2xl font-black text-slate-900 mt-1">{scorecard.total_complaints_registered}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{scorecard.total_complaints_resolved} resolved / closed</p>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+                      📑
+                    </div>
+                  </Card>
+
+                  <Card className="p-4 rounded-2xl border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Resolution Rate</p>
+                      <p className="text-2xl font-black text-emerald-700 mt-1">{scorecard.citywide_sla_compliance_pct}%</p>
+                      <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Citywide Redressal SLA</p>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                      🎯
+                    </div>
+                  </Card>
+
+                  <Card className="p-4 rounded-2xl border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Avg Turnaround</p>
+                      <p className="text-2xl font-black text-indigo-700 mt-1">{scorecard.average_turnaround_hours}h</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">From filing to resolution</p>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold">
+                      ⚡
+                    </div>
+                  </Card>
+
+                  <Card className="p-4 rounded-2xl border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Citizen Satisfaction</p>
+                      <div className="flex items-baseline gap-1 mt-1">
+                        <span className="text-2xl font-black text-amber-700">{scorecard.citizen_satisfaction_rating}</span>
+                        <span className="text-xs font-bold text-slate-400">/ 5.0 ★</span>
+                      </div>
+                      <p className="text-[10px] text-amber-600 font-semibold mt-0.5">Verified citizen ratings</p>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                      ⭐
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Department Efficiency Breakdown */}
+                <Card className="rounded-2xl border border-slate-100 overflow-hidden shadow-xs">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-slate-600" />
+                      Departmental Redressal Efficiency Breakdown
+                    </h3>
+                    <span className="text-xs text-slate-400">{scorecard.departments?.length ?? 0} departments</span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                          <th className="py-3 px-4">Department</th>
+                          <th className="py-3 px-4 text-center">Total Received</th>
+                          <th className="py-3 px-4 text-center">Resolved</th>
+                          <th className="py-3 px-4 text-right">Resolution Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {scorecard.departments?.map((d) => (
+                          <tr key={d.name} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-3 px-4 font-bold text-slate-800">{d.name}</td>
+                            <td className="py-3 px-4 text-center text-slate-600 font-medium">{d.total_complaints}</td>
+                            <td className="py-3 px-4 text-center text-emerald-700 font-bold">{d.resolved_complaints}</td>
+                            <td className="py-3 px-4 text-right">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  d.resolution_rate_pct >= 90
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : d.resolution_rate_pct >= 75
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {d.resolution_rate_pct}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
             )}
           </div>
         )}
@@ -1340,7 +1933,7 @@ export default function RewardsPage() {
                           {/* Points */}
                           <td className="py-3 px-4 text-right whitespace-nowrap">
                             <span className={`font-black text-sm ${tx.points >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                              {tx.points >= 0 ? `+${tx.points}` : tx.points} 🪙
+                              {formatPoints(tx.points)} 🪙
                             </span>
                           </td>
 
@@ -1396,6 +1989,15 @@ export default function RewardsPage() {
             users={allStaffUsers?.items || []}
             onClose={() => setAdjustModalOpen(false)}
             onAdjusted={handleAdjustmentSuccess}
+          />
+        )}
+
+        {/* Certificate Modal */}
+        {certificateOpen && mySummary?.tier && (
+          <CertificateModal
+            userName={me.name}
+            tier={mySummary.tier}
+            onClose={() => setCertificateOpen(false)}
           />
         )}
 

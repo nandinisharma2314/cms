@@ -255,3 +255,98 @@ def test_reopen_clawback(client, login, end_user_login):
     rule_types = [tx["rule_type"] for tx in me_clawed["recent_transactions"]]
     assert "reopen_clawback" in rule_types
 
+
+def test_manual_deduction_and_badge_recalibration(client, login):
+    root = login(SUPER_ADMIN)
+    agent = login(ELEC_AGENT)
+
+    me_agent = client.get("/auth/me", headers=agent).json()
+    agent_id = me_agent["id"]
+
+    # 1. Give massive points to reach high tier
+    adj_award = client.post(
+        "/rewards/admin/adjust",
+        headers=root,
+        json={"user_id": agent_id, "points": 1000, "description": "Outstanding annual contribution"},
+    )
+    assert adj_award.status_code in [200, 201], adj_award.text
+
+    summary_high = client.get("/rewards/me", headers=agent).json()
+    assert summary_high["balance"] >= 1000
+    assert summary_high["lifetime_points"] >= 1000
+    high_tier = summary_high["tier"]["current_tier"]
+    assert high_tier == "Silver Specialist"
+
+    # 2. Deduct points to trigger downward recalibration
+    adj_deduct = client.post(
+        "/rewards/admin/adjust",
+        headers=root,
+        json={"user_id": agent_id, "points": -950, "description": "SLA Negligence / Delay Penalty"},
+    )
+    assert adj_deduct.status_code in [200, 201], adj_deduct.text
+    deduct_tx = adj_deduct.json()
+    assert deduct_tx["points"] == -950
+    assert "+-" not in deduct_tx["description"]
+
+    summary_low = client.get("/rewards/me", headers=agent).json()
+    assert summary_low["lifetime_points"] < 500
+    low_tier = summary_low["tier"]["current_tier"]
+    assert low_tier == "Bronze Resolver"
+    assert low_tier != high_tier
+
+
+def test_monthly_quests_and_department_cup(client, login):
+    agent = login(ELEC_AGENT)
+
+    # 1. Monthly Quests
+    quests_res = client.get("/rewards/quests", headers=agent)
+    assert quests_res.status_code == 200, quests_res.text
+    quests = quests_res.json()
+    assert len(quests) == 3
+    quest_ids = [q["id"] for q in quests]
+    assert "speed_sprint" in quest_ids
+    assert "citizen_hero" in quest_ids
+    assert "clean_sweep" in quest_ids
+    for q in quests:
+        assert "target" in q
+        assert "current" in q
+        assert "progress_pct" in q
+
+    # 2. Department Cup Leaderboard
+    cup_res = client.get("/rewards/departments", headers=agent)
+    assert cup_res.status_code == 200, cup_res.text
+    dept_cup = cup_res.json()
+    assert len(dept_cup) > 0
+    first_dept = dept_cup[0]
+    assert "department_id" in first_dept
+    assert "department_name" in first_dept
+    assert "total_points" in first_dept
+    assert "total_resolved" in first_dept
+    assert "trophy" in first_dept
+
+
+def test_potential_duplicates_and_scorecard(client, login, end_user_login):
+    agent = login(ELEC_AGENT)
+    citizen = end_user_login()
+
+    # 1. Public Scorecard
+    sc_res = client.get("/public/scorecard")
+    assert sc_res.status_code == 200, sc_res.text
+    scorecard = sc_res.json()
+    assert "citywide_sla_compliance_pct" in scorecard
+    assert "total_complaints_registered" in scorecard
+    assert "total_complaints_resolved" in scorecard
+    assert "departments" in scorecard
+
+    # 2. Potential Duplicates Detection
+    c1 = file_complaint(client, citizen, title="Damaged transformer sparking on Park Avenue")
+    c2 = file_complaint(client, citizen, title="Transformer sparking heavily near Park Avenue corner")
+
+    dupes_res = client.get(f"/complaints/{c2}/potential-duplicates", headers=agent)
+    assert dupes_res.status_code == 200, dupes_res.text
+    dupes = dupes_res.json()
+    assert len(dupes) >= 1
+    found_ids = [d["generated_id"] for d in dupes]
+    assert c1 in found_ids
+
+

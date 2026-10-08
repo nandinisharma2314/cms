@@ -544,3 +544,46 @@ def clean_complaint_text(title: str | None, description: str | None,
         multi_line(description, "Description", DESCRIPTION_MAX_LENGTH),
         multi_line(additional_details, "Additional details", max_length(Complaint.additional_details), required=False),
     )
+
+
+def find_potential_duplicates(db: Session, complaint: Complaint, limit: int = 5) -> list[dict]:
+    """Identifies open complaints in the same department/location that share keywords."""
+    if not complaint.title:
+        return []
+
+    words = {w.lower().strip() for w in complaint.title.split() if len(w) > 3}
+    if not words:
+        return []
+
+    candidates = (
+        db.query(Complaint)
+        .filter(
+            Complaint.id != complaint.id,
+            Complaint.department_id == complaint.department_id,
+            Complaint.status.notin_([CLOSED, REJECTED]),
+        )
+        .order_by(Complaint.created_at.desc())
+        .limit(30)
+        .all()
+    )
+
+    duplicates = []
+    for cand in candidates:
+        cand_words = {w.lower().strip() for w in (cand.title or "").split() if len(w) > 3}
+        intersection = words.intersection(cand_words)
+        if len(intersection) >= 2 or (len(words) == 1 and len(intersection) == 1):
+            score = round(len(intersection) / max(len(words), 1), 2)
+            duplicates.append({
+                "id": cand.id,
+                "generated_id": cand.generated_id,
+                "title": cand.title,
+                "status": cand.status,
+                "location_name": cand.location.name if cand.location else None,
+                "created_at": cand.created_at.isoformat() if cand.created_at else None,
+                "similarity_score": min(1.0, score),
+                "matching_terms": list(intersection),
+            })
+
+    duplicates.sort(key=lambda x: x["similarity_score"], reverse=True)
+    return duplicates[:limit]
+

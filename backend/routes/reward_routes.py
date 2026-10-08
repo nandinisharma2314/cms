@@ -259,3 +259,18 @@ def backfill_rewards(
 ):
     return reward_service.backfill_historical_rewards(ctx.db)
 
+
+@router.get("/quests")
+def get_user_quests(
+    ctx: AccessContext = Depends(require_permission("rewards.view")),
+):
+    return reward_service.get_monthly_quests(ctx.db, ctx.user.id)
+
+
+@router.get("/departments")
+def get_department_leaderboard(
+    ctx: AccessContext = Depends(require_permission("rewards.view")),
+):
+    return reward_service.get_department_leaderboard(ctx.db)
+
+

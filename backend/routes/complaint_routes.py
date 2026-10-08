@@ -484,3 +484,14 @@ def add_comment(
         stored.discard()
         raise
     return staff_detail(ctx, _get_scoped(ctx, complaint_id))
+
+
+@router.get("/{complaint_id}/potential-duplicates")
+def get_potential_duplicates(
+    complaint_id: str,
+    ctx: AccessContext = Depends(require_permission("complaint.view")),
+):
+    complaint = _get_scoped(ctx, complaint_id)
+    from services.complaint_service import find_potential_duplicates
+    return find_potential_duplicates(ctx.db, complaint)
+

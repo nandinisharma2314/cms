@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -18,7 +19,7 @@ import {
   UserCircle2,
   Wand2,
 } from "lucide-react";
-import { api, Attachment, attachmentUrl, ComplaintDetail, SlaState, WorkflowAction } from "@/lib/api";
+import { api, Attachment, attachmentUrl, ComplaintDetail, PotentialDuplicate, SlaState, WorkflowAction } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import { attachmentProblem } from "@/lib/attachments";
@@ -71,6 +72,57 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
       <div className="text-[11px] text-slate-400 font-medium">{label}</div>
       <div className="text-xs font-semibold text-slate-800 mt-0.5 wrap-break-word">{children}</div>
     </div>
+  );
+}
+
+function PotentialDuplicatesPanel({ complaintId }: { complaintId: string | number }) {
+  const { data: duplicates } = useApiData<PotentialDuplicate[]>(
+    () => api.complaints.potentialDuplicates(complaintId),
+    [complaintId],
+  );
+
+  if (!duplicates || duplicates.length === 0) return null;
+
+  return (
+    <Card className="p-4 rounded-2xl border-amber-200 bg-amber-50/50 space-y-2.5 shadow-2xs">
+      <div className="flex items-center gap-2 text-amber-900">
+        <span className="text-base">⚠️</span>
+        <h3 className="text-xs font-bold uppercase tracking-wider">
+          Potential Duplicate Tickets Detected ({duplicates.length})
+        </h3>
+      </div>
+      <p className="text-[11px] text-slate-600 leading-relaxed">
+        Similar open complaints exist in this department. Review before dispatching duplicate staff:
+      </p>
+      <div className="space-y-2">
+        {duplicates.map((d) => (
+          <div
+            key={d.id}
+            className="p-2.5 rounded-xl bg-white border border-amber-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-2"
+          >
+            <div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/complaints/${encodeURIComponent(d.generated_id)}`}
+                  className="font-mono text-xs font-bold text-blue-600 hover:underline"
+                >
+                  {d.generated_id}
+                </Link>
+                <span className="text-xs font-semibold text-slate-800 truncate max-w-xs">{d.title}</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {d.location_name ? `${d.location_name} • ` : ""}Status: {d.status}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                {d.similarity_score}% Match
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -678,6 +730,10 @@ function ComplaintView() {
               </div>
             )}
           </Card>
+
+          {detail.status !== "CLOSED" && detail.status !== "RESOLVED" && (
+            <PotentialDuplicatesPanel complaintId={detail.id} />
+          )}
 
           <Card className="p-5 space-y-4">
             <h2 className="text-sm font-bold text-slate-800">Actions</h2>

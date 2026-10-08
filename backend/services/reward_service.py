@@ -226,17 +226,27 @@ def _apply_reward_transaction(
     user.reward_points_balance = max(0, (user.reward_points_balance or 0) + points)
     if points > 0:
         user.lifetime_reward_points = (user.lifetime_reward_points or 0) + points
+    else:
+        # Deduction recalibrates lifetime points downwards so the tier & badge immediately reflect the penalty!
+        user.lifetime_reward_points = max(0, (user.lifetime_reward_points or 0) + points)
 
     db.flush()
 
     # Send in-app notification to staff member
     if send_notification:
         settings = get_reward_settings(db)
+        if points >= 0:
+            msg_title = f"{settings.currency_symbol} You earned +{points} {settings.currency_name}!"
+            event_type = "reward.earned"
+        else:
+            msg_title = f"{settings.currency_symbol} {abs(points)} {settings.currency_name} were deducted from your balance."
+            event_type = "reward.deducted"
+
         notification_service.notify(
             db,
             [user],
-            "reward.earned",
-            f"{settings.currency_symbol} You earned {points} {settings.currency_name}!",
+            event_type,
+            msg_title,
             description,
             complaint=complaint,
             at=now,
@@ -618,7 +628,8 @@ def award_manual_points(
     if not target_user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff member not found")
 
-    desc = f"{description.strip()} (Awarded by {admin_user.name})"
+    action_label = "Deducted" if points < 0 else "Awarded"
+    desc = f"{description.strip()} ({action_label} by {admin_user.name})"
     tx = _apply_reward_transaction(
         db, target_user, REWARD_RULE_MANUAL, points, desc, complaint=None, at=at,
     )
@@ -1220,3 +1231,151 @@ def update_redemption_status(
     db.commit()
     db.refresh(redemption)
     return redemption
+
+
+def get_monthly_quests(db: Session, user_id: int) -> list[dict[str, Any]]:
+    """Calculates active monthly gamification missions/quests for staff."""
+    now = utcnow()
+    month_start = datetime(now.year, now.month, 1)
+
+    # 1. Speed Demon Quest (Target: 5 fast resolutions <= 50% SLA)
+    speed_count = (
+        db.query(func.count(RewardTransaction.id))
+        .filter(
+            RewardTransaction.user_id == user_id,
+            RewardTransaction.rule_type == REWARD_RULE_SPEED_BONUS,
+            RewardTransaction.created_at >= month_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    # 2. Citizen Favorite Quest (Target: 3 5-star ratings)
+    star_count = (
+        db.query(func.count(RewardTransaction.id))
+        .filter(
+            RewardTransaction.user_id == user_id,
+            RewardTransaction.rule_type == REWARD_RULE_FIVE_STAR,
+            RewardTransaction.created_at >= month_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    # 3. Clean Sweep Quest (Target: 10 zero-reopen resolutions)
+    clean_count = (
+        db.query(func.count(RewardTransaction.id))
+        .filter(
+            RewardTransaction.user_id == user_id,
+            RewardTransaction.rule_type == REWARD_RULE_ZERO_REOPEN,
+            RewardTransaction.created_at >= month_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    return [
+        {
+            "id": "speed_sprint",
+            "title": "Speed Demon Sprint",
+            "description": "Resolve 5 complaints in under 50% of the SLA target time window.",
+            "icon": "⚡",
+            "current": min(5, speed_count),
+            "target": 5,
+            "reward_points": 150,
+            "completed": speed_count >= 5,
+            "progress_pct": min(100, int((speed_count / 5) * 100)),
+        },
+        {
+            "id": "citizen_hero",
+            "title": "Citizen Favorite",
+            "description": "Earn 3 top five-star reviews directly from citizens on resolved tickets.",
+            "icon": "⭐",
+            "current": min(3, star_count),
+            "target": 3,
+            "reward_points": 200,
+            "completed": star_count >= 3,
+            "progress_pct": min(100, int((star_count / 3) * 100)),
+        },
+        {
+            "id": "clean_sweep",
+            "title": "Flawless First-Time Fix",
+            "description": "Close 10 complaints with zero citizen reopens.",
+            "icon": "🎯",
+            "current": min(10, clean_count),
+            "target": 10,
+            "reward_points": 250,
+            "completed": clean_count >= 10,
+            "progress_pct": min(100, int((clean_count / 10) * 100)),
+        },
+    ]
+
+
+def get_department_leaderboard(db: Session) -> list[dict[str, Any]]:
+    """Ranks departments by total reward points and SLA compliance for Department Cup competition."""
+    departments = db.query(Department).all()
+    results = []
+
+    for dept in departments:
+        # Total points in this department
+        total_pts = (
+            db.query(func.sum(RewardTransaction.points))
+            .filter(RewardTransaction.department_id == dept.id)
+            .scalar()
+            or 0
+        )
+        total_pts = max(0, int(total_pts))
+
+        # Total resolved complaints
+        total_resolved = (
+            db.query(func.count(Complaint.id))
+            .filter(Complaint.department_id == dept.id, Complaint.status.in_(["RESOLVED", "CLOSED"]))
+            .scalar()
+            or 0
+        )
+
+        # On-time resolutions
+        on_time_count = (
+            db.query(func.count(RewardTransaction.id))
+            .filter(
+                RewardTransaction.department_id == dept.id,
+                RewardTransaction.rule_type == REWARD_RULE_ON_TIME,
+            )
+            .scalar()
+            or 0
+        )
+
+        sla_pct = int(round((on_time_count / total_resolved) * 100)) if total_resolved > 0 else 100
+
+        # Find top agent in this department
+        top_user_row = (
+            db.query(User.name, func.sum(RewardTransaction.points).label("pts"))
+            .join(RewardTransaction, User.id == RewardTransaction.user_id)
+            .filter(RewardTransaction.department_id == dept.id)
+            .group_by(User.id)
+            .order_by(func.sum(RewardTransaction.points).desc())
+            .first()
+        )
+        top_agent = top_user_row[0] if top_user_row else None
+
+        results.append({
+            "department_id": dept.id,
+            "department_name": dept.name,
+            "total_points": total_pts,
+            "total_resolved": total_resolved,
+            "on_time_count": on_time_count,
+            "sla_compliance_pct": sla_pct,
+            "top_performer": top_agent,
+        })
+
+    # Sort descending by total points
+    results.sort(key=lambda x: x["total_points"], reverse=True)
+
+    # Assign ranks & trophies
+    trophies = ["🏆", "🥈", "🥉"]
+    for idx, item in enumerate(results):
+        item["rank"] = idx + 1
+        item["trophy"] = trophies[idx] if idx < len(trophies) else f"#{idx + 1}"
+
+    return results
+
