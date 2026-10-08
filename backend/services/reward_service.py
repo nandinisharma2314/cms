@@ -10,9 +10,9 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from models import (
-    Complaint, Department, Location, Priority, Role, User,
+    Complaint, Department, Location, Priority, Role, User, ComplaintEvent,
     RewardSettings, RewardTransaction, RewardPerk, RewardRedemption,
-    REWARD_RULE_ON_TIME, REWARD_RULE_SPEED_BONUS, REWARD_RULE_FIVE_STAR,
+    REWARD_RULE_RESOLUTION, REWARD_RULE_ON_TIME, REWARD_RULE_SPEED_BONUS, REWARD_RULE_FIVE_STAR,
     REWARD_RULE_FOUR_STAR, REWARD_RULE_ZERO_REOPEN, REWARD_RULE_STREAK,
     REWARD_RULE_MANUAL, REWARD_RULE_PERK_REDEMPTION, REWARD_RULE_REOPEN_CLAWBACK,
 )
@@ -20,7 +20,7 @@ from services import notification_service
 from services.team_service import get_all_subordinates
 from utils.security import utcnow
 
-DEFAULT_ELIGIBLE_ROLES = ["agent", "field_worker"]
+DEFAULT_ELIGIBLE_ROLES = ["agent", "field_worker", "supervisor", "manager", "admin"]
 DEFAULT_PRIORITY_MULTIPLIERS = {
     "critical": 2.0,
     "danger": 1.5,
@@ -76,7 +76,7 @@ def get_reward_settings(db: Session) -> RewardSettings:
     if not settings:
         settings = RewardSettings(
             id=1,
-            is_enabled=False,
+            is_enabled=True,
             currency_name="Points",
             currency_symbol="🪙",
             eligible_roles=json.dumps(DEFAULT_ELIGIBLE_ROLES),
@@ -209,6 +209,7 @@ def _apply_reward_transaction(
     description: str,
     complaint: Complaint | None = None,
     at: datetime | None = None,
+    send_notification: bool = True,
 ) -> RewardTransaction:
     now = at or utcnow()
     tx = RewardTransaction(
@@ -229,35 +230,50 @@ def _apply_reward_transaction(
     db.flush()
 
     # Send in-app notification to staff member
-    settings = get_reward_settings(db)
-    notification_service.notify(
-        db,
-        [user],
-        "reward.earned",
-        f"{settings.currency_symbol} You earned {points} {settings.currency_name}!",
-        description,
-        complaint=complaint,
-        at=now,
-    )
+    if send_notification:
+        settings = get_reward_settings(db)
+        notification_service.notify(
+            db,
+            [user],
+            "reward.earned",
+            f"{settings.currency_symbol} You earned {points} {settings.currency_name}!",
+            description,
+            complaint=complaint,
+            at=now,
+        )
     return tx
 
 
 def evaluate_resolution_reward(
-    db: Session, complaint: Complaint, actor: User, at: datetime | None = None,
+    db: Session,
+    complaint: Complaint,
+    actor: User,
+    at: datetime | None = None,
+    send_notification: bool = True,
 ) -> list[RewardTransaction]:
     """Triggered when complaint is marked RESOLVED."""
     settings = get_reward_settings(db)
     if not settings.is_enabled:
         return []
-    if not _is_role_eligible(settings, actor.role):
+
+    # Identify recipient:
+    # If assigned to an eligible staff member, they are the primary solver!
+    # Otherwise fallback to the actor if eligible.
+    recipient = None
+    if complaint.assigned_to and _is_role_eligible(settings, complaint.assigned_to.role):
+        recipient = complaint.assigned_to
+    elif actor and _is_role_eligible(settings, actor.role):
+        recipient = actor
+
+    if not recipient:
         return []
 
-    # Check already awarded on_time_resolution for this complaint to avoid double-minting
+    # Check already awarded on_time_resolution or resolution_completed for this complaint to avoid double-minting
     existing = (
         db.query(RewardTransaction)
         .filter(
             RewardTransaction.complaint_id == complaint.id,
-            RewardTransaction.rule_type == REWARD_RULE_ON_TIME,
+            RewardTransaction.rule_type.in_([REWARD_RULE_ON_TIME, REWARD_RULE_RESOLUTION]),
         )
         .first()
     )
@@ -271,70 +287,91 @@ def evaluate_resolution_reward(
 
     # On-time resolution check
     is_on_time = resolution_due_at is None or resolved_at <= resolution_due_at
-    if not is_on_time:
-        return []
 
     created_txs: list[RewardTransaction] = []
     multiplier = _get_priority_multiplier(settings, complaint.priority)
-    base_points = int(round(settings.points_on_time_resolution * multiplier))
 
-    if base_points > 0:
-        tx1 = _apply_reward_transaction(
-            db,
-            actor,
-            REWARD_RULE_ON_TIME,
-            base_points,
-            f"Resolved {complaint.generated_id} within SLA target ({multiplier}x priority multiplier)",
-            complaint,
-            at=now,
-        )
-        created_txs.append(tx1)
-
-    # Speed Demon bonus: resolved in <= 50% of the total SLA target duration
-    if resolution_due_at and resolution_due_at > created_at and settings.points_speed_bonus > 0:
-        total_sla_seconds = (resolution_due_at - created_at).total_seconds()
-        actual_seconds = (resolved_at - created_at).total_seconds()
-        if actual_seconds <= (total_sla_seconds * 0.5):
-            speed_points = int(round(settings.points_speed_bonus * multiplier))
-            tx_speed = _apply_reward_transaction(
+    if is_on_time:
+        base_points = int(round(settings.points_on_time_resolution * multiplier))
+        if base_points > 0:
+            tx1 = _apply_reward_transaction(
                 db,
-                actor,
-                REWARD_RULE_SPEED_BONUS,
-                speed_points,
-                f"Speed Bonus: Resolved {complaint.generated_id} in under 50% of SLA time window",
+                recipient,
+                REWARD_RULE_ON_TIME,
+                base_points,
+                f"Resolved {complaint.generated_id} within SLA target ({multiplier}x priority multiplier)",
                 complaint,
                 at=now,
+                send_notification=send_notification,
             )
-            created_txs.append(tx_speed)
+            created_txs.append(tx1)
 
-    # Streak bonus check: count on-time resolutions by this user since the last breach
-    if settings.streak_interval > 0 and settings.streak_bonus > 0:
-        total_on_time = (
-            db.query(func.count(RewardTransaction.id))
-            .filter(
-                RewardTransaction.user_id == actor.id,
-                RewardTransaction.rule_type == REWARD_RULE_ON_TIME,
+        # Speed Demon bonus: resolved in <= 50% of the total SLA target duration
+        if resolution_due_at and resolution_due_at > created_at and settings.points_speed_bonus > 0:
+            total_sla_seconds = (resolution_due_at - created_at).total_seconds()
+            actual_seconds = (resolved_at - created_at).total_seconds()
+            if actual_seconds <= (total_sla_seconds * 0.5):
+                speed_points = int(round(settings.points_speed_bonus * multiplier))
+                tx_speed = _apply_reward_transaction(
+                    db,
+                    recipient,
+                    REWARD_RULE_SPEED_BONUS,
+                    speed_points,
+                    f"Speed Bonus: Resolved {complaint.generated_id} in under 50% of SLA time window",
+                    complaint,
+                    at=now,
+                    send_notification=send_notification,
+                )
+                created_txs.append(tx_speed)
+
+        # Streak bonus check: count on-time resolutions by this user
+        if settings.streak_interval > 0 and settings.streak_bonus > 0:
+            total_on_time = (
+                db.query(func.count(RewardTransaction.id))
+                .filter(
+                    RewardTransaction.user_id == recipient.id,
+                    RewardTransaction.rule_type == REWARD_RULE_ON_TIME,
+                )
+                .scalar()
+                or 0
             )
-            .scalar()
-            or 0
-        )
-        if total_on_time > 0 and total_on_time % settings.streak_interval == 0:
-            tx_streak = _apply_reward_transaction(
+            if total_on_time > 0 and total_on_time % settings.streak_interval == 0:
+                tx_streak = _apply_reward_transaction(
+                    db,
+                    recipient,
+                    REWARD_RULE_STREAK,
+                    settings.streak_bonus,
+                    f"Streak Milestone: {total_on_time} consecutive complaints resolved on time!",
+                    complaint,
+                    at=now,
+                    send_notification=send_notification,
+                )
+                created_txs.append(tx_streak)
+    else:
+        # Standard resolution points for resolving overdue complaints
+        base_points = max(10, int(round((settings.points_on_time_resolution // 2) * multiplier)))
+        if base_points > 0:
+            tx_late = _apply_reward_transaction(
                 db,
-                actor,
-                REWARD_RULE_STREAK,
-                settings.streak_bonus,
-                f"Streak Milestone: {total_on_time} consecutive complaints resolved on time!",
+                recipient,
+                REWARD_RULE_RESOLUTION,
+                base_points,
+                f"Resolved {complaint.generated_id} ({multiplier}x priority multiplier)",
                 complaint,
                 at=now,
+                send_notification=send_notification,
             )
-            created_txs.append(tx_streak)
+            created_txs.append(tx_late)
 
     return created_txs
 
 
 def evaluate_feedback_reward(
-    db: Session, complaint: Complaint, rating: int, at: datetime | None = None,
+    db: Session,
+    complaint: Complaint,
+    rating: int,
+    at: datetime | None = None,
+    send_notification: bool = True,
 ) -> list[RewardTransaction]:
     """Triggered when end-user submits feedback rating."""
     settings = get_reward_settings(db)
@@ -342,6 +379,18 @@ def evaluate_feedback_reward(
         return []
 
     handler = complaint.assigned_to
+    if not handler:
+        prev_tx = (
+            db.query(RewardTransaction)
+            .filter(
+                RewardTransaction.complaint_id == complaint.id,
+                RewardTransaction.rule_type.in_([REWARD_RULE_ON_TIME, REWARD_RULE_RESOLUTION]),
+            )
+            .first()
+        )
+        if prev_tx:
+            handler = prev_tx.user
+
     if not handler or not _is_role_eligible(settings, handler.role):
         return []
 
@@ -375,6 +424,7 @@ def evaluate_feedback_reward(
             f"Citizen 5★ Review on {complaint.generated_id}",
             complaint,
             at=now,
+            send_notification=send_notification,
         )
         created_txs.append(tx)
     elif rating == 4 and settings.points_four_star > 0:
@@ -386,6 +436,7 @@ def evaluate_feedback_reward(
             f"Citizen 4★ Review on {complaint.generated_id}",
             complaint,
             at=now,
+            send_notification=send_notification,
         )
         created_txs.append(tx)
 
@@ -404,7 +455,7 @@ def evaluate_reopen_clawback(
         db.query(RewardTransaction)
         .filter(
             RewardTransaction.complaint_id == complaint.id,
-            RewardTransaction.rule_type.in_([REWARD_RULE_ON_TIME, REWARD_RULE_SPEED_BONUS]),
+            RewardTransaction.rule_type.in_([REWARD_RULE_ON_TIME, REWARD_RULE_RESOLUTION, REWARD_RULE_SPEED_BONUS]),
         )
         .all()
     )
@@ -442,7 +493,10 @@ def evaluate_reopen_clawback(
 
 
 def evaluate_closure_reward(
-    db: Session, complaint: Complaint, at: datetime | None = None,
+    db: Session,
+    complaint: Complaint,
+    at: datetime | None = None,
+    send_notification: bool = True,
 ) -> list[RewardTransaction]:
     """Triggered when complaint is CLOSED."""
     settings = get_reward_settings(db)
@@ -450,6 +504,18 @@ def evaluate_closure_reward(
         return []
 
     handler = complaint.assigned_to
+    if not handler:
+        prev_tx = (
+            db.query(RewardTransaction)
+            .filter(
+                RewardTransaction.complaint_id == complaint.id,
+                RewardTransaction.rule_type.in_([REWARD_RULE_ON_TIME, REWARD_RULE_RESOLUTION]),
+            )
+            .first()
+        )
+        if prev_tx:
+            handler = prev_tx.user
+
     if not handler or not _is_role_eligible(settings, handler.role):
         return []
 
@@ -478,8 +544,71 @@ def evaluate_closure_reward(
         f"First-Time Resolution Bonus on {complaint.generated_id} (Closed with zero reopens)",
         complaint,
         at=now,
+        send_notification=send_notification,
     )
     return [tx]
+
+
+def backfill_historical_rewards(db: Session) -> dict[str, Any]:
+    """Scans all historical resolved or closed complaints and backfills earned reward points."""
+    settings = get_reward_settings(db)
+    if not settings.is_enabled:
+        settings.is_enabled = True
+        db.commit()
+
+    # Ensure eligible_roles includes administrative and operational roles
+    try:
+        roles = json.loads(settings.eligible_roles) if isinstance(settings.eligible_roles, str) else settings.eligible_roles
+    except Exception:
+        roles = []
+    updated_roles = list(set(roles + ["agent", "field_worker", "supervisor", "manager", "admin"]))
+    settings.eligible_roles = json.dumps(updated_roles)
+    db.commit()
+
+    complaints = (
+        db.query(Complaint)
+        .filter(Complaint.status.in_(["RESOLVED", "CLOSED"]))
+        .order_by(Complaint.created_at.asc())
+        .all()
+    )
+
+    complaints_scanned = 0
+    txs_created = 0
+
+    for c in complaints:
+        complaints_scanned += 1
+        res_time = c.resolved_at or c.closed_at or c.updated_at
+
+        # Determine resolver actor
+        actor = c.assigned_to
+        if not actor:
+            ev = (
+                db.query(ComplaintEvent)
+                .filter(ComplaintEvent.complaint_id == c.id, ComplaintEvent.to_status == "RESOLVED")
+                .order_by(ComplaintEvent.id.desc())
+                .first()
+            )
+            if ev and ev.actor_id and ev.actor_type == "staff":
+                actor = db.query(User).filter(User.id == ev.actor_id).first()
+
+        if actor:
+            txs = evaluate_resolution_reward(db, c, actor, at=res_time, send_notification=False)
+            txs_created += len(txs)
+
+        if c.status == "CLOSED":
+            txs_close = evaluate_closure_reward(db, c, at=c.closed_at or res_time, send_notification=False)
+            txs_created += len(txs_close)
+
+        if c.feedback_rating:
+            txs_fb = evaluate_feedback_reward(db, c, c.feedback_rating, at=c.feedback_at or res_time, send_notification=False)
+            txs_created += len(txs_fb)
+
+    db.commit()
+
+    return {
+        "complaints_scanned": complaints_scanned,
+        "transactions_created": txs_created,
+    }
 
 
 def award_manual_points(

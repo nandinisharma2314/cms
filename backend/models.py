@@ -867,6 +867,7 @@ class StaffGrievanceEvent(Base):
 # Reward & Recognition System
 # ---------------------------------------------------------------------------
 
+REWARD_RULE_RESOLUTION = "resolution_completed"
 REWARD_RULE_ON_TIME = "on_time_resolution"
 REWARD_RULE_SPEED_BONUS = "speed_bonus"
 REWARD_RULE_FIVE_STAR = "five_star_rating"
@@ -878,6 +879,7 @@ REWARD_RULE_PERK_REDEMPTION = "perk_redemption"
 REWARD_RULE_REOPEN_CLAWBACK = "reopen_clawback"
 
 REWARD_RULES = (
+    REWARD_RULE_RESOLUTION,
     REWARD_RULE_ON_TIME,
     REWARD_RULE_SPEED_BONUS,
     REWARD_RULE_FIVE_STAR,
@@ -894,10 +896,10 @@ class RewardSettings(Base):
     __tablename__ = "reward_settings"
 
     id = Column(Integer, primary_key=True)
-    is_enabled = Column(Boolean, default=False, nullable=False)
+    is_enabled = Column(Boolean, default=True, nullable=False)
     currency_name = Column(String(50), default="Points", nullable=False)
     currency_symbol = Column(String(10), default="🪙", nullable=False)
-    eligible_roles = Column(Text, nullable=False, default='["agent", "field_worker"]')
+    eligible_roles = Column(Text, nullable=False, default='["agent", "field_worker", "supervisor", "manager", "admin"]')
     points_on_time_resolution = Column(Integer, default=50, nullable=False)
     points_speed_bonus = Column(Integer, default=25, nullable=False)
     points_five_star = Column(Integer, default=30, nullable=False)

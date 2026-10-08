@@ -251,3 +251,11 @@ def update_redemption(
         "admin_notes": r.admin_notes,
         "updated_at": r.updated_at.isoformat(),
     }
+
+
+@router.post("/admin/backfill")
+def backfill_rewards(
+    ctx: AccessContext = Depends(require_permission("rewards.manage")),
+):
+    return reward_service.backfill_historical_rewards(ctx.db)
+

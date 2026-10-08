@@ -65,10 +65,12 @@ function flattenLocations(nodes: LocationNode[], prefix = ""): { id: number; lab
 }
 
 const RULE_LABELS: Record<string, { label: string; color: string; icon: string }> = {
+  resolution_completed: { label: "Complaint Resolved", color: "bg-teal-50 text-teal-700 border-teal-200", icon: "✅" },
   on_time_resolution: { label: "On-Time Resolution", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "⏱️" },
   speed_bonus: { label: "Speed Bonus (≤50% SLA)", color: "bg-sky-50 text-sky-700 border-sky-200", icon: "⚡" },
   five_star_rating: { label: "5★ Citizen Rating", color: "bg-amber-50 text-amber-700 border-amber-200", icon: "⭐" },
   four_star_rating: { label: "4★ Citizen Rating", color: "bg-yellow-50 text-yellow-700 border-yellow-200", icon: "✨" },
+  zero_reopen: { label: "Zero-Reopen Closure", color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: "🎯" },
   zero_reopen_closure: { label: "Zero-Reopen Closure", color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: "🎯" },
   streak_milestone: { label: "Clean Streak Milestone", color: "bg-purple-50 text-purple-700 border-purple-200", icon: "🔥" },
   manual_adjustment: { label: "Admin Adjustment", color: "bg-slate-100 text-slate-700 border-slate-200", icon: "🛡️" },
@@ -415,6 +417,22 @@ export default function RewardsPage() {
     });
   };
 
+  const syncAction = useAction();
+  const handleSyncRewards = () => {
+    syncAction.run(async () => {
+      const res = await api.rewards.backfill();
+      reloadMySummary();
+      reloadLeaderboard();
+      reloadAudit();
+      reloadStats();
+      setCelebration({
+        title: "Historical Rewards Synced! 🎉",
+        message: `Successfully scanned ${res.complaints_scanned} complaints and created/verified ${res.transactions_created} reward transactions.`,
+        badge: "✨",
+      });
+    });
+  };
+
   return (
     <RequirePermission anyOf={["rewards.view"]}>
       <div className="space-y-6 pb-12">
@@ -425,13 +443,25 @@ export default function RewardsPage() {
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {canManage && (
-                <button
-                  type="button"
-                  onClick={() => setAdjustModalOpen(true)}
-                  className={primaryButtonClass}
-                >
-                  <Plus className="w-4 h-4" /> Manual Adjustment
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleSyncRewards}
+                    disabled={syncAction.busy}
+                    className={secondaryButtonClass}
+                    title="Scan all historical resolved complaints and credit eligible staff"
+                  >
+                    <RotateCcw className={`w-4 h-4 ${syncAction.busy ? "animate-spin" : ""}`} />
+                    {syncAction.busy ? "Syncing..." : "Sync Past Points"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustModalOpen(true)}
+                    className={primaryButtonClass}
+                  >
+                    <Plus className="w-4 h-4" /> Manual Adjustment
+                  </button>
+                </>
               )}
             </div>
           }

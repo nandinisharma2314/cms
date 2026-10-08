@@ -1586,5 +1586,10 @@ export const api = {
         `/rewards/admin/redemptions/${id}`,
         { method: "PUT", body: data },
       ),
+    backfill: () =>
+      request<{ complaints_scanned: number; transactions_created: number }>(
+        "/rewards/admin/backfill",
+        { method: "POST" },
+      ),
   },
 };
