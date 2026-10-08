@@ -1,21 +1,25 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Bell,
   Calendar,
+  Camera,
   CheckCircle,
   CreditCard,
   HelpCircle,
   Info,
+  Loader2,
   LogOut,
   Mail,
   MapPin,
   Phone,
   ShieldCheck,
+  Trash2,
   User,
 } from "lucide-react";
-import { api, ApiError, OtpChallenge, OtpChannel, Profile } from "@/lib/portalApi";
+import { api, ApiError, OtpChallenge, OtpChannel, Profile, resolveAvatarUrl } from "@/lib/portalApi";
 import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
 import { initials, today } from "@/lib/portalFormat";
 import { useEndUser } from "@/lib/portalSession";
@@ -263,6 +267,42 @@ export default function ProfilePage() {
   const [changing, setChanging] = useState<OtpChannel | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("File size exceeds 5MB limit.");
+      return;
+    }
+    setAvatarUploading(true);
+    setAvatarError(null);
+    try {
+      const updated = await api.profile.uploadAvatar(file);
+      setProfile(updated);
+    } catch (err) {
+      setAvatarError((err as Error).message);
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    setAvatarUploading(true);
+    setAvatarError(null);
+    try {
+      const updated = await api.profile.deleteAvatar();
+      setProfile(updated);
+    } catch (err) {
+      setAvatarError((err as Error).message);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const changes = (): Parameters<typeof api.profile.update>[0] => {
     const data: Parameters<typeof api.profile.update>[0] = {};
@@ -313,12 +353,56 @@ export default function ProfilePage() {
         <div className="flex shrink-0 flex-col border-b border-slate-100">
           <div className="h-16 bg-linear-to-r from-sky-100 via-blue-50 to-indigo-50 md:h-28" aria-hidden="true" />
           <div className="relative z-10 -mt-7 flex flex-col items-center gap-2 px-4 pb-3 sm:flex-row sm:items-end sm:gap-6 sm:px-8 md:-mt-12 md:pb-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-white bg-blue-50 text-xl font-extrabold text-blue-700 shadow-sm md:h-24 md:w-24 md:text-3xl">
-              {initials(profile.name)}
+            <div className="relative group">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-white bg-blue-50 text-xl font-extrabold text-blue-700 shadow-sm md:h-24 md:w-24 md:text-3xl overflow-hidden relative">
+                {avatarUploading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                ) : profile.avatar_url ? (
+                  <img
+                    src={resolveAvatarUrl(profile.avatar_url)!}
+                    alt={profile.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initials(profile.name)
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+              <div className="absolute -bottom-1 -right-1 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  title="Upload profile picture"
+                  aria-label="Upload profile picture"
+                  className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-blue-600 text-white shadow-md transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  <Camera className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </button>
+                {profile.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={handleAvatarDelete}
+                    disabled={avatarUploading}
+                    title="Remove profile picture"
+                    aria-label="Remove profile picture"
+                    className="flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-red-600 text-white shadow-md transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Trash2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex w-full flex-1 flex-col items-center justify-between gap-2 sm:flex-row sm:items-end">
               <div className="flex flex-col items-center text-center sm:items-start sm:text-left">
                 <h1 className="text-xl font-extrabold leading-tight text-slate-800 md:text-2xl">{profile.name}</h1>
+                {avatarError && <p className="mt-1 text-xs font-semibold text-rose-600">{avatarError}</p>}
                 <p className="mt-1 flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-slate-500 sm:justify-start md:gap-3 md:text-sm">
                   <span className="flex items-center gap-1">
                     <Phone size={12} className="text-slate-400" aria-hidden="true" /> {profile.mobile}

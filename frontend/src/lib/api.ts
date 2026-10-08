@@ -61,6 +61,7 @@ export interface StaffUser {
   mobile: string | null;
   aadhar?: string | null;
   pan_card?: string | null;
+  avatar_url?: string | null;
   role: RoleRef;
   reports_to: { id: number; name: string } | null;
   primary_department?: { id: number; name: string } | null;
@@ -161,6 +162,7 @@ export interface EndUserRow {
   email: string;
   aadhar: string | null;
   pan_card: string | null;
+  avatar_url?: string | null;
   location: LocationRef | null;
   is_active: boolean;
   created_at: string;
@@ -1007,6 +1009,13 @@ export function attachmentUrl(attachment: Attachment): string {
   return `${API_URL}${attachment.url}`;
 }
 
+/** Resolves an avatar URL into an absolute URL whether it's absolute (R2/S3) or relative (backend serve route). */
+export function resolveAvatarUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${API_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 const id = (value: string) => encodeURIComponent(value);
 
 // ---------------------------------------------------------------------------
@@ -1069,6 +1078,12 @@ export const api = {
       ),
     rejectResetQuery: (ticketId: string, note: string) =>
       request<PasswordResetTicket>(`/auth/reset-queries/${id(ticketId)}/reject`, { method: "POST", body: { note } }),
+    uploadAvatar: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<Me>("/auth/avatar", { method: "POST", body: form });
+    },
+    deleteAvatar: () => request<Me>("/auth/avatar", { method: "DELETE" }),
   },
   settings: {
     get: () => request<SettingsResponse>("/settings/"),

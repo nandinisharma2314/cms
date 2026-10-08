@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -5,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, FileText, LogOut, Search, User } from "lucide-react";
 import { initials } from "@/lib/portalFormat";
+import { resolveAvatarUrl } from "@/lib/portalApi";
 import { useEndUser } from "@/lib/portalSession";
 import { BrandMark } from "@/components/portal/Brand/BrandMark";
 
@@ -66,8 +68,12 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
             aria-expanded={menuOpen}
             aria-label="Account menu"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shadow-md shadow-blue-600/20">
-              {initials(profile.name)}
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shadow-md shadow-blue-600/20 overflow-hidden">
+              {profile.avatar_url ? (
+                <img src={resolveAvatarUrl(profile.avatar_url)!} alt={profile.name} className="h-full w-full object-cover" />
+              ) : (
+                initials(profile.name)
+              )}
             </span>
             <span className="hidden flex-col items-start text-left md:flex">
               <span className="max-w-40 truncate text-sm font-bold leading-tight text-slate-800">{profile.name}</span>

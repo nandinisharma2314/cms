@@ -55,6 +55,7 @@ export interface Profile {
   agent_name?: string | null;
   mobile: string;
   email: string;
+  avatar_url?: string | null;
   location: LocationRef | null;
   dob: string | null;
   gender: Gender | null;
@@ -428,6 +429,13 @@ export function attachmentUrl(attachment: Attachment): string {
   return `${API_URL}${attachment.url}`;
 }
 
+/** Resolves an avatar URL into an absolute URL whether it's absolute (R2/S3) or relative (backend serve route). */
+export function resolveAvatarUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${API_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 const id = (value: string) => encodeURIComponent(value);
 
 // ---------------------------------------------------------------------------
@@ -496,6 +504,12 @@ export const api = {
       keep(
         await request<Session>("/portal/profile/contact/verify", { method: "POST", body: { challenge_id: challengeId, otp } }),
       ),
+    uploadAvatar: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<Profile>("/portal/profile/avatar", { method: "POST", body: form });
+    },
+    deleteAvatar: () => request<Profile>("/portal/profile/avatar", { method: "DELETE" }),
   },
   reference: {
     departments: () => request<PortalDepartment[]>("/portal/departments"),

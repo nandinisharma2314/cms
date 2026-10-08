@@ -61,11 +61,17 @@ class StoredFiles:
 
     def __init__(self):
         self.paths: list[Path] = []
+        self.keys: list[str] = []
 
     def discard(self) -> None:
         for path in self.paths:
             path.unlink(missing_ok=True)
         self.paths.clear()
+        if self.keys:
+            from services import storage_service
+            for key in self.keys:
+                storage_service.delete_file(key)
+            self.keys.clear()
 
 
 def _extension(filename: str) -> str:
@@ -110,29 +116,46 @@ def save_attachments(
             raise HTTPException(status.HTTP_400_BAD_REQUEST,
                                 f"{upload.filename}: file type not allowed (allowed: {', '.join(allowed)})")
 
+    from services import storage_service
+    from fastapi.responses import RedirectResponse, Response
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     rows = []
     for upload in files:
         ext = _extension(upload.filename)
         storage_name = f"{uuid.uuid4().hex}.{ext}"
-        path = UPLOAD_DIR / storage_name
-        stored.paths.append(path)
         size = 0
         head = b""
-        with open(path, "wb") as out:
-            while chunk := upload.file.read(CHUNK):
-                if len(head) < 16:
-                    head += chunk[:16 - len(head)]
-                size += len(chunk)
-                if size > max_bytes:
-                    raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                        f"{upload.filename} is larger than {max_bytes // (1024 * 1024)} MB")
-                out.write(chunk)
+        buffer = bytearray()
+        while chunk := upload.file.read(CHUNK):
+            if len(head) < 16:
+                head += chunk[:16 - len(head)]
+            size += len(chunk)
+            if size > max_bytes:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                    f"{upload.filename} is larger than {max_bytes // (1024 * 1024)} MB")
+            buffer.extend(chunk)
+
         if size == 0:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{upload.filename} is empty")
         if not _matches_signature(ext, head):
             raise HTTPException(status.HTTP_400_BAD_REQUEST,
                                 f"{upload.filename} does not look like a .{ext} file")
+
+        if storage_service.is_r2_enabled():
+            storage_service.get_s3_client().put_object(
+                Bucket=storage_service.R2_BUCKET,
+                Key=storage_name,
+                Body=bytes(buffer),
+                ContentType=_CONTENT_TYPES[ext],
+            )
+            stored.keys.append(storage_name)
+        else:
+            path = UPLOAD_DIR / storage_name
+            stored.paths.append(path)
+            with open(path, "wb") as out:
+                out.write(buffer)
+
         row = ComplaintAttachment(
             complaint=complaint, comment=comment, storage_name=storage_name,
             content_type=_CONTENT_TYPES[ext], file_name=_display_name(upload.filename, ext), file_size=size,
@@ -155,25 +178,49 @@ def signed_url(attachment: ComplaintAttachment) -> str:
     return f"/files/{attachment.id}?expires={expires}&signature={sign_value(f'attachment:{attachment.id}', expires)}"
 
 
-def serve(db: Session, attachment_id: int, expires: int, signature: str) -> FileResponse:
+def serve(db: Session, attachment_id: int, expires: int, signature: str):
     if not signature_valid(f"attachment:{attachment_id}", expires, signature):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This download link has expired. Reopen the complaint to get a new one.")
     attachment = db.get(ComplaintAttachment, attachment_id)
-    path = UPLOAD_DIR / attachment.storage_name if attachment else None
-    if attachment is None or not path.is_file():
+    if attachment is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+
+    from services import storage_service
+    from fastapi.responses import RedirectResponse, Response
+
     inline = attachment.content_type in _INLINE
     if not inline:
         policy = "sandbox; frame-ancestors 'none'"
     elif attachment.content_type == "application/pdf":
-        # Browsers' PDF viewers refuse to run in a sandbox; the apps may show it in a frame.
         policy = f"frame-ancestors {' '.join(CORS_ORIGINS)}"
     else:
         policy = f"sandbox; frame-ancestors {' '.join(CORS_ORIGINS)}"
+
+    if storage_service.is_r2_enabled():
+        presigned = storage_service.get_presigned_url(attachment.storage_name, expires_in=max(60, expires - unix_now()))
+        if presigned:
+            return RedirectResponse(presigned, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        try:
+            data, _ = storage_service.get_file(attachment.storage_name)
+            return Response(
+                content=data,
+                media_type=attachment.content_type,
+                headers={
+                    "Content-Disposition": f"{'inline' if inline else 'attachment'}; filename=\"{attachment.file_name}\"",
+                    "Cache-Control": f"private, max-age={max(0, expires - unix_now())}",
+                    "Content-Security-Policy": policy,
+                    "X-Content-Type-Options": "nosniff",
+                },
+            )
+        except Exception:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found in storage")
+
+    path = UPLOAD_DIR / attachment.storage_name
+    if not path.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
     return FileResponse(
         path, media_type=attachment.content_type, filename=attachment.file_name,
         content_disposition_type="inline" if inline else "attachment",
-        # Cached for as long as this link is valid.
         headers={"Cache-Control": f"private, max-age={max(0, expires - unix_now())}", "Content-Security-Policy": policy,
                  "X-Content-Type-Options": "nosniff"},
     )

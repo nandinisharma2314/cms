@@ -109,6 +109,7 @@ def _profile(db: Session, end_user: EndUser) -> dict:
         "id": end_user.id,
         "external_id": end_user.external_id,
         "name": end_user.name,
+        "avatar_url": end_user.avatar_url,
         "agent_name": agent_name,
         "mobile": end_user.mobile,
         "email": end_user.email,
@@ -573,3 +574,55 @@ def clear_notifications(end_user: EndUser = Depends(get_current_end_user), db: S
     ).delete(synchronize_session=False)
     db.commit()
     return {"success": True}
+
+
+@router.post("/profile/avatar")
+def upload_avatar(
+    file: UploadFile = File(...),
+    end_user: EndUser = Depends(require_portal_permission("portal.profile.update")),
+    db: Session = Depends(get_db),
+):
+    """Uploads a profile picture for the current citizen (jpg, png, webp up to 5 MB)."""
+    from services import attachment_service, storage_service
+
+    if not file.filename:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is required")
+    ext = attachment_service._extension(file.filename)
+    if ext not in ("jpg", "jpeg", "png", "webp"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Photo must be a JPG, PNG, or WebP image")
+
+    max_bytes = 5 * 1024 * 1024
+    content = bytearray()
+    head = b""
+    while chunk := file.file.read(64 * 1024):
+        if len(head) < 16:
+            head += chunk[:16 - len(head)]
+        content.extend(chunk)
+        if len(content) > max_bytes:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Photo is larger than 5 MB")
+
+    if not content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is empty")
+    if not attachment_service._matches_signature(ext, head):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"File does not match its .{ext} extension")
+
+    content_type = attachment_service._CONTENT_TYPES.get(ext, "image/jpeg")
+    _, url = storage_service.save_file(bytes(content), file.filename, content_type, folder="avatars", is_public=True)
+
+    end_user.avatar_url = url
+    db.commit()
+    db.refresh(end_user)
+    return _profile(db, end_user)
+
+
+@router.delete("/profile/avatar")
+def delete_avatar(
+    end_user: EndUser = Depends(require_portal_permission("portal.profile.update")),
+    db: Session = Depends(get_db),
+):
+    """Removes the citizen's profile photo."""
+    end_user.avatar_url = None
+    db.commit()
+    db.refresh(end_user)
+    return _profile(db, end_user)
+

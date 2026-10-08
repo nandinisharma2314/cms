@@ -27,6 +27,7 @@ def serialize_users(db: Session, users: list[User], ctx: AccessContext | None = 
             "mobile": u.mobile,
             "aadhar": u.aadhar,
             "pan_card": u.pan_card,
+            "avatar_url": u.avatar_url,
             "role": serialize_role(u.role),
             "reports_to": {"id": u.reports_to.id, "name": u.reports_to.name} if u.reports_to else None,
             "primary_department": (

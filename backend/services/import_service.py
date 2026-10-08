@@ -284,8 +284,8 @@ class _EndUserRow:
     name: str
     mobile: str
     email: str
-    aadhar: str
-    pan_card: str
+    aadhar: str | None
+    pan_card: str | None
     level_names: list[str]
 
 
@@ -303,7 +303,7 @@ def _existing_end_users(db: Session, parsed: list[_EndUserRow]) -> list[EndUser]
 
 def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportResult:
     headers, rows = read_csv(content)
-    missing = [c for c in ("name", "mobile", "email", "aadhar", "pan_card") if c not in headers]
+    missing = [c for c in ("name", "mobile", "email") if c not in headers]
     if missing:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"CSV is missing required column(s): {', '.join(missing)}")
     resolver = _LocationResolver(db)
@@ -331,13 +331,13 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
         if email is None:
             result.fail(row_number, "Email is not valid", row)
             continue
-        aadhar = (row.get("aadhar") or "").strip()
-        if not aadhar:
-            result.fail(row_number, "Aadhar is required", row)
+        aadhar = (row.get("aadhar") or "").strip() or None
+        if aadhar and (len(aadhar) != 12 or not aadhar.isdigit()):
+            result.fail(row_number, "Aadhar must be exactly 12 digits", row)
             continue
-        pan_card = (row.get("pan_card") or "").strip()
-        if not pan_card:
-            result.fail(row_number, "PAN Card is required", row)
+        pan_card = (row.get("pan_card") or "").strip() or None
+        if pan_card and len(pan_card) != 10:
+            result.fail(row_number, "PAN Card must be exactly 10 characters", row)
             continue
         try:
             level_names = resolver.levels(row)
@@ -457,8 +457,8 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
                 "name": p.name,
                 "mobile": p.mobile,
                 "email": p.email,
-                "aadhar": p.aadhar,
-                "pan_card": p.pan_card,
+                "aadhar": p.aadhar if ("aadhar" in headers) else existing.aadhar,
+                "pan_card": p.pan_card if ("pan_card" in headers) else existing.pan_card,
                 "location_id": location.id if location is not None else existing.location_id,
             }
             if all(getattr(existing, k) == v for k, v in new_values.items()):

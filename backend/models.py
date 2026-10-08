@@ -199,6 +199,7 @@ class User(Base):
     mobile = Column(String(20), unique=True, nullable=True)
     aadhar = Column(String(20), nullable=True)
     pan_card = Column(String(20), nullable=True)
+    avatar_url = Column(String(500), nullable=True)
     password_hash = Column(String(255), nullable=False)
     # Set for passwords someone else chose (new accounts, approved resets).
     must_change_password = Column(Boolean, default=False, nullable=False)
@@ -263,6 +264,7 @@ class EndUser(Base):
     token_version = Column(Integer, default=0, nullable=False)
     aadhar = Column(String(20), nullable=True)
     pan_card = Column(String(20), nullable=True)
+    avatar_url = Column(String(500), nullable=True)
 
     # Profile details the end user maintains in the portal
     dob = Column(Date, nullable=True)

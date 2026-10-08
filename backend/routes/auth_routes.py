@@ -1,7 +1,7 @@
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
@@ -141,6 +141,55 @@ def set_my_availability(
             changes={"is_available": [not payload.is_available, payload.is_available]}, request=request,
         )
         ctx.db.commit()
+    return staff_profile(ctx.db, ctx)
+
+
+@router.post("/avatar")
+def upload_staff_avatar(
+    file: UploadFile = File(...),
+    ctx: AccessContext = Depends(get_access_context),
+):
+    """Uploads a profile picture for the current staff member (jpg, png, webp up to 5 MB)."""
+    from services import attachment_service, storage_service
+
+    if not file.filename:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is required")
+    ext = attachment_service._extension(file.filename)
+    if ext not in ("jpg", "jpeg", "png", "webp"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Photo must be a JPG, PNG, or WebP image")
+
+    max_bytes = 5 * 1024 * 1024
+    content = bytearray()
+    head = b""
+    while chunk := file.file.read(64 * 1024):
+        if len(head) < 16:
+            head += chunk[:16 - len(head)]
+        content.extend(chunk)
+        if len(content) > max_bytes:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Photo is larger than 5 MB")
+
+    if not content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is empty")
+    if not attachment_service._matches_signature(ext, head):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"File does not match its .{ext} extension")
+
+    content_type = attachment_service._CONTENT_TYPES.get(ext, "image/jpeg")
+    _, url = storage_service.save_file(bytes(content), file.filename, content_type, folder="avatars", is_public=True)
+
+    ctx.user.avatar_url = url
+    ctx.db.commit()
+    ctx.db.refresh(ctx.user)
+    return staff_profile(ctx.db, ctx)
+
+
+@router.delete("/avatar")
+def delete_staff_avatar(
+    ctx: AccessContext = Depends(get_access_context),
+):
+    """Removes the staff member's profile photo."""
+    ctx.user.avatar_url = None
+    ctx.db.commit()
+    ctx.db.refresh(ctx.user)
     return staff_profile(ctx.db, ctx)
 
 

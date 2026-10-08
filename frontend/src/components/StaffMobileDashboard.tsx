@@ -1,13 +1,15 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpCircle, ChevronRight } from "lucide-react";
-import { api, ComplaintData, DashboardStats } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
+import { api, ComplaintData, DashboardStats, resolveAvatarUrl } from "@/lib/api";
+import { formatDateTime, initials } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { scopeLabel } from "./ScopeEditor";
 import { StatusBadge } from "./ui";
+import { ChangeAvatarModal } from "./ChangeAvatarModal";
 
 function greetingFor(hour: number) {
   if (hour < 12) return "Good morning";
@@ -26,6 +28,7 @@ export function StaffMobileDashboard() {
   const [complaints, setComplaints] = useState<ComplaintData[] | null>(null);
   const [loading, setLoading] = useState(canViewComplaints);
   const [toggling, setToggling] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   useEffect(() => {
     if (!canViewComplaints) {
@@ -169,6 +172,18 @@ export function StaffMobileDashboard() {
             <span className={`h-2 w-2 rounded-full ${me.is_available ? "bg-emerald-500" : "bg-slate-400"}`} />
             {me.is_available ? "Available" : "Off duty"}
           </button>
+          <button
+            type="button"
+            onClick={() => setAvatarOpen(true)}
+            aria-label="Profile photo"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-xs overflow-hidden shadow-xs cursor-pointer"
+          >
+            {me.avatar_url ? (
+              <img src={resolveAvatarUrl(me.avatar_url)!} alt={me.name} className="w-full h-full object-cover" />
+            ) : (
+              initials(me.name)
+            )}
+          </button>
         </div>
       </div>
 
@@ -291,6 +306,7 @@ export function StaffMobileDashboard() {
           </ul>
         )}
       </section>
+      {avatarOpen && <ChangeAvatarModal onClose={() => setAvatarOpen(false)} />}
     </div>
   );
 }

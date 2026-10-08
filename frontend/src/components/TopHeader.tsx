@@ -1,10 +1,11 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, ChevronDown, KeyRound, LogOut, MapPin, Menu, Search, Shield } from "lucide-react";
-import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/api";
+import { Bell, Camera, ChevronDown, KeyRound, LogOut, MapPin, Menu, Search, Shield } from "lucide-react";
+import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT, resolveAvatarUrl } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatDateTime, initials } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
@@ -12,6 +13,7 @@ import { useSession } from "@/lib/session";
 import { scopeLabel } from "./ScopeEditor";
 import { QuickActionsBar } from "./QuickActionsBar";
 import { ChangePasswordModal } from "./ChangePasswordForm";
+import { ChangeAvatarModal } from "./ChangeAvatarModal";
 
 /** Closes a popover on outside click or Escape. */
 function usePopover() {
@@ -154,6 +156,7 @@ function UserMenu() {
   const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
   const [error, setError] = useState<string | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   return (
     <div className="relative" ref={menuRef}>
@@ -163,8 +166,12 @@ function UserMenu() {
         aria-expanded={menuOpen}
         aria-label="Account menu"
       >
-        <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-bold text-xs">
-          {initials(me.name)}
+        <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-bold text-xs overflow-hidden">
+          {me.avatar_url ? (
+            <img src={resolveAvatarUrl(me.avatar_url)!} alt={me.name} className="w-full h-full object-cover" />
+          ) : (
+            initials(me.name)
+          )}
         </span>
         <span className="text-xs font-semibold text-slate-800 hidden md:inline-block max-w-35 truncate">{me.name}</span>
         <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden md:inline-block" />
@@ -212,6 +219,15 @@ function UserMenu() {
           {error && <p className="px-3.5 py-1 text-[11px] text-rose-600">{error}</p>}
           <button
             onClick={() => {
+              setAvatarOpen(true);
+              setMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer text-left"
+          >
+            <Camera className="w-3.5 h-3.5" /> Change profile photo
+          </button>
+          <button
+            onClick={() => {
               setPasswordOpen(true);
               setMenuOpen(false);
             }}
@@ -228,6 +244,7 @@ function UserMenu() {
         </div>
       )}
       {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
+      {avatarOpen && <ChangeAvatarModal onClose={() => setAvatarOpen(false)} />}
     </div>
   );
 }

@@ -1,9 +1,11 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React from "react";
 import Link from "next/link";
 import { User, Plus } from "lucide-react";
 import { currentHour } from "@/lib/portalFormat";
+import { resolveAvatarUrl } from "@/lib/portalApi";
 import { useEndUser } from "@/lib/portalSession";
 
 function greetingFor(hour: number) {
@@ -40,9 +42,13 @@ export default function Greeting() {
         <Link
           href="/dashboard/profile"
           aria-label="Profile"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#dce9fd] text-blue-600 transition-transform active:scale-95 md:hidden"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#dce9fd] text-blue-600 transition-transform active:scale-95 md:hidden overflow-hidden"
         >
-          <User className="h-6 w-6" strokeWidth={2.2} />
+          {profile.avatar_url ? (
+            <img src={resolveAvatarUrl(profile.avatar_url)!} alt={profile.name} className="h-full w-full object-cover" />
+          ) : (
+            <User className="h-6 w-6" strokeWidth={2.2} />
+          )}
         </Link>
       </div>
     </div>

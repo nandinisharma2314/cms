@@ -56,6 +56,7 @@ def serialize_end_users(db: Session, end_users: list[EndUser]) -> list[dict]:
             "is_active": e.is_active,
             "aadhar": e.aadhar,
             "pan_card": e.pan_card,
+            "avatar_url": e.avatar_url,
             "created_at": e.created_at.isoformat(),
             "last_login_at": e.last_login_at.isoformat() if e.last_login_at else None,
         }

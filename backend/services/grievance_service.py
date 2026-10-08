@@ -252,39 +252,47 @@ def save_grievance_attachments(
                 f"{upload.filename}: file type not allowed (allowed: {', '.join(allowed)})",
             )
 
+    from services import storage_service
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     rows = []
     for upload in files:
         ext = _extension(upload.filename)
         storage_name = f"grv_{uuid.uuid4().hex}.{ext}"
-        path = UPLOAD_DIR / storage_name
-        stored.paths.append(path)
         size = 0
         head = b""
-        try:
-            with open(path, "wb") as f:
-                while chunk := upload.file.read(64 * 1024):
-                    size += len(chunk)
-                    if size > max_bytes:
-                        raise HTTPException(
-                            status.HTTP_400_BAD_REQUEST,
-                            f"{upload.filename}: file exceeds the size limit",
-                        )
-                    if len(head) < 32:
-                        head += chunk[: 32 - len(head)]
-                    f.write(chunk)
-        except Exception:
-            path.unlink(missing_ok=True)
-            raise
+        buffer = bytearray()
+        while chunk := upload.file.read(64 * 1024):
+            size += len(chunk)
+            if size > max_bytes:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"{upload.filename}: file exceeds the size limit",
+                )
+            if len(head) < 32:
+                head += chunk[: 32 - len(head)]
+            buffer.extend(chunk)
 
         if not _matches_signature(ext, head):
-            path.unlink(missing_ok=True)
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 f"{upload.filename}: file content does not match its .{ext} extension",
             )
 
         content_type = attachment_service._CONTENT_TYPES.get(ext, "application/octet-stream")
+        if storage_service.is_r2_enabled():
+            storage_service.get_s3_client().put_object(
+                Bucket=storage_service.R2_BUCKET,
+                Key=storage_name,
+                Body=bytes(buffer),
+                ContentType=content_type,
+            )
+            stored.keys.append(storage_name)
+        else:
+            path = UPLOAD_DIR / storage_name
+            stored.paths.append(path)
+            with open(path, "wb") as f:
+                f.write(buffer)
         attachment = StaffGrievanceAttachment(
             grievance=grievance,
             storage_name=storage_name,

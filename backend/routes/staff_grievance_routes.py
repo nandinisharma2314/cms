@@ -468,6 +468,23 @@ def download_attachment(
 
     check_grievance_access(ctx.db, att.grievance, ctx)
 
+    from services import storage_service
+    from fastapi.responses import RedirectResponse, Response
+
+    if storage_service.is_r2_enabled():
+        presigned = storage_service.get_presigned_url(att.storage_name, expires_in=max(60, expires - settings_service.unix_now()))
+        if presigned:
+            return RedirectResponse(presigned, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        try:
+            data, _ = storage_service.get_file(att.storage_name)
+            return Response(
+                content=data,
+                media_type=att.content_type,
+                headers={"Content-Disposition": f"attachment; filename=\"{att.file_name}\""},
+            )
+        except Exception:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found in storage.")
+
     path = UPLOAD_DIR / att.storage_name
     if not path.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found on storage disk.")

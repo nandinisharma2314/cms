@@ -186,6 +186,16 @@ RESET_REQUESTS_PER_IP_PER_HOUR = _int("RESET_REQUESTS_PER_IP_PER_HOUR", 1, 10000
 
 _upload_dir = Path(_str("UPLOAD_DIR"))
 UPLOAD_DIR = _upload_dir if _upload_dir.is_absolute() else (BASE_DIR / _upload_dir)
+
+# Cloudflare R2 / S3 Object Storage (optional; defaults to local disk)
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").strip().lower()
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip() or None
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "").strip() or None
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "").strip() or None
+R2_BUCKET = os.getenv("R2_BUCKET", "").strip() or None
+R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "").strip().rstrip("/") or None
+R2_CUSTOM_ENDPOINT = os.getenv("R2_CUSTOM_ENDPOINT", "").strip() or None
+
 MAX_CSV_UPLOAD_BYTES = _int("MAX_CSV_UPLOAD_BYTES", 1024, 500 * 1024 * 1024)
 MAX_IMPORT_ROWS = _int("MAX_IMPORT_ROWS", 1, 1_000_000)
 # How alike (0-1) a new location name must be to an existing sibling to be flagged as a likely typo.
