@@ -418,6 +418,8 @@ def _apply_reward_filters(
     if date_to:
         try:
             dt = datetime.fromisoformat(date_to)
+            if len(date_to) <= 10:
+                dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
             query = query.filter(RewardTransaction.created_at <= dt)
         except ValueError:
             pass
@@ -457,7 +459,7 @@ def _apply_reward_filters(
         query = query.filter(RewardTransaction.rule_type == rule_type)
 
     if complaint_id:
-        query = query.join(RewardTransaction.complaint).filter(
+        query = query.outerjoin(Complaint, RewardTransaction.complaint_id == Complaint.id).filter(
             or_(
                 Complaint.generated_id.ilike(f"%{complaint_id}%"),
                 func.cast(Complaint.id, func.CHAR).ilike(f"%{complaint_id}%"),
@@ -465,12 +467,17 @@ def _apply_reward_filters(
         )
 
     if q:
-        term = f"%{q}%"
-        query = query.join(RewardTransaction.user).filter(
-            or_(
-                User.name.ilike(term),
-                User.email.ilike(term),
-                RewardTransaction.description.ilike(term),
+        term = f"%{q.strip()}%"
+        query = (
+            query.outerjoin(User, RewardTransaction.user_id == User.id)
+            .outerjoin(Complaint, RewardTransaction.complaint_id == Complaint.id)
+            .filter(
+                or_(
+                    User.name.ilike(term),
+                    User.email.ilike(term),
+                    RewardTransaction.description.ilike(term),
+                    Complaint.generated_id.ilike(term),
+                )
             )
         )
 
