@@ -3,13 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import { useDocumentTitle } from "@/lib/portalConfig";
-import { api } from "@/lib/portalApi";
+import { api, resolveAvatarUrl } from "@/lib/portalApi";
 
 type HierarchyNode = {
   id: string;
   name: string;
   role: string;
   initials: string;
+  avatar_url?: string;
   color?: string;
   bgColor?: string;
   isMe?: boolean;
@@ -43,7 +44,11 @@ function OrgNode({ node }: { node: HierarchyNode }) {
             node.isMe ? "ring-2 ring-indigo-500 ring-offset-1" : "border border-white"
           }`}
         >
-          <span className={`text-[12px] sm:text-[14px] font-bold ${node.color}`}>{node.initials}</span>
+          {node.avatar_url ? (
+            <img src={resolveAvatarUrl(node.avatar_url)!} alt={node.name} className="w-full h-full rounded-full object-cover" />
+          ) : (
+            <span className={`text-[12px] sm:text-[14px] font-bold ${node.color}`}>{node.initials}</span>
+          )}
           {node.isMe && (
             <span className="absolute -top-1 -right-1 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[8px] font-bold text-white shadow-sm z-20">
               You
