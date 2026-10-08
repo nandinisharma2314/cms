@@ -31,7 +31,10 @@ def _alembic_config() -> Config:
 
 
 def wait_for_db(timeout_seconds: int = 60) -> None:
-    """Waits for the database server to be available and accepting connections."""
+    """Waits for the database server to be available and accepting connections.
+    If the target database does not exist on MySQL/MariaDB, automatically creates it."""
+    from sqlalchemy.engine import create_engine as sa_create_engine, make_url
+    from config import DATABASE_URI
     from database import engine
 
     start = time.time()
@@ -43,6 +46,20 @@ def wait_for_db(timeout_seconds: int = 60) -> None:
                 return
         except Exception as e:
             last_err = e
+            err_msg = str(e).lower()
+            if "1049" in err_msg or "unknown database" in err_msg:
+                try:
+                    url = make_url(DATABASE_URI)
+                    db_name = url.database
+                    if db_name:
+                        server_url = url.set(database=None)
+                        temp_engine = sa_create_engine(server_url)
+                        with temp_engine.connect() as conn:
+                            conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+                            conn.commit()
+                        continue
+                except Exception as create_err:
+                    last_err = create_err
             time.sleep(1.5)
     raise RuntimeError(f"Database did not become ready within {timeout_seconds}s: {last_err}")
 
