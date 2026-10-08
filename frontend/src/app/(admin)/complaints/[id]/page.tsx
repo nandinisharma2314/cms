@@ -746,45 +746,11 @@ function ComplaintView() {
                 </div>
               )}
             </Card>
+
+            {detail.status !== "CLOSED" && detail.status !== "RESOLVED" && (
+              <PotentialDuplicatesPanel complaintId={detail.id} />
+            )}
           </div>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        <div className="lg:col-span-8 space-y-5">
-          <Card className="p-5 space-y-2">
-            <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap wrap-break-word">{detail.description}</p>
-            {detail.additional_details && <p className="text-xs text-slate-500">{detail.additional_details}</p>}
-            <AttachmentLinks attachments={detail.attachments.filter((a) => a.comment_id === null)} />
-            {detail.resolution_note && (
-              <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-xs">
-                <div className="font-semibold text-emerald-800">Resolution</div>
-                <p className="text-emerald-900 mt-0.5 whitespace-pre-wrap">{detail.resolution_note}</p>
-              </div>
-            )}
-          </Card>
-
-          {detail.status !== "CLOSED" && detail.status !== "RESOLVED" && (
-            <PotentialDuplicatesPanel complaintId={detail.id} />
-          )}
-
-          <Card className="p-5 space-y-4">
-            <h2 className="text-sm font-bold text-slate-800">Actions</h2>
-            <ActionsPanel detail={detail} onUpdate={setData} />
-            {detail.can_reclassify && (
-              <ReclassifyPanel
-                key={`${detail.department_id}-${detail.category_id}-${detail.location_detail.id}-${detail.priority.id}`}
-                detail={detail}
-                onUpdate={setData}
-              />
-            )}
-            <RejectionPanel detail={detail} onUpdate={setData} />
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-              <MessageSquare className="w-4 h-4 text-slate-400" aria-hidden="true" /> Conversation
-            </h2>
-            <Conversation detail={detail} onUpdate={setData} />
-          </Card>
-        </div>
 
           <div className="lg:col-span-4 space-y-5">
             <Card className="p-5 grid grid-cols-2 gap-4">
@@ -792,8 +758,7 @@ function ComplaintView() {
               <DetailRow label="Category">{detail.category ?? "Not set"}</DetailRow>
               <div className="col-span-2">
                 <DetailRow label="Location">
-                  <div className="flex items-start gap-1.5 mt-1  rounded-lg ">
-                    
+                  <div className="flex items-start gap-1.5 mt-1 rounded-lg">
                     <div className="text-[12px] leading-relaxed text-slate-600">
                       {detail.location_detail.label.split(" > ").map((part, index, array) => (
                         <React.Fragment key={index}>
