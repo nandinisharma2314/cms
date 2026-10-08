@@ -1,20 +1,24 @@
-# The whole stack: MariaDB, the API, the background worker and both web apps.
+# Complaint Management System — Zero-Touch Production & Development Stack
 #
-#   cp .env.example .env                    # database credentials and public URLs
-#   cp backend/.env.example backend/.env    # API settings (DATABASE_URI is set here instead)
+# Quickstart:
+#   cp .env.example .env
 #   docker compose up --build -d
-#   docker compose run --rm api python manage.py create-super-admin --name "..." --email ...
 #
-# Every variable marked :? must be set in .env; compose refuses to start otherwise.
+# Docker will automatically:
+#   1. Start MariaDB and initialize InnoDB.
+#   2. Apply all Alembic database migrations to head.
+#   3. Bootstrap system roles, permissions, settings, location levels, SLA rules,
+#      escalations, rejection reasons, rewards & perks catalog.
+#   4. Provision the initial Super Admin account (configurable via SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD).
+#   5. Start the FastAPI API server, the background worker, and the Next.js web application.
 
-# The API's database URL points at the db service; it overrides the one in backend/.env.
-# A password with URL-special characters (@ : / ? #) must be percent-encoded in .env.
-x-database-uri: &database-uri mysql+pymysql://${DB_USER:?set DB_USER in .env}:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:3306/${DB_NAME:?set DB_NAME in .env}?charset=utf8mb4
+x-database-uri: &database-uri mysql+pymysql://${DB_USER:-cms}:${DB_PASSWORD:-cmspassword}@db:3306/${DB_NAME:-cms}?charset=utf8mb4
 
 x-api-image: &api-image
   build:
     context: ./backend
-  env_file: ./backend/.env
+  env_file:
+    - .env
   environment:
     DATABASE_URI: *database-uri
 
@@ -23,25 +27,30 @@ services:
     image: mariadb:11.8
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
-      MARIADB_DATABASE: ${DB_NAME:?set DB_NAME in .env}
-      MARIADB_USER: ${DB_USER:?set DB_USER in .env}
-      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MARIADB_DATABASE: ${DB_NAME:-cms}
+      MARIADB_USER: ${DB_USER:-cms}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-cmspassword}
     volumes:
       - db-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 15
+      start_period: 15s
 
-  # Creates or upgrades the schema, then exits; the API starts only after it succeeded.
+  # Runs migrations and syncs system defaults, then exits; api and worker start only after success.
   migrate:
     <<: *api-image
     command: ["python", "manage.py", "migrate"]
+    environment:
+      DATABASE_URI: *database-uri
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@kvontech.com}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-Admin@12345}
+      SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
     healthcheck:
-      disable: true  # the image's check probes the HTTP server, which only the api service runs
+      disable: true
     depends_on:
       db:
         condition: service_healthy
@@ -59,10 +68,12 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET: ${R2_BUCKET:-}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
-      # The worker service does the background work; the API process doesn't.
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@kvontech.com}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-Admin@12345}
+      SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
       WORKER_INTERVAL_SECONDS: "0"
     ports:
-      - "${API_PORT:?set API_PORT in .env}:5000"
+      - "${API_PORT:-5000}:5000"
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -83,7 +94,7 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in .env}
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:5000}
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

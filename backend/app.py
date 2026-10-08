@@ -29,14 +29,25 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Refuse to serve an unmigrated or unsynced database rather than fail on the first request.
+    # Ensure database schema is migrated and system data is synchronized
+    problem = schema_problem(engine)
+    needs_sync = False
+    try:
+        with SessionLocal() as db:
+            if system_data_problems(db):
+                needs_sync = True
+    except Exception:
+        needs_sync = True
+
+    if problem or needs_sync:
+        logging.info("Auto-migrating and bootstrapping system data...")
+        from manage import migrate
+        migrate()
+
     problem = schema_problem(engine)
     if problem:
         raise RuntimeError(f"Cannot start: {problem}")
-    with SessionLocal() as db:
-        problems = system_data_problems(db)
-    if problems:
-        raise RuntimeError(f"Cannot start: {'; '.join(problems)}; run `python manage.py migrate`")
+
     worker = asyncio.create_task(run_forever(WORKER_INTERVAL_SECONDS)) if WORKER_INTERVAL_SECONDS > 0 else None
     yield
     if worker is not None:

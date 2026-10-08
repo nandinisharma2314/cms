@@ -9,18 +9,21 @@ End users register complaints and follow them; staff route, work, escalate and r
 
 Nothing organisation-specific lives in the code: the name, support contacts, time zone, phone format, complaint numbering and limits are set by the Super Admin under *Settings* and served by `GET /public/config`. The application ships without sample data.
 
-## Run with Docker
+## Run with Docker (Zero-Touch 1-Step Deployment)
 
 ```bash
-cp .env.example .env                    # database credentials, ports, the API's public URL
-cp backend/.env.example backend/.env    # API settings; its DATABASE_URI is replaced by compose
-docker compose up --build -d
-docker compose run --rm api python manage.py create-super-admin --name "Your Name" --email you@example.org
+cp .env.example .env                    # copy unified environment file
+docker compose up --build -d            # start MariaDB, auto-migrate DB, auto-bootstrap defaults, launch API & UI
 ```
 
-Compose starts MariaDB, runs `manage.py migrate` once, then starts the API, a separate background worker and the frontend. The frontend is built for the `PUBLIC_API_URL` in `.env`; rebuild it (`docker compose build frontend`) after changing it, and list its URL in `CORS_ORIGINS` in `backend/.env`. Uploads and the database live in the `uploads` and `db-data` volumes. Put a TLS-terminating reverse proxy in front for production, add its address to `backend/.env` as `FORWARDED_ALLOW_IPS` (so rate limits see real client addresses), and cap request sizes there (see `backend/README.md`, *Sessions and security*).
+Docker automatically:
+1. Starts the MariaDB database service.
+2. Applies all Alembic database migrations to head.
+3. Automatically bootstraps system settings defaults, location hierarchy levels, default priorities & SLA rules, escalation policies, rejection reasons, and rewards & perks catalog.
+4. Creates the initial Super Admin account (default: `admin@kvontech.com` / `Admin@12345`, configurable via `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` in `.env`).
+5. Launches the FastAPI backend, background worker, and Next.js frontend on `http://localhost:3000`.
 
-Sign in to the app as the Super Admin and work through the setup checklist on the dashboard: *Settings*, *Locations*, *SLA & Escalation*, *Departments*, *Roles*.
+Sign in to the admin panel at `http://localhost:3000/login` with your Super Admin credentials to immediately start managing complaints and configuring custom rules.
 
 ## Develop locally
 

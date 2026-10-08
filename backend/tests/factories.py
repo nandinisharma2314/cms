@@ -5,7 +5,7 @@ import random
 from datetime import timedelta
 
 from models import (
-    ComplaintCategory, Department, EndUser, EscalationRule, LocationType, RejectionReason, Role, SystemSettings, User,
+    ComplaintCategory, Department, EndUser, EscalationRule, LocationType, Priority, RejectionReason, Role, SlaRule, SystemSettings, User,
     UserScope,
 )
 from services import priority_service, rejection_service, routing_service, workflow_service
@@ -99,17 +99,50 @@ def location_by_path(db, *names):
 def configure(db) -> dict:
     """Settings, levels, priorities (with SLA targets), escalation, reasons."""
     settings = db.get(SystemSettings, 1)
-    for key, value in SETTINGS.items():
-        setattr(settings, key, value)
+    if settings:
+        for key, value in SETTINGS.items():
+            setattr(settings, key, value)
+
+    existing_levels = {lt.depth: lt for lt in db.query(LocationType).all()}
     for depth, (key, name) in enumerate(LEVELS):
-        db.add(LocationType(key=key, name=name, depth=depth))
+        if depth in existing_levels:
+            existing_levels[depth].key = key
+            existing_levels[depth].name = name
+        else:
+            db.add(LocationType(key=key, name=name, depth=depth))
+    db.flush()
+
+    existing_priorities = {p.key: p for p in db.query(Priority).all()}
     priorities = {}
     for key, name, tone, response, resolution, warning in PRIORITIES:
-        priorities[key] = priority_service.create(db, key, name, tone, response, resolution, warning)
+        if key in existing_priorities:
+            p = existing_priorities[key]
+            p.name = name
+            p.tone = tone
+            sla = db.query(SlaRule).filter(SlaRule.priority_id == p.id, SlaRule.department_id.is_(None)).first()
+            if sla:
+                sla.response_hours = response
+                sla.resolution_hours = resolution
+                sla.warning_minutes = warning
+            else:
+                db.add(SlaRule(priority=p, department_id=None, response_hours=response, resolution_hours=resolution, warning_minutes=warning))
+            priorities[key] = p
+        else:
+            priorities[key] = priority_service.create(db, key, name, tone, response, resolution, warning)
+
     for breach_type in ("response", "resolution"):
-        db.add(EscalationRule(breach_type=breach_type, department_id=None, level_hours=24, max_level=4, is_active=True))
+        rule = db.query(EscalationRule).filter(EscalationRule.breach_type == breach_type, EscalationRule.department_id.is_(None)).first()
+        if rule:
+            rule.level_hours = 24
+            rule.max_level = 4
+            rule.is_active = True
+        else:
+            db.add(EscalationRule(breach_type=breach_type, department_id=None, level_hours=24, max_level=4, is_active=True))
+
+    existing_reasons = {r.name: r for r in db.query(RejectionReason).all()}
     for position, name in enumerate(REJECTION_REASONS, start=1):
-        db.add(RejectionReason(name=name, sort_order=position, is_active=True))
+        if name not in existing_reasons:
+            db.add(RejectionReason(name=name, sort_order=position, is_active=True))
     db.flush()
     return priorities
 

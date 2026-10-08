@@ -1,7 +1,7 @@
 """Administrative commands.
 
-    python manage.py migrate              # create/upgrade the schema and sync system data
-    python manage.py create-super-admin   # create the first Super Admin (prompts for details)
+    python manage.py migrate              # wait for DB, create/upgrade schema and sync system data
+    python manage.py create-super-admin   # create a Super Admin account
     python manage.py check                # report configuration problems
 
 `migrate` also upgrades databases created by older versions of the app (which
@@ -11,12 +11,13 @@ schema, records it as the baseline revision and upgrades from there.
 import argparse
 import getpass
 import sys
+import time
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from config import BASE_DIR
 
@@ -24,12 +25,33 @@ BASELINE_REVISION = "0001"
 
 
 def _alembic_config() -> Config:
-    return Config(str(Path(BASE_DIR) / "alembic.ini"))
+    cfg = Config(str(Path(BASE_DIR) / "alembic.ini"))
+    cfg.set_main_option("script_location", str(Path(BASE_DIR) / "migrations"))
+    return cfg
+
+
+def wait_for_db(timeout_seconds: int = 60) -> None:
+    """Waits for the database server to be available and accepting connections."""
+    from database import engine
+
+    start = time.time()
+    last_err = None
+    while time.time() - start < timeout_seconds:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                return
+        except Exception as e:
+            last_err = e
+            time.sleep(1.5)
+    raise RuntimeError(f"Database did not become ready within {timeout_seconds}s: {last_err}")
 
 
 def migrate() -> None:
     from database import SessionLocal, engine
     from services.bootstrap_service import sync_system_data
+
+    wait_for_db(timeout_seconds=60)
 
     cfg = _alembic_config()
     tables = set(inspect(engine).get_table_names())
@@ -43,7 +65,7 @@ def migrate() -> None:
     print("Database is up to date.")
 
 
-def create_super_admin(name: str, email: str, mobile: str | None) -> None:
+def create_super_admin(name: str, email: str, mobile: str | None, password: str | None = None) -> None:
     from fastapi import HTTPException
 
     from database import SessionLocal
@@ -60,9 +82,12 @@ def create_super_admin(name: str, email: str, mobile: str | None) -> None:
     clean_email = normalize_email(email)
     if clean_email is None:
         sys.exit("A valid email address is required.")
-    password = getpass.getpass("Password for the Super Admin: ")
-    if getpass.getpass("Repeat the password: ") != password:
-        sys.exit("The passwords do not match.")
+
+    if not password:
+        password = getpass.getpass("Password for the Super Admin: ")
+        if getpass.getpass("Repeat the password: ") != password:
+            sys.exit("The passwords do not match.")
+
     error = validate_password_strength(password)
     if error:
         sys.exit(error)
@@ -119,13 +144,14 @@ def main() -> None:
     admin.add_argument("--name", required=True)
     admin.add_argument("--email", required=True)
     admin.add_argument("--mobile", help="optional; needs the phone settings to be configured")
+    admin.add_argument("--password", help="optional password for non-interactive execution")
     sub.add_parser("check", help="report schema and configuration problems")
     args = parser.parse_args()
 
     if args.command == "migrate":
         migrate()
     elif args.command == "create-super-admin":
-        create_super_admin(args.name, args.email, args.mobile)
+        create_super_admin(args.name, args.email, args.mobile, password=args.password)
     else:
         sys.exit(check())
 
