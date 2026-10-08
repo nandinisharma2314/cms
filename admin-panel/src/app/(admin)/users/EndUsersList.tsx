@@ -50,6 +50,8 @@ function EndUserForm({
   const [locationId, setLocationId] = useState<number | null>(editing?.location?.id ?? null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
+  const [aadharError, setAadharError] = useState<string | null>(null);
+  const [panError, setPanError] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   // End users are placed by location only; any department scope covers them.
   const identityChanged = editing !== null && (mobile !== editing.mobile || email !== editing.email);
@@ -58,9 +60,13 @@ function EndUserForm({
     e.preventDefault();
     const nErr = validateName(name);
     const mErr = validatePhone(mobile);
+    const aErr = aadhar.trim() && aadhar.trim().length !== 12 ? "Aadhar must be exactly 12 digits." : null;
+    const pErr = panCard.trim() && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panCard.trim()) ? "Invalid PAN format." : null;
     setNameError(nErr);
     setMobileError(mErr);
-    if (nErr || mErr) return;
+    setAadharError(aErr);
+    setPanError(pErr);
+    if (nErr || mErr || aErr || pErr) return;
     run(async () => {
       if (locationId === null) {
         throw new Error("Please choose an assigned workplace location for this employee.");
@@ -143,20 +149,32 @@ function EndUserForm({
               onChange={(e) => setEmail(e.target.value)}
             />
           </Field>
-          <Field label="Aadhar">
+          <Field label="Aadhar" error={aadharError}>
             <input
               required
-              className={inputClass}
+              className={aadharError ? `${inputClass} !border-red-400` : inputClass}
+              placeholder="e.g., 123456789012"
+              maxLength={12}
               value={aadhar}
-              onChange={(e) => setAadhar(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, 12);
+                setAadhar(val);
+                setAadharError(val && val.length !== 12 ? "Aadhar must be exactly 12 digits." : null);
+              }}
             />
           </Field>
-          <Field label="PAN Card">
+          <Field label="PAN Card" error={panError}>
             <input
               required
-              className={inputClass}
+              className={panError ? `${inputClass} !border-red-400` : inputClass}
+              placeholder="e.g., ABCDE1234F"
+              maxLength={10}
               value={panCard}
-              onChange={(e) => setPanCard(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 10);
+                setPanCard(val);
+                setPanError(val && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val) ? "Invalid PAN format." : null);
+              }}
             />
           </Field>
         </div>
@@ -254,7 +272,7 @@ export function EndUsersList() {
       />
       <input
         type="search"
-        className={`${inputClass} sm:max-w-xs`}
+        className={`${inputClass} sm:max-w-xs my-6`}
         placeholder="Search name, mobile, email or user ID"
         aria-label="Search end users"
         value={search}
@@ -270,13 +288,13 @@ export function EndUsersList() {
         <table className="w-full min-w-215 text-left text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider">
-              <th className="px-3 py-3 font-semibold">Name</th>
-              <th className="px-3 py-3 font-semibold">Mobile</th>
-              <th className="px-3 py-3 font-semibold">Email</th>
-              <th className="px-3 py-3 font-semibold">Location</th>
-              <th className="px-3 py-3 font-semibold">Status</th>
-              <th className="px-3 py-3 font-semibold">Last sign-in</th>
-              <th className="px-5 py-3">
+              <th className="px-4 py-5 font-semibold">Name</th>
+              <th className="px-4 py-5 font-semibold">Mobile</th>
+              <th className="px-4 py-5 font-semibold">Email</th>
+              <th className="px-4 py-5 font-semibold">Location</th>
+              <th className="px-4 py-5 font-semibold">Status</th>
+              <th className="px-4 py-5 font-semibold">Last sign-in</th>
+              <th className="px-5 py-5">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -291,19 +309,19 @@ export function EndUsersList() {
             ) : (
               data.items.map((row) => (
                 <tr key={row.id} className="hover:bg-slate-50/70">
-                  <td className="px-3 py-3 font-bold text-slate-800">
+                  <td className="px-4 py-5 font-bold text-slate-800">
                     <Link href={`/users/end-user/${row.id}`} className="hover:text-sky-700 hover:underline">
                       {row.name}
                     </Link>
                   </td>
-                  <td className="px-3 py-3 text-slate-600">{row.mobile}</td>
-                  <td className="px-3 py-3 text-slate-600">{row.email}</td>
-                  <td className="px-3 py-3 text-slate-600">{row.location?.label ?? "—"}</td>
-                  <td className="px-3 py-3">
+                  <td className="px-4 py-5 text-slate-600">{row.mobile}</td>
+                  <td className="px-4 py-5 text-slate-600">{row.email}</td>
+                  <td className="px-4 py-5 text-slate-600">{row.location?.label ?? "—"}</td>
+                  <td className="px-4 py-5">
                     <StatusPill active={row.is_active} />
                   </td>
-                  <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{formatDateTime(row.last_login_at)}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-5 text-slate-500 whitespace-nowrap">{formatDateTime(row.last_login_at)}</td>
+                  <td className="px-5 py-5">
                     {can("end_user.update") && (
                       <div className="flex justify-end gap-1">
                         <button

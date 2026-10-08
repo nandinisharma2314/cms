@@ -35,6 +35,8 @@ interface FormState {
   name: string;
   email: string;
   mobile: string;
+  aadhar: string;
+  pan_card: string;
   role_id: number | null;
   password: string;
   reports_to_id: number | null;
@@ -54,6 +56,8 @@ function toForm(user: StaffUser): FormState {
     name: user.name,
     email: user.email,
     mobile: user.mobile ?? "",
+    aadhar: user.aadhar ?? "",
+    pan_card: user.pan_card ?? "",
     role_id: user.role.id,
     password: "",
     reports_to_id: user.reports_to?.id ?? null,
@@ -91,6 +95,8 @@ function UserForm({
             name: "",
             email: "",
             mobile: "",
+            aadhar: "",
+            pan_card: "",
             role_id: null,
             password: "",
             reports_to_id: null,
@@ -111,6 +117,8 @@ function UserForm({
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
+  const [aadharError, setAadharError] = useState<string | null>(null);
+  const [panError, setPanError] = useState<string | null>(null);
   const problems = !editing && form.password ? passwordProblems(form.password, rules) : [];
 
   const assignableDepartments = useMemo(() => {
@@ -169,9 +177,13 @@ function UserForm({
     e.preventDefault();
     const nErr = validateName(form.name);
     const mErr = form.mobile.trim() ? validatePhone(form.mobile) : null;
+    const aErr = form.aadhar.trim() && form.aadhar.trim().length !== 12 ? "Aadhar must be exactly 12 digits." : null;
+    const pErr = form.pan_card.trim() && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.pan_card.trim()) ? "Invalid PAN format." : null;
     setNameError(nErr);
     setMobileError(mErr);
-    if (nErr || mErr) return;
+    setAadharError(aErr);
+    setPanError(pErr);
+    if (nErr || mErr || aErr || pErr) return;
     if (form.role_id === null) {
       setError("Choose a role.");
       return;
@@ -201,6 +213,8 @@ function UserForm({
           if (form.mobile.trim()) changes.mobile = form.mobile;
           else changes.clear_mobile = true;
         }
+        if (form.aadhar.trim() !== initial.aadhar) changes.aadhar = form.aadhar.trim() || null;
+        if (form.pan_card.trim() !== initial.pan_card) changes.pan_card = form.pan_card.trim() || null;
         if (form.role_id !== initial.role_id) changes.role_id = form.role_id;
         if (form.reports_to_id !== initial.reports_to_id) {
           if (form.reports_to_id === null) changes.clear_reports_to = true;
@@ -230,6 +244,8 @@ function UserForm({
           name: form.name,
           email: form.email,
           mobile: form.mobile.trim() || null,
+          aadhar: form.aadhar.trim() || null,
+          pan_card: form.pan_card.trim() || null,
           role_id: form.role_id,
           password: form.password,
           reports_to_id: form.reports_to_id,
@@ -297,6 +313,32 @@ function UserForm({
                 const val = e.target.value.replace(/\D/g, "").slice(0, 10);
                 setForm({ ...form, mobile: val });
                 setMobileError(val ? validatePhone(val) : null);
+              }}
+            />
+          </Field>
+          <Field label="Aadhar" error={aadharError}>
+            <input
+              className={aadharError ? `${inputClass} !border-red-400` : inputClass}
+              placeholder="e.g., 123456789012"
+              maxLength={12}
+              value={form.aadhar}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, 12);
+                setForm({ ...form, aadhar: val });
+                setAadharError(val && val.length !== 12 ? "Aadhar must be exactly 12 digits." : null);
+              }}
+            />
+          </Field>
+          <Field label="PAN Card" error={panError}>
+            <input
+              className={panError ? `${inputClass} !border-red-400` : inputClass}
+              placeholder="e.g., ABCDE1234F"
+              maxLength={10}
+              value={form.pan_card}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 10);
+                setForm({ ...form, pan_card: val });
+                setPanError(val && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val) ? "Invalid PAN format." : null);
               }}
             />
           </Field>
@@ -615,18 +657,18 @@ function UsersList() {
         <Notice message={notice} />
       </div>
 
-      <Card className="mt-4 overflow-x-auto overflow-y-auto flex-1 min-h-0 mb-4 relative">
+      <Card className="mt-8 overflow-x-auto overflow-y-auto flex-1 min-h-0 mb-4 relative">
         <table className="w-full min-w-215 text-left text-xs relative">
           <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
             <tr className="border-b border-slate-100 text-slate-400 uppercase text-[11px] tracking-wider">
-              <th className="px-5 py-3 font-semibold">User</th>
-              <th className="px-3 py-3 font-semibold">Role</th>
-              <th className="px-3 py-3 font-semibold">Workplace</th>
-              <th className="px-3 py-3 font-semibold">Scope</th>
-              <th className="px-3 py-3 font-semibold">Reports to</th>
-              <th className="px-3 py-3 font-semibold">Status</th>
-              <th className="px-3 py-3 font-semibold">Last sign-in</th>
-              <th className="px-5 py-3">
+              <th className="px-5 py-5 font-semibold">User</th>
+              <th className="px-4 py-5 font-semibold">Role</th>
+              <th className="px-4 py-5 font-semibold">Workplace</th>
+              <th className="px-4 py-5 font-semibold">Scope</th>
+              <th className="px-4 py-5 font-semibold">Reports to</th>
+              <th className="px-4 py-5 font-semibold">Status</th>
+              <th className="px-4 py-5 font-semibold">Last sign-in</th>
+              <th className="px-5 py-5">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -641,14 +683,14 @@ function UsersList() {
             ) : (
               data.items.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50/70 align-top">
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-5">
                     <Link href={`/users/staff/${u.id}`} className="font-bold text-sky-700 hover:underline">
                       {u.name}
                     </Link>
                     <div className="text-[11px] text-slate-400">{u.email}</div>
                     {u.mobile && <div className="text-[11px] text-slate-400">{u.mobile}</div>}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-4 py-5">
                     <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded text-[10px]">
                       {u.role.name}
                     </span>
@@ -660,7 +702,7 @@ function UsersList() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-slate-600">
+                  <td className="px-4 py-5 text-slate-600">
                     {u.primary_department || u.primary_location ? (
                       <div>
                         {u.primary_department && <div className="font-medium text-slate-800">{u.primary_department.name}</div>}
@@ -672,15 +714,15 @@ function UsersList() {
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-slate-600">
+                  <td className="px-4 py-5 text-slate-600">
                     {u.scopes.length === 0 ? (
                       <span className="text-slate-400">Entire system</span>
                     ) : (
                       u.scopes.map((s, i) => <div key={i}>{scopeLabel(s)}</div>)
                     )}
                   </td>
-                  <td className="px-3 py-3 text-slate-600">{u.reports_to?.name ?? "—"}</td>
-                  <td className="px-3 py-3 space-y-1">
+                  <td className="px-4 py-5 text-slate-600">{u.reports_to?.name ?? "—"}</td>
+                  <td className="px-4 py-5 space-y-1">
                     <StatusPill active={u.is_active} />
                     {u.is_active && !u.is_available && (
                       <span className="block w-fit px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">
@@ -693,8 +735,8 @@ function UsersList() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{formatDateTime(u.last_login_at)}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-5 text-slate-500 whitespace-nowrap">{formatDateTime(u.last_login_at)}</td>
+                  <td className="px-5 py-5">
                     <div className="flex justify-end gap-1">
                       {can("user.update") && u.can_manage && (
                         <button

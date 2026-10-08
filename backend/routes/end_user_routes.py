@@ -16,6 +16,7 @@ from utils.csv_export import csv_response
 from utils.security import normalize_email
 from utils.search import text_match
 from utils.text import single_line
+import re
 
 router = APIRouter()
 
@@ -96,11 +97,15 @@ def _clean(db: Session, name: str | None, mobile: str | None, email: str | None,
     if aadhar is not None:
         if not aadhar.strip():
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Aadhar is required")
+        if not re.match(r"^\d{12}$", aadhar.strip()):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Aadhar must be exactly 12 digits")
         result["aadhar"] = single_line(aadhar, "Aadhar", max_length(EndUser.aadhar), required=True)
     if pan_card is not None:
         if not pan_card.strip():
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "PAN Card is required")
-        result["pan_card"] = single_line(pan_card, "PAN Card", max_length(EndUser.pan_card), required=True)
+        if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", pan_card.strip().upper()):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid PAN Card format")
+        result["pan_card"] = single_line(pan_card.upper(), "PAN Card", max_length(EndUser.pan_card), required=True)
     return result
 
 

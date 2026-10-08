@@ -14,6 +14,7 @@ from utils.auth_middleware import get_access_context, require_permission
 from utils.security import hash_password, normalize_email, utcnow, validate_password_strength
 from utils.search import text_match
 from utils.text import single_line
+import re
 
 router = APIRouter()
 
@@ -38,6 +39,8 @@ class CreateUserRequest(BaseModel):
     reports_to_id: int | None = None
     primary_department_id: int | None = None
     primary_location_id: int | None = None
+    aadhar: str | None = None
+    pan_card: str | None = None
     scopes: list[ScopeInput] = []
     custom_permissions: list[CustomPermissionInput] = []
 
@@ -54,6 +57,8 @@ class UpdateUserRequest(BaseModel):
     clear_primary_department: bool = False
     primary_location_id: int | None = None
     clear_primary_location: bool = False
+    aadhar: str | None = None
+    pan_card: str | None = None
     scopes: list[ScopeInput] | None = None
     custom_permissions: list[CustomPermissionInput] | None = None
     is_available: bool | None = None
@@ -94,6 +99,18 @@ def _clean_mobile(db: Session, mobile: str, exclude_id: int | None = None) -> st
         duplicate = duplicate.filter(User.id != exclude_id)
     if duplicate.first() is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Another staff account already uses this mobile number")
+    return clean
+
+def _clean_aadhar(aadhar: str) -> str:
+    clean = aadhar.strip()
+    if not re.match(r"^\d{12}$", clean):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Aadhar must be exactly 12 digits")
+    return clean
+
+def _clean_pan_card(pan_card: str) -> str:
+    clean = pan_card.strip().upper()
+    if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", clean):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid PAN Card format")
     return clean
 
 
@@ -210,6 +227,8 @@ def create_user(payload: CreateUserRequest, request: Request,
     name = _clean_name(payload.name)
     email = _clean_email(db, payload.email)
     mobile = _clean_mobile(db, payload.mobile) if payload.mobile and payload.mobile.strip() else None
+    aadhar = _clean_aadhar(payload.aadhar) if payload.aadhar and payload.aadhar.strip() else None
+    pan_card = _clean_pan_card(payload.pan_card) if payload.pan_card and payload.pan_card.strip() else None
     error = validate_password_strength(payload.password)
     if error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error)
@@ -222,6 +241,7 @@ def create_user(payload: CreateUserRequest, request: Request,
 
     user = User(
         name=name, email=email, mobile=mobile, role=role,
+        aadhar=aadhar, pan_card=pan_card,
         password_hash=hash_password(payload.password), must_change_password=True,
         reports_to=reports_to, primary_department=primary_dept, primary_location=primary_loc,
         created_by_id=ctx.user.id, scopes=scopes,
@@ -266,6 +286,10 @@ def update_user(
         user.mobile = None
     elif payload.mobile is not None:
         user.mobile = _clean_mobile(db, payload.mobile, exclude_id=user.id)
+    if payload.aadhar is not None:
+        user.aadhar = _clean_aadhar(payload.aadhar) if payload.aadhar.strip() else None
+    if payload.pan_card is not None:
+        user.pan_card = _clean_pan_card(payload.pan_card) if payload.pan_card.strip() else None
     role = _assignable_role(ctx, payload.role_id) if payload.role_id is not None else user.role
     if payload.scopes is not None:
         user.scopes = build_scopes(db, ctx, role, [s.model_dump() for s in payload.scopes])

@@ -197,6 +197,8 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(120), unique=True, index=True, nullable=False)
     mobile = Column(String(20), unique=True, nullable=True)
+    aadhar = Column(String(20), nullable=True)
+    pan_card = Column(String(20), nullable=True)
     password_hash = Column(String(255), nullable=False)
     # Set for passwords someone else chose (new accounts, approved resets).
     must_change_password = Column(Boolean, default=False, nullable=False)

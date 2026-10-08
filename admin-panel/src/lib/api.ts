@@ -59,6 +59,8 @@ export interface StaffUser {
   name: string;
   email: string;
   mobile: string | null;
+  aadhar?: string | null;
+  pan_card?: string | null;
   role: RoleRef;
   reports_to: { id: number; name: string } | null;
   primary_department?: { id: number; name: string } | null;
@@ -1159,6 +1161,8 @@ export const api = {
       name: string;
       email: string;
       mobile: string | null;
+      aadhar?: string | null;
+      pan_card?: string | null;
       role_id: number;
       password: string;
       reports_to_id: number | null;
@@ -1175,6 +1179,8 @@ export const api = {
         email: string;
         mobile: string;
         clear_mobile: boolean;
+        aadhar: string | null;
+        pan_card: string | null;
         role_id: number;
         reports_to_id: number;
         clear_reports_to: boolean;
