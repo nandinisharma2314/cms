@@ -260,6 +260,7 @@ def get_hierarchy(end_user: EndUser = Depends(get_current_end_user), db: Session
             "name": u.name,
             "role": u.role.name,
             "initials": "".join([n[0].upper() for n in u.name.split() if n])[:2] if u.name else "U",
+            "avatar_url": u.avatar_url,
             "isMe": False,
             "children": [],
             "reports_to_id": u.reports_to_id
@@ -288,6 +289,7 @@ def get_hierarchy(end_user: EndUser = Depends(get_current_end_user), db: Session
             "name": end_user.name,
             "role": "Me",
             "initials": "".join([n[0].upper() for n in end_user.name.split() if n])[:2] if end_user.name else "U",
+            "avatar_url": end_user.avatar_url,
             "isMe": True,
             "children": []
         })
