@@ -274,10 +274,12 @@ def staff_detail(ctx: AccessContext, complaint: Complaint) -> dict:
         "resolution_due_at": _iso(complaint.resolution_due_at),
         "resolution_breached_at": _iso(complaint.resolution_breached_at),
     }
+    in_department_scope = ctx.covers(complaint.department_id, complaint.location.path)
     data["actions"] = [
         {"key": a.key, "label": a.label, "note": a.note, "note_label": a.note_label}
-        for a in staff_actions_for(ctx, complaint)
+        for a in (staff_actions_for(ctx, complaint) if in_department_scope else [])
     ]
+
     data["rejection"] = {
         "can_request": rejection_service.can_request(ctx, complaint),
         "reasons": [rejection_service.serialize_reason(r) for r in rejection_service.list_reasons(ctx.db)],

@@ -2,12 +2,12 @@
 import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import func
 
 from models import RejectionReason, SystemSettings, max_length
-from services import audit_service, messaging, rejection_service, settings_service
+from services import audit_service, messaging, rejection_service, settings_service, storage_service
 from services.access_service import AccessContext
 from services.complaint_service import highest_number_used
 from utils.auth_middleware import require_permission
@@ -159,6 +159,38 @@ def update_settings(payload: SettingsRequest, request: Request,
 def configuration_status(ctx: AccessContext = Depends(require_permission("settings.manage"))):
     """What still has to be configured before the platform fully works."""
     return {"problems": settings_service.configuration_problems(ctx.db)}
+
+
+@router.post("/logo")
+def upload_logo(
+    request: Request,
+    file: UploadFile = File(...),
+    ctx: AccessContext = Depends(require_permission("settings.manage"))
+):
+    settings = settings_service.get_settings(ctx.db, for_update=True)
+    before = settings_service.serialize_settings(settings)
+    
+    content = file.file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is larger than 2MB")
+
+    content_type = file.content_type or "application/octet-stream"
+    if not content_type.startswith("image/"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File must be an image")
+
+    _, url = storage_service.save_file(bytes(content), file.filename, content_type, folder="logos", is_public=True)
+    
+    settings.logo_url = url
+    settings.updated_at = utcnow()
+    settings.updated_by_id = ctx.user.id
+    ctx.db.commit()
+    
+    after = settings_service.serialize_settings(settings)
+    
+    audit_service.record(ctx.db, actor=ctx.user, action="settings.logo_upload", entity_type="settings", entity_id=1,
+                         summary="Uploaded new organisation logo", changes={"logo_url": [before.get("logo_url"), url]}, request=request)
+    
+    return {"logo_url": url}
 
 
 # ---------------------------------------------------------------------------

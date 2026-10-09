@@ -9,7 +9,7 @@ from services import audit_service, team_service
 from services.access_service import AccessContext
 from services.complaint_service import serialize_complaints
 from services.user_service import serialize_users
-from utils.auth_middleware import require_permission
+from utils.auth_middleware import get_access_context
 from utils.text import single_line
 
 router = APIRouter()
@@ -27,7 +27,7 @@ class ReassignComplaintRequest(BaseModel):
 
 @router.get("/managers")
 def list_managers(
-    ctx: AccessContext = Depends(require_permission("team.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """Returns a list of managers accessible to the current user."""
     db = ctx.db
@@ -41,7 +41,7 @@ def get_dashboard(
     date_to: date | None = None,
     direct_only: bool = False,
     manager_id: int | None = None,
-    ctx: AccessContext = Depends(require_permission("team.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """Team overview with aggregated performance metrics and per-member breakdown."""
     return team_service.get_team_dashboard(ctx, date_from, date_to, direct_only, manager_id)
@@ -51,7 +51,7 @@ def get_dashboard(
 def list_members(
     direct_only: bool = False,
     manager_id: int | None = None,
-    ctx: AccessContext = Depends(require_permission("team.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """Returns direct or recursive team members under the current manager."""
     db = ctx.db
@@ -76,7 +76,7 @@ def list_members(
 @router.get("/members/{member_id}/complaints")
 def member_complaints(
     member_id: int,
-    ctx: AccessContext = Depends(require_permission("team.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """Returns active complaints assigned to a team member."""
     db = ctx.db
@@ -97,7 +97,7 @@ def member_complaints(
 @router.get("/members/{member_id}/profile")
 def get_member_profile(
     member_id: int,
-    ctx: AccessContext = Depends(require_permission("team.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """Returns a comprehensive profile for a specific member including hierarchy and stats."""
     return team_service.get_member_profile(ctx.db, ctx, member_id)
@@ -108,7 +108,7 @@ def set_member_availability(
     member_id: int,
     payload: AvailabilityToggleRequest,
     request: Request,
-    ctx: AccessContext = Depends(require_permission("team.manage")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """Manager override for team member availability (e.g. marking on unplanned leave)."""
     db = ctx.db
@@ -141,7 +141,7 @@ def set_member_availability(
 def reassign_complaint(
     payload: ReassignComplaintRequest,
     request: Request,
-    ctx: AccessContext = Depends(require_permission("team.manage")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """Manager action: reassign a complaint to a team member."""
     db = ctx.db

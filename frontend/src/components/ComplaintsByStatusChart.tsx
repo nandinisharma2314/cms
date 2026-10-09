@@ -37,7 +37,7 @@ export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardSt
   }));
 
   return (
-    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-200/60 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] h-full transition-shadow hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+    <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-200/60  shadow-[0_2px_12px_rgba(0,0,0,0.04)] h-full transition-shadow hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <h2 className="text-base font-bold text-slate-800">Complaints by status</h2>
         <CardDateFilter onChange={setDateRange} />

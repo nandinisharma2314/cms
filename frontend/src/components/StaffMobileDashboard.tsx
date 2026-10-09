@@ -26,6 +26,7 @@ export function StaffMobileDashboard() {
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [complaints, setComplaints] = useState<ComplaintData[] | null>(null);
+  const [createdComplaints, setCreatedComplaints] = useState<ComplaintData[] | null>(null);
   const [loading, setLoading] = useState(canViewComplaints);
   const [toggling, setToggling] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -41,10 +42,15 @@ export function StaffMobileDashboard() {
         assigned: isAgent ? "me" : undefined,
         page_size: 5,
       }),
+      api.complaints.list({
+        created_by: "me",
+        page_size: 5,
+      }),
     ])
-      .then(([statsData, complaintsData]) => {
+      .then(([statsData, complaintsData, createdData]) => {
         setStats(statsData);
         setComplaints(complaintsData.items);
+        setCreatedComplaints(createdData.items);
       })
       .catch(() => undefined)
       .finally(() => setLoading(false));
@@ -245,11 +251,6 @@ export function StaffMobileDashboard() {
         ) : !complaints || complaints.length === 0 ? (
           <p className="py-7 text-center text-[13px] text-slate-500">
             No active complaints in your queue.
-            {canCreate && (
-              <Link href="/complaints" className="block mt-1 font-semibold text-blue-600">
-                Register a complaint
-              </Link>
-            )}
           </p>
         ) : (
           <ul>
@@ -293,6 +294,61 @@ export function StaffMobileDashboard() {
           </ul>
         )}
       </section>
+
+      {/* 5. Requests You Raised */}
+      {(!loading && createdComplaints && createdComplaints.length > 0) && (
+        <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-1 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-[15px] font-bold text-[#0b1a3f]">Requests you raised</h2>
+            <Link
+              href="/complaints?created_by=me"
+              className="flex items-center text-[13px] font-semibold text-blue-600 hover:text-blue-700"
+            >
+              View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
+            </Link>
+          </div>
+
+          <ul>
+            {createdComplaints.map((c) => (
+              <li key={c.id} className="group">
+                <Link href={`/complaints/${encodeURIComponent(c.id)}`} className="flex w-full items-center gap-3 text-left">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
+                  <span className="flex min-w-0 flex-1 items-center gap-2 border-b border-slate-100 py-3 group-last:border-b-0">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-bold text-[#0b1a3f]">{c.title}</span>
+                      <span className="mt-0.5 block truncate text-[12px] text-slate-500">
+                        {c.id}
+                        <span className="mx-1 text-slate-300" aria-hidden="true">
+                          |
+                        </span>
+                        {c.department}
+                        {c.location && (
+                          <>
+                            <span className="mx-1 text-slate-300" aria-hidden="true">
+                              |
+                            </span>
+                            {c.location}
+                          </>
+                        )}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-slate-400">{formatDateTime(c.created_at)}</span>
+                    </span>
+                    <span className="shrink-0 flex flex-col items-end gap-1">
+                      <StatusBadge status={c.status} label={c.status_label} />
+                      {c.escalation && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600">
+                          <ArrowUpCircle className="w-3 h-3" /> L{c.escalation.level}
+                        </span>
+                      )}
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {avatarOpen && <ChangeAvatarModal onClose={() => setAvatarOpen(false)} />}
     </div>
   );

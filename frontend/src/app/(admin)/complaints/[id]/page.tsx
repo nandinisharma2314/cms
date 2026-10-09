@@ -736,7 +736,9 @@ function ComplaintView() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           <div className="lg:col-span-8 space-y-5">
             <Card className="p-5 space-y-2">
-              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap wrap-break-word">{detail.description}</p>
+              <p className="text-lg font-bold text-slate-700 leading-relaxed whitespace-pre-wrap wrap-break-word">
+                {(me.is_super_admin || me.role.key === "admin") ? detail.description : detail.description.replace(/^Reported by .*?:\s*/i, "")}
+              </p>
               {detail.additional_details && <p className="text-xs text-slate-500">{detail.additional_details}</p>}
               <AttachmentLinks attachments={detail.attachments.filter((a) => a.comment_id === null)} />
               {detail.resolution_note && (
@@ -772,7 +774,7 @@ function ComplaintView() {
                   </div>
                 </DetailRow>
               </div>
-              {me.is_super_admin && (
+              {(me.is_super_admin || me.role.key === "admin") && (
                 <>
                   <DetailRow label="Reported by">{detail.end_user?.name ?? detail.end_user_name ?? "—"}</DetailRow>
                   <DetailRow label="Contact">

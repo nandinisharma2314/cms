@@ -100,6 +100,18 @@ def _get_scoped(ctx: AccessContext, generated_id: str, detail: bool = True) -> C
     return complaint
 
 
+def _get_scoped_for_viewing(ctx: AccessContext, generated_id: str, detail: bool = True) -> Complaint:
+    # Allow viewing if in location scope, regardless of department
+    query = ctx.db.query(Complaint).join(Location, Complaint.location_id == Location.id)
+    query = ctx.apply_scope(query, None, Location.path).filter(Complaint.generated_id == generated_id)
+    if detail:
+        query = query.options(*DETAIL_OPTIONS)
+    complaint = query.first()
+    if complaint is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found")
+    return complaint
+
+
 @router.get("/admin/stats")
 def get_admin_dashboard_stats(
     date_from: str | None = None,
@@ -167,6 +179,7 @@ def list_complaints(
     search: str | None = None,
     sla: str | None = None,
     escalated: str | None = None,
+    created_by: str | None = None,
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
     ctx: AccessContext = Depends(require_permission("complaint.view")),
@@ -235,6 +248,8 @@ def list_complaints(
         query = query.filter(Complaint.escalated_to_id.isnot(None))
     elif escalated:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "escalated must be 'me' or 'any'")
+    if created_by == "me":
+        query = query.filter(Complaint.created_by_user_id == ctx.user.id)
     if search and search.strip():
         term = search.strip()
         query = query.filter(
@@ -280,7 +295,7 @@ def classification_options(ctx: AccessContext = Depends(get_access_context)):
 
 @router.get("/{complaint_id}")
 def get_complaint(complaint_id: str, ctx: AccessContext = Depends(require_permission("complaint.view"))):
-    return staff_detail(ctx, _get_scoped(ctx, complaint_id))
+    return staff_detail(ctx, _get_scoped_for_viewing(ctx, complaint_id))
 
 
 @router.post("/quick-create", status_code=status.HTTP_201_CREATED)

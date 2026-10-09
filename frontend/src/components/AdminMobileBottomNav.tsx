@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { ArrowUpCircle, BarChart3, Bell, FileText, Home, Plus, Settings, User, Users } from "lucide-react";
 import { useSession } from "@/lib/session";
 
@@ -75,7 +75,7 @@ export function AdminMobileBottomNav() {
 
         {canCreate && (
           <Link
-            href="/complaints"
+            href="/complaints/new"
             aria-label="New complaint"
             className="absolute left-1/2 -top-7 flex h-[60px] w-[60px] -translate-x-1/2 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-[6px] ring-slate-50 transition-transform active:scale-95"
           >

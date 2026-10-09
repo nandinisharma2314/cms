@@ -7,7 +7,7 @@ export default function HomePage() {
       <div className="block md:hidden">
         <StaffMobileDashboard />
       </div>
-      <div className="hidden md:block">
+      <div className="hidden md:flex flex-col gap-5">
         <DashboardView />
       </div>
     </>

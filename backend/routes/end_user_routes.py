@@ -11,7 +11,7 @@ from services.complaint_service import serialize_complaints
 from services.import_service import read_upload, run_import
 from services.location_service import location_types_by_depth, path_names, require_usable, serialize_location
 from services.phone_service import phone_format
-from utils.auth_middleware import require_permission
+from utils.auth_middleware import get_access_context, require_permission
 from utils.csv_export import csv_response
 from utils.security import normalize_email
 from utils.search import text_match
@@ -124,7 +124,7 @@ def list_end_users(
     include_inactive: bool = True,
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
-    ctx: AccessContext = Depends(require_permission("end_user.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     page, page_size = max(page, 1), min(max(page_size, 1), MAX_PAGE_SIZE)
     query = _scoped_query(ctx)
@@ -233,7 +233,7 @@ def import_end_user_csv(
 @router.get("/export")
 def export_end_users(
     search: str | None = None, include_inactive: bool = True,
-    ctx: AccessContext = Depends(require_permission("end_user.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """End users in your location scope, in the import format."""
     levels = [t.key for t in location_types_by_depth(ctx.db)]
@@ -252,7 +252,7 @@ def export_end_users(
 @router.get("/{end_user_id}/profile")
 def get_end_user_profile(
     end_user_id: int,
-    ctx: AccessContext = Depends(require_permission("end_user.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     db = ctx.db
     end_user = _scoped_query(ctx).filter(EndUser.id == end_user_id).first()

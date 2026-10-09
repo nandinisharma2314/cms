@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ArrowDown, ArrowUp, Pencil, Plus } from "lucide-react";
-import { api, RejectionReason, SettingsForm, SettingsResponse } from "@/lib/api";
+import { api, RejectionReason, SettingsForm, SettingsResponse, resolveFileUrl } from "@/lib/api";
 import { useConfig, useDocumentTitle, useReloadConfig } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { useAction, useApiData } from "@/lib/hooks";
@@ -21,10 +21,57 @@ import {
   StatusPill,
 } from "@/components/ui";
 import { RewardSettingsEditor } from "./RewardSettingsEditor";
+function LogoUpload({ initialLogoUrl, onUpload }: { initialLogoUrl: string | null; onUpload: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <Section title="Organisation Logo" description="This logo replaces the default 'MC' badge in the sidebar.">
+      <div className="col-span-full flex items-center gap-5">
+        <div className="w-16 h-16 shrink-0 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+          {initialLogoUrl ? (
+            <img src={resolveFileUrl(initialLogoUrl)!} alt="Logo" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-slate-400 text-xs font-semibold">None</span>
+          )}
+        </div>
+        <div className="flex-1 space-y-2">
+          <input
+            type="file"
+            accept="image/*"
+            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            disabled={uploading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (file.size > 2 * 1024 * 1024) {
+                setError("File is larger than 2MB");
+                return;
+              }
+              setUploading(true);
+              setError(null);
+              try {
+                await api.settings.uploadLogo(file);
+                onUpload();
+              } catch (err: any) {
+                setError(err.message);
+              } finally {
+                setUploading(false);
+              }
+            }}
+          />
+          {error && <p className="text-xs text-rose-500">{error}</p>}
+          {uploading && <p className="text-xs text-slate-500">Uploading...</p>}
+        </div>
+      </div>
+    </Section>
+  );
+}
 
 function toForm(s: SettingsResponse): SettingsForm {
   return {
     organisation_name: s.organisation_name,
+    logo_url: s.logo_url,
     product_name: s.product_name,
     support_email: s.support_email,
     support_phone: s.support_phone,
@@ -105,6 +152,8 @@ function SettingsEditor({ initial, onSaved }: { initial: SettingsResponse; onSav
         });
       }}
     >
+      <LogoUpload initialLogoUrl={initial.logo_url} onUpload={onSaved} />
+
       <Section title="Organisation" description="Shown in both apps. Contact details are left out wherever they are empty.">
         {text("organisation_name", "Organisation name", undefined, { maxLength: limits.organisation_name })}
         {text("product_name", "Product name", "What people call this system", { maxLength: limits.product_name })}

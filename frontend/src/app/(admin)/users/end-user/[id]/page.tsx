@@ -19,6 +19,7 @@ import { api, EndUserProfileResponse } from "@/lib/api";
 import { useApiData } from "@/lib/hooks";
 import { formatDateTime } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/config";
+import { useSession } from "@/lib/session";
 import { RequirePermission } from "@/components/RequirePermission";
 import { ErrorBanner, StatusPill } from "@/components/ui";
 
@@ -68,6 +69,7 @@ function EndUserProfileContent() {
   const params = useParams();
   const router = useRouter();
   const id = Number(params.id);
+  const { me } = useSession();
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -135,112 +137,64 @@ function EndUserProfileContent() {
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: User Info with Stats inside */}
-        <div className="lg:col-span-5 h-full overflow-y-auto custom-scrollbar pr-1 pb-1">
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col min-h-full">
-            <div className="h-24 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 relative shrink-0">
-              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+      {/* Main Content */}
+      <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto custom-scrollbar ">
+        {/* User Info Small Card */}
+        <div className="px-2 py-1  flex flex-col  shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="   flex items-center justify-center text-xl font-extrabold text-slate-700 shrink-0">
             </div>
-            <div className="px-8 pb-8 flex-1 flex flex-col relative">
-              <div className="w-20 h-20 bg-white rounded-2xl shadow-md flex items-center justify-center text-3xl font-extrabold text-slate-800 bg-gradient-to-br from-slate-50 to-slate-100 -mt-10 mb-5 shrink-0">
-                {user.name.charAt(0).toUpperCase()}
+            <div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2  ">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-slate-50 text-slate-400">
+                <Mail className="w-4 h-4" />
               </div>
-
-              <div className="space-y-5 flex-1">
-                <div className="flex items-start gap-3.5 group">
-                  <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-sky-600 group-hover:bg-sky-50 transition-colors">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Email Address</div>
-                    <div className="text-[13px] font-semibold text-slate-800">{user.email}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5 group">
-                  <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-emerald-600 group-hover:bg-emerald-50 transition-colors">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Mobile Number</div>
-                    <div className="text-[13px] font-semibold text-slate-800">{user.mobile}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5 group">
-                  <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-colors">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Assigned Location</div>
-                    <div className="text-[13px] font-semibold text-slate-800 leading-snug">{user.location?.label ?? "—"}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5 group">
-                  <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-purple-600 group-hover:bg-purple-50 transition-colors">
-                    <UserIcon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Aadhar</div>
-                    <div className="text-[13px] font-semibold text-slate-800">{user.aadhar || "—"}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5 group">
-                  <div className="mt-0.5 p-2 rounded-xl bg-slate-50 text-slate-400 group-hover:text-orange-600 group-hover:bg-orange-50 transition-colors">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">PAN Card</div>
-                    <div className="text-[13px] font-semibold text-slate-800">{user.pan_card || "—"}</div>
-                  </div>
-                </div>
-
-                <div className="pt-5 flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Joined</div>
-                    <div className="text-[11px] text-slate-600 font-medium">{formatDateTime(user.created_at)}</div>
-                  </div>
-                  {user.last_login_at && (
-                    <div className="text-right">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Last Seen</div>
-                      <div className="text-[11px] text-slate-600 font-medium">{formatDateTime(user.last_login_at)}</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* KPI Cards inside User Info */}
-                <div className="pt-6 mt-2 border-t border-slate-100">
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Complaint Statistics</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <KpiTile label="Total Filed" value={stats.total_complaints} icon={Mail} tone="brand" />
-                    <KpiTile
-                      label="Currently Open"
-                      value={stats.open_complaints}
-                      icon={Clock}
-                      tone={stats.open_complaints > 0 ? "warning" : "neutral"}
-                    />
-                    <KpiTile label="Resolved" value={stats.resolved_complaints} icon={CheckCircle2} tone="success" />
-                    <KpiTile
-                      label="Rejected"
-                      value={stats.rejected_complaints}
-                      icon={XCircle}
-                      tone={stats.rejected_complaints > 0 ? "danger" : "neutral"}
-                    />
-                  </div>
-                </div>
+              <div className="text-sm font-medium text-slate-800">{user.email}</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-slate-50 text-slate-400">
+                <Phone className="w-4 h-4" />
               </div>
+              <div className="text-sm font-medium text-slate-800">{user.mobile}</div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Complaints */}
-        <div className="lg:col-span-7 h-full flex flex-col min-h-0">
-          <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col h-full overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4 shrink-0">
+        {/* KPI Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 mb-2">
+          <KpiTile
+            label="Total Complaints"
+            value={stats.total_complaints}
+            icon={ShieldAlert}
+            tone="brand"
+          />
+          <KpiTile
+            label="Open"
+            value={stats.open_complaints}
+            icon={Clock}
+            tone="warning"
+          />
+          <KpiTile
+            label="Resolved"
+            value={stats.resolved_complaints}
+            icon={CheckCircle2}
+            tone="success"
+          />
+          <KpiTile
+            label="Rejected"
+            value={stats.rejected_complaints}
+            icon={XCircle}
+            tone="danger"
+          />
+        </div>
+
+        {/* Complaints Section (No Card) */}
+        {(me.is_super_admin || me.role.key === "admin") && (
+          <div className="mt-2 flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-indigo-500" />
                 Recent Complaints
@@ -267,64 +221,56 @@ function EndUserProfileContent() {
               </div>
             </div>
 
-            {filteredComplaints.length === 0 ? (
-              <div className="text-center py-12 bg-slate-50/50 rounded-2xl border border-slate-200 border-dashed m-1">
-                <p className="text-slate-500 text-sm font-medium">No complaints match your filters.</p>
-              </div>
-            ) : (
-              <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar">
-                {filteredComplaints.map(
-                  (complaint: {
-                    id: string | number;
-                    title: string;
-                    status_group: string;
-                    status_label: string;
-                    created_at: string;
-                    assigned_to?: { name: string };
-                  }) => (
-                    <Link
-                      key={complaint.id}
-                      href={`/complaints/${complaint.id}`}
-                      className="block bg-slate-50/50 hover:bg-slate-100/80 rounded-2xl p-4 transition-all hover:shadow-sm group"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-2 gap-2">
-                        <div className="font-bold text-slate-800 group-hover:text-sky-700 transition-colors">
-                          {complaint.title || "(No subject provided)"}
-                        </div>
-                        <div className="text-[11px] font-mono font-semibold text-slate-500 bg-white shadow-sm px-2.5 py-1 rounded-lg shrink-0">
-                          {complaint.id}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-                        <span
-                          className={`px-2.5 py-1 rounded-lg font-bold tracking-wide uppercase text-[9px] ${
-                            complaint.status_group === "resolved"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : complaint.status_group === "rejected"
-                                ? "bg-rose-100 text-rose-800"
-                                : "bg-sky-100 text-sky-800"
-                          }`}
-                        >
-                          {complaint.status_label}
-                        </span>
-                        <span className="text-slate-500 flex items-center gap-1.5 font-medium">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          {formatDateTime(complaint.created_at)}
-                        </span>
-                        {complaint.assigned_to && (
-                          <span className="text-slate-500 flex items-center gap-1.5 font-medium">
-                            <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                            Assigned to: <span className="text-slate-700">{complaint.assigned_to.name}</span>
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left text-sm text-slate-600 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-4 w-24">ID</th>
+                    <th className="px-4 py-4">Title</th>
+                    <th className="px-4 py-4 text-center w-32">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredComplaints.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="text-center py-12 text-slate-500 text-sm">
+                        No complaints match your filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredComplaints.map((c: any) => (
+                      <tr
+                        key={c.id}
+                        onClick={() => router.push(`/complaints/${c.id}`)}
+                        className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                      >
+                        <td className="px-4 py-5 text-sm font-mono font-medium text-slate-500">
+                          {c.id}
+                        </td>
+                        <td className="px-4 py-5 text-base font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
+                          {c.title || "(No subject provided)"}
+                        </td>
+                        <td className="px-4 py-5 text-center">
+                          <span
+                            className={`px-3 py-1.5 rounded-lg font-bold tracking-wide uppercase text-[10px] inline-block ${
+                              c.status_group === "resolved"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : c.status_group === "rejected"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-sky-100 text-sky-800"
+                            }`}
+                          >
+                            {c.status_label}
                           </span>
-                        )}
-                      </div>
-                    </Link>
-                  ),
-                )}
-              </div>
-            )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -332,8 +278,6 @@ function EndUserProfileContent() {
 
 export default function EndUserPage() {
   return (
-    <RequirePermission anyOf={["end_user.view"]}>
-      <EndUserProfileContent />
-    </RequirePermission>
+    <EndUserProfileContent />
   );
 }

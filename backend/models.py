@@ -26,6 +26,7 @@ class SystemSettings(Base):
     id = Column(Integer, primary_key=True)
     organisation_name = Column(String(150), nullable=True)
     product_name = Column(String(100), nullable=True)
+    logo_url = Column(String(255), nullable=True)
     support_email = Column(String(120), nullable=True)
     support_phone = Column(String(40), nullable=True)
     support_hours = Column(String(120), nullable=True)

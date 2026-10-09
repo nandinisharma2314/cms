@@ -17,6 +17,7 @@ export interface ComplaintFilters {
   date_to: string;
   sla: "breached" | "at_risk" | "";
   escalated: "me" | "any" | "";
+  created_by: "me" | "";
 }
 
 export function countActiveFilters(filters: ComplaintFilters): number {
@@ -29,6 +30,7 @@ export function countActiveFilters(filters: ComplaintFilters): number {
     filters.date_from || filters.date_to ? "date" : "",
     filters.sla,
     filters.escalated,
+    filters.created_by,
   ].filter(Boolean).length;
 }
 

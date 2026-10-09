@@ -284,7 +284,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
   const hideHamburger = ["agent", "manager", "team_lead", "supervisor", "field_worker"].includes(me.role.key);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 py-3 px-4 sm:px-6 lg:px-8 bg-slate-50/95 backdrop-blur border-b border-slate-100 lg:border-0">
+    <header className="sticky top-0 z-30 flex items-center gap-3 py-1  px-4 sm:px-6 lg:px-8 bg-slate-50/95 backdrop-blur border-b border-slate-100 lg:border-0">
       {!hideHamburger && (
         <button
           onClick={onOpenMenu}

@@ -9,13 +9,14 @@ import { api, ComplaintData, MemberProfileResponse } from "@/lib/api";
 import { useApiData } from "@/lib/hooks";
 import { formatDateTime } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/config";
-import { RequirePermission } from "@/components/RequirePermission";
+import { useSession } from "@/lib/session";
 import { Card, PageHeader, ErrorBanner, secondaryButtonClass, Modal } from "@/components/ui";
 
 export default function MemberProfilePage() {
   const { id } = useParams();
   const router = useRouter();
   const memberId = Number(id);
+  const { me, canAny } = useSession();
 
   useDocumentTitle("Member Profile");
 
@@ -73,8 +74,21 @@ export default function MemberProfilePage() {
 
   const { user, hierarchy, performance } = data;
 
+  const canView = canAny("team.view") || me?.id === memberId;
+  if (!canView) {
+    return (
+      <div className="p-8">
+        <Card className="p-10 flex flex-col items-center text-center gap-2 max-w-lg mx-auto">
+          <ShieldAlert className="w-8 h-8 text-slate-300" />
+          <h2 className="text-sm font-bold text-slate-800">You don&apos;t have access to this page</h2>
+          <p className="text-xs text-slate-500">Ask an administrator above you if you need it.</p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <RequirePermission anyOf={["team.view"]}>
+    <>
       <div className="space-y-6">
         <div className="flex items-center gap-4 -mt-2 mb-2">
           <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
@@ -273,6 +287,6 @@ export default function MemberProfilePage() {
           </div>
         </Modal>
       )}
-    </RequirePermission>
+    </>
   );
 }

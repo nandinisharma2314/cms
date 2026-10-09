@@ -50,6 +50,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
       date_to: "",
       sla: "",
       escalated: "",
+      created_by: "",
     });
     setPage(1);
   };
@@ -68,6 +69,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
         date_to: filters.date_to || undefined,
         sla: filters.sla,
         escalated: filters.escalated,
+        created_by: filters.created_by,
         page,
         page_size: ui.default_page_size,
       }),
@@ -82,6 +84,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
       filters.date_to,
       filters.sla,
       filters.escalated,
+      filters.created_by,
       page,
       ui.default_page_size,
     ],
@@ -381,6 +384,7 @@ function ComplaintsRoute() {
     date_to: params.get("date_to") ?? "",
     sla: pick(params.get("sla"), ["breached", "at_risk"] as const),
     escalated: pick(params.get("escalated"), ["me", "any"] as const),
+    created_by: pick(params.get("created_by"), ["me"] as const),
   };
 
   useEffect(() => {
@@ -395,6 +399,7 @@ function ComplaintsRoute() {
     if (initial.date_to) p.set("date_to", initial.date_to);
     if (initial.sla) p.set("sla", initial.sla);
     if (initial.escalated) p.set("escalated", initial.escalated);
+    if (initial.created_by) p.set("created_by", initial.created_by);
     const qs = p.toString();
     router.replace(qs ? `/complaints?${qs}` : "/complaints");
     // eslint-disable-next-line react-hooks/exhaustive-deps

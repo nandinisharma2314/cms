@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Building, ChevronDown, FileSpreadsheet, MapPinned, Plus, UserPlus, Zap } from "lucide-react";
 import { useSession } from "@/lib/session";
-import { RegisterComplaintDialog } from "./RegisterComplaintDialog";
 import { Toast } from "./ui";
 
 interface QuickAction {
@@ -23,6 +22,7 @@ const ACTIONS: QuickAction[] = [
     label: "Register complaint",
     icon: Plus,
     permissions: ["complaint.create"],
+    href: "/complaints/new",
     tint: "bg-blue-50 text-blue-600",
   },
   {
@@ -121,7 +121,6 @@ export function QuickActionsBar() {
                 className={className}
                 onClick={() => {
                   setOpen(false);
-                  setRegistering(true);
                 }}
               >
                 {content}
@@ -132,16 +131,6 @@ export function QuickActionsBar() {
       )}
 
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
-
-      {registering && (
-        <RegisterComplaintDialog
-          onClose={() => setRegistering(false)}
-          onCreated={(message) => {
-            setRegistering(false);
-            setToast(message);
-          }}
-        />
-      )}
     </div>
   );
 }

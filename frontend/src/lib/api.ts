@@ -942,6 +942,7 @@ export interface RewardStats {
 export interface SystemSettings {
   organisation_name: string | null;
   product_name: string | null;
+  logo_url: string | null;
   support_email: string | null;
   support_phone: string | null;
   support_hours: string | null;
@@ -981,6 +982,7 @@ export interface ConfigurationProblem {
 export interface PublicConfig {
   organisation_name: string | null;
   product_name: string | null;
+  logo_url: string | null;
   support: { email: string | null; phone: string | null; hours: string | null };
   timezone: string | null;
   phone: { country_code: string | null; number_length: number | null };
@@ -1214,6 +1216,10 @@ export function attachmentUrl(attachment: Attachment): string {
 
 /** Resolves an avatar URL into an absolute URL whether it's absolute (R2/S3) or relative (backend serve route). */
 export function resolveAvatarUrl(url?: string | null): string | null {
+  return resolveFileUrl(url);
+}
+
+export function resolveFileUrl(url?: string | null): string | null {
   if (!url) return null;
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return `${API_URL}${url.startsWith("/") ? "" : "/"}${url}`;
@@ -1291,6 +1297,11 @@ export const api = {
   settings: {
     get: () => request<SettingsResponse>("/settings/"),
     save: (form: SettingsForm) => request<SystemSettings>("/settings/", { method: "PUT", body: form }),
+    uploadLogo: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<{ logo_url: string }>("/settings/logo", { method: "POST", body: form });
+    },
     status: () => request<{ problems: ConfigurationProblem[] }>("/settings/status"),
     reasons: () => request<RejectionReason[]>("/settings/rejection-reasons"),
     addReason: (name: string) => request<RejectionReason>("/settings/rejection-reasons", { method: "POST", body: { name } }),
@@ -1330,6 +1341,7 @@ export const api = {
         search?: string;
         sla?: "breached" | "at_risk" | "";
         escalated?: "me" | "any" | "";
+        created_by?: "me" | "";
         page?: number;
         page_size?: number;
       } = {},

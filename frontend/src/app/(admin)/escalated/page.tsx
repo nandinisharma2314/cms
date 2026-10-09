@@ -49,6 +49,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
       date_to: "",
       sla: "",
       escalated: "me",
+      created_by: "",
     });
     setPage(1);
   };
@@ -373,6 +374,7 @@ function EscalatedRoute() {
     date_to: params.get("date_to") ?? "",
     sla: pick(params.get("sla"), ["breached", "at_risk"] as const),
     escalated: pick(params.get("escalated"), ["me", "any"] as const) || "me",
+    created_by: pick(params.get("created_by"), ["me"] as const),
   };
 
   return <EscalatedList initial={initial} />;

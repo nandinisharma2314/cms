@@ -176,6 +176,7 @@ def serialize_settings(settings: SystemSettings) -> dict:
     return {
         "organisation_name": settings.organisation_name,
         "product_name": settings.product_name,
+        "logo_url": settings.logo_url,
         "support_email": settings.support_email,
         "support_phone": settings.support_phone,
         "support_hours": settings.support_hours,
@@ -205,6 +206,7 @@ def public_config(db: Session) -> dict:
     return {
         "organisation_name": settings.organisation_name,
         "product_name": settings.product_name,
+        "logo_url": settings.logo_url,
         "support": {
             "email": settings.support_email,
             "phone": settings.support_phone,
