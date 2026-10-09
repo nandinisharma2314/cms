@@ -147,7 +147,7 @@ export function StaffMobileDashboard() {
   return (
     <div className="flex flex-col gap-3.5 pb-6">
       {/* 1. Greeting & Profile Section */}
-      <div className="flex items-start justify-between gap-3 px-1">
+      <div className="flex items-start justify-between gap-3 mt-2 px-1">
         <div className="min-w-0">
           <p className="text-[14px] text-slate-500">{greetingFor(hour)},</p>
           <h1 className="mt-0.5 text-[22px] font-bold leading-tight tracking-tight text-slate-900 truncate">
