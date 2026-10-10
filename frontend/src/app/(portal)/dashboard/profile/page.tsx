@@ -348,7 +348,7 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div className="flex flex-1 flex-col items-center overflow-y-auto bg-white p-0 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
+    <div className="flex flex-col items-center md:flex-1 md:min-h-0 md:overflow-y-auto bg-white p-0 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
       <div className="flex w-full max-w-5xl flex-col overflow-hidden bg-white md:rounded-b-3xl md:border-x md:border-b md:border-slate-100 md:shadow-sm mb-2 md:mb-20">
         <div className="flex shrink-0 flex-col border-b border-slate-100">
           <div className="h-16 bg-linear-to-r from-sky-100 via-blue-50 to-indigo-50 md:h-28" aria-hidden="true" />

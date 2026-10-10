@@ -244,9 +244,9 @@ export function ComplaintFilterDrawer({
               <p className="text-[11px] text-slate-500">Refine by date, region, department and status</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {activeCount > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-600 text-white">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-600 text-white whitespace-nowrap">
                 {activeCount} active
               </span>
             )}

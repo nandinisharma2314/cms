@@ -2086,7 +2086,7 @@ export default function RewardsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 {/* 2nd Place */}
                 <Card className="p-5 rounded-2xl border-slate-200 bg-gradient-to-t from-slate-50 via-white to-white flex flex-col items-center text-center order-2 md:order-1 relative shadow-xs">
-                  <div className="absolute top-3 left-3 text-sm font-bold text-slate-400">#2</div>
+                  <div className="absolute top-3 left-3 text-sm font-bold text-slate-400">2</div>
                   <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-600 font-bold text-lg overflow-hidden mb-2">
                     {leaderboard[1].user.avatar_url ? (
                       <img src={resolveAvatarUrl(leaderboard[1].user.avatar_url)!} alt="" className="w-full h-full object-cover" />
@@ -2122,7 +2122,7 @@ export default function RewardsPage() {
 
                 {/* 3rd Place */}
                 <Card className="p-5 rounded-2xl border-amber-200/50 bg-gradient-to-t from-amber-50/30 via-white to-white flex flex-col items-center text-center order-3 relative shadow-xs">
-                  <div className="absolute top-3 left-3 text-sm font-bold text-amber-700/60">#3</div>
+                  <div className="absolute top-3 left-3 text-sm font-bold text-amber-700/60">3</div>
                   <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-300/80 flex items-center justify-center text-amber-700 font-bold text-lg overflow-hidden mb-2">
                     {leaderboard[2].user.avatar_url ? (
                       <img src={resolveAvatarUrl(leaderboard[2].user.avatar_url)!} alt="" className="w-full h-full object-cover" />
@@ -2175,7 +2175,7 @@ export default function RewardsPage() {
                         return (
                           <tr key={row.user.id} className={isMe ? "bg-amber-50/50 font-medium" : "hover:bg-slate-50/60"}>
                             <td className="py-3 px-4 font-bold text-slate-700">
-                              {row.rank === 1 ? "🥇 1" : row.rank === 2 ? "🥈 2" : row.rank === 3 ? "🥉 3" : `#${row.rank}`}
+                              {row.rank === 1 ? "🥇 1" : row.rank === 2 ? "🥈 2" : row.rank === 3 ? "🥉 3" : `    ${row.rank}`}
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5">
@@ -2335,7 +2335,7 @@ export default function RewardsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     {/* 2nd Place */}
                     <Card className="p-5 rounded-2xl border-slate-200 bg-gradient-to-t from-slate-50 via-white to-white flex flex-col items-center text-center order-2 md:order-1 relative shadow-xs">
-                      <div className="absolute top-3 left-3 text-sm font-bold text-slate-400">#2</div>
+                      <div className="absolute top-3 left-3 text-sm font-bold text-slate-400">2</div>
                       <div className="w-16 h-16 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-3xl mb-2 shadow-xs">
                         {championshipConfig?.trophies?.[1] || deptCup[1].trophy}
                       </div>
@@ -2373,7 +2373,7 @@ export default function RewardsPage() {
 
                     {/* 3rd Place */}
                     <Card className="p-5 rounded-2xl border-amber-200/50 bg-gradient-to-t from-amber-50/30 via-white to-white flex flex-col items-center text-center order-3 relative shadow-xs">
-                      <div className="absolute top-3 left-3 text-sm font-bold text-amber-700/60">#3</div>
+                      <div className="absolute top-3 left-3 text-sm font-bold text-amber-700/60">3</div>
                       <div className="w-16 h-16 rounded-2xl bg-amber-50 border-2 border-amber-300/80 flex items-center justify-center text-3xl mb-2 shadow-xs">
                         {championshipConfig?.trophies?.[2] || deptCup[2].trophy}
                       </div>
@@ -2417,7 +2417,7 @@ export default function RewardsPage() {
                         {deptCup.map((dept) => (
                           <tr key={dept.department_id} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-3 px-4 font-bold text-slate-700 text-sm">
-                              {(championshipConfig?.trophies && championshipConfig.trophies[dept.rank - 1]) || dept.trophy} #{dept.rank}
+                              {(championshipConfig?.trophies && championshipConfig.trophies[dept.rank - 1]) || dept.trophy}{dept.rank}
                             </td>
                             <td className="py-3 px-4 font-bold text-slate-800">
                               {dept.department_name}

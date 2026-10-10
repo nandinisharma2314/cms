@@ -90,7 +90,7 @@ export default function TeamsPage() {
   }, []);
 
   return (
-    <div className="flex flex-1 flex-col items-center overflow-hidden bg-slate-50/50 p-3 sm:p-6 w-full max-w-full">
+    <div className="flex flex-col items-center md:flex-1 md:min-h-0 md:overflow-hidden bg-slate-50/50 p-3 sm:p-6 w-full max-w-full">
       <style dangerouslySetInnerHTML={{ __html: `
         .org-tree ul {
           padding-top: 12px;
@@ -168,7 +168,7 @@ export default function TeamsPage() {
         </div>
         
         {/* Tree Container */}
-        <div className="relative rounded-xl sm:rounded-3xl border border-slate-200 bg-white p-2 sm:p-8 shadow-sm org-tree w-full overflow-hidden flex flex-col justify-center flex-1">
+        <div className="relative rounded-xl sm:rounded-3xl border border-slate-200 bg-white p-2 sm:p-8 shadow-sm org-tree w-full overflow-auto flex flex-col justify-center flex-1">
           {loading ? (
             <div className="flex h-full w-full items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />

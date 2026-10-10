@@ -47,17 +47,6 @@ export default function Greeting() {
           <Plus className="h-5 w-5" strokeWidth={2.5} />
           Register complaint
         </Link>
-        <Link
-          href="/dashboard/profile"
-          aria-label="Profile"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#dce9fd] text-blue-600 transition-transform active:scale-95 md:hidden overflow-hidden"
-        >
-          {profile.avatar_url ? (
-            <img src={resolveAvatarUrl(profile.avatar_url)!} alt={profile.name} className="h-full w-full object-cover" />
-          ) : (
-            <User className="h-6 w-6" strokeWidth={2.2} />
-          )}
-        </Link>
       </div>
     </div>
   );

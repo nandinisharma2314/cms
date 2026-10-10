@@ -16,6 +16,7 @@ import { ChangePasswordModal } from "./ChangePasswordForm";
 import { ChangeAvatarModal } from "./ChangeAvatarModal";
 import { openCommandPalette } from "./CommandPalette";
 import { SystemHealthPill } from "./SystemHealthPill";
+import { BrandMark } from "./BrandMark";
 
 /** Closes a popover on outside click or Escape. */
 function usePopover() {
@@ -74,11 +75,11 @@ function Notifications() {
             window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
           }
         }}
-        className="relative p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+        className="relative p-1.5 sm:p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={menuOpen}
       >
-        <Bell className="w-5 h-5" />
+        <Bell className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
         {unread > 0 && (
           <span className="absolute top-1 right-1 flex items-center justify-center min-w-4.5 h-4.5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full ring-2 ring-white">
             {unread > 99 ? "99+" : unread}
@@ -168,7 +169,7 @@ function UserMenu() {
         aria-expanded={menuOpen}
         aria-label="Account menu"
       >
-        <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-100 text-blue-700 font-bold text-xs overflow-hidden">
+        <span className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-100 text-blue-700 font-bold text-xs overflow-hidden">
           {me.avatar_url ? (
             <img src={resolveAvatarUrl(me.avatar_url)!} alt={me.name} className="w-full h-full object-cover" />
           ) : (
@@ -284,16 +285,20 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
   const hideHamburger = ["agent", "manager", "team_lead", "supervisor", "field_worker"].includes(me.role.key);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 py-1  px-4 sm:px-6 lg:px-8 bg-slate-50/95 backdrop-blur border-b border-slate-100 lg:border-0">
+    <header className="sticky top-0 z-30 flex items-center gap-1.5 sm:gap-3 py-1 px-3 sm:px-6 lg:px-8 bg-slate-50/95 backdrop-blur border-b border-slate-100 lg:border-0">
       {!hideHamburger && (
         <button
           onClick={onOpenMenu}
-          className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 cursor-pointer"
+          className="lg:hidden p-1.5 sm:p-2 rounded-xl text-slate-700 hover:bg-slate-100 cursor-pointer"
           aria-label="Open menu"
         >
           <Menu className="w-5 h-5" />
         </button>
       )}
+
+      <Link href="/" className={`shrink-0 ${hideHamburger ? "" : "lg:hidden"}`}>
+        <BrandMark theme="light" />
+      </Link>
 
       {can("complaint.view") ? (
         <div
@@ -312,7 +317,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       ) : null}
       <div className="flex-1 sm:hidden" />
 
-      <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+      <div className="flex items-center gap-1.5 sm:gap-3 ml-auto">
         
         <div
           className="hidden xl:flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl"
@@ -329,7 +334,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
         {can("rewards.view") && (
           <Link
             href="/rewards"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200/80 text-amber-900 transition-colors cursor-pointer text-xs font-semibold shadow-xs pointer-events-none md:pointer-events-auto"
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200/80 text-amber-900 transition-colors cursor-pointer text-xs font-semibold shadow-xs pointer-events-none md:pointer-events-auto"
             title={`Reward Points: ${me.reward_points_balance ?? 0}`}
           >
             <span className="text-sm">🪙</span>

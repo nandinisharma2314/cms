@@ -318,7 +318,7 @@ function DepartmentCard({
         </div>
       </div>
       {department.description && <p className="text-xs text-slate-500">{department.description}</p>}
-      <ul className="divide-y divide-slate-50 border border-slate-100 rounded-xl">
+      <ul className="divide-y divide-slate-50 border border-slate-100 rounded-xl max-h-[116px] overflow-y-auto custom-scrollbar">
         {department.categories.map((c) => (
           <li key={c.id} className="flex items-center gap-2 px-3 py-2 text-xs">
             <span className={`flex-1 min-w-0 truncate ${c.is_active ? "text-slate-700" : "text-slate-400 line-through"}`}>
