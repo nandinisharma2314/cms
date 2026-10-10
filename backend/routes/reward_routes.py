@@ -2,12 +2,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
-from database import get_db
 from services import reward_service
 from services.access_service import AccessContext
-from utils.auth_middleware import get_access_context, require_permission
+from utils.auth_middleware import require_permission
 
 router = APIRouter(prefix="/rewards", tags=["rewards"])
 

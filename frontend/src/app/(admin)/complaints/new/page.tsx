@@ -188,7 +188,7 @@ export default function AdminRegisterComplaintPage() {
         end_user_name: null,
         end_user_phone: null,
       });
-      setCreated(result as any);
+      setCreated(result as ComplaintDetail);
       setStep(3);
     } catch (err) {
       setError((err as Error).message);
@@ -203,7 +203,7 @@ export default function AdminRegisterComplaintPage() {
         <div className="max-w-sm rounded-2xl bg-white p-6 text-center shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
           <h1 className="text-[17px] font-bold text-[#0b1a3f]">Permission denied</h1>
           <p className="mt-2 text-[14px] leading-snug text-slate-500">
-            You don't have permission to create complaints.
+            You don&apos;t have permission to create complaints.
           </p>
           <Link
             href="/dashboard"
@@ -373,7 +373,7 @@ export default function AdminRegisterComplaintPage() {
                     <ChevronDown size={16} aria-hidden="true" />
                   </div>
                 </div>
-                {!canSetPriority && <p className="text-[11px] font-semibold text-slate-400">Set by the category. You don't have permission to reclassify priority.</p>}
+                {!canSetPriority && <p className="text-[11px] font-semibold text-slate-400">Set by the category. You don&apos;t have permission to reclassify priority.</p>}
               </div>
               
               {priorityChanged && (
@@ -469,7 +469,7 @@ export default function AdminRegisterComplaintPage() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div>
                   <h2 className="text-[15px] font-bold text-slate-900">Check request details</h2>
-                  <p className="text-[12px] font-semibold text-slate-500">Edit anything that isn't right, then send it.</p>
+                  <p className="text-[12px] font-semibold text-slate-500">Edit anything that isn&apos;t right, then send it.</p>
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
                   <Clock size={11} aria-hidden="true" /> Step 2 of 2

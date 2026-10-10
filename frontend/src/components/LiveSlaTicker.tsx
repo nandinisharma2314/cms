@@ -90,6 +90,7 @@ export function LiveSlaTicker({
     ) : null;
   }
 
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const dueTime = new Date(targetDateStr).getTime();
   const diffMs = dueTime - now;

@@ -169,7 +169,7 @@ def upload_logo(
 ):
     settings = settings_service.get_settings(ctx.db, for_update=True)
     before = settings_service.serialize_settings(settings)
-    
+
     content = file.file.read()
     if len(content) > 2 * 1024 * 1024:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is larger than 2MB")
@@ -179,17 +179,17 @@ def upload_logo(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File must be an image")
 
     _, url = storage_service.save_file(bytes(content), file.filename, content_type, folder="logos", is_public=True)
-    
+
     settings.logo_url = url
     settings.updated_at = utcnow()
     settings.updated_by_id = ctx.user.id
     ctx.db.commit()
-    
-    after = settings_service.serialize_settings(settings)
-    
+
+    settings_service.serialize_settings(settings)
+
     audit_service.record(ctx.db, actor=ctx.user, action="settings.logo_upload", entity_type="settings", entity_id=1,
                          summary="Uploaded new organisation logo", changes={"logo_url": [before.get("logo_url"), url]}, request=request)
-    
+
     return {"logo_url": url}
 
 

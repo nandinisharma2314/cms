@@ -96,6 +96,7 @@ export function CommandPalette() {
   // Focus input when opened
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery("");
       setActiveIndex(0);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -105,6 +106,7 @@ export function CommandPalette() {
   // Search complaints when query is typed
   useEffect(() => {
     if (!open || !debouncedQuery) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setComplaintResults([]);
       setLoadingComplaints(false);
       return;
