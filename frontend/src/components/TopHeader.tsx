@@ -81,7 +81,7 @@ function Notifications() {
       >
         <Bell className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
         {unread > 0 && (
-          <span className="absolute top-1 right-1 flex items-center justify-center min-w-4.5 h-4.5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full ring-2 ring-white">
+          <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 flex items-center justify-center min-w-[13px] h-[13px] px-[3px] text-[7.5px] font-extrabold text-white bg-rose-500 rounded-full ring-1 ring-white">
             {unread > 99 ? "99+" : unread}
           </span>
         )}

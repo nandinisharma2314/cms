@@ -63,7 +63,7 @@ export interface StaffUser {
   pan_card?: string | null;
   avatar_url?: string | null;
   role: RoleRef;
-  reports_to: { id: number; name: string } | null;
+  reports_to: { id: number; name: string; designation?: string } | null;
   primary_department?: { id: number; name: string } | null;
   primary_location?: LocationRef | null;
   custom_permissions?: UserCustomPermission[];
