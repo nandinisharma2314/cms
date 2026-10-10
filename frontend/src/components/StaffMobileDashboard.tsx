@@ -155,7 +155,11 @@ export function StaffMobileDashboard() {
           <div className="mt-1 flex flex-col items-start gap-0.5 text-[12px]">
             <span className="font-semibold text-blue-600">{me.role.name}</span>
 
-            {me.reports_to && <span className="text-amber-500 font-medium">{me.reports_to.designation || "Reports to"}: {me.reports_to.name}</span>}
+            {me.reports_to && (
+              <span className="text-amber-500 font-medium">
+                {me.reports_to.designation || "Reports to"}: {me.reports_to.name}
+              </span>
+            )}
           </div>
         </div>
 
