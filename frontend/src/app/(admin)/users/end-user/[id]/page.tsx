@@ -216,8 +216,8 @@ function EndUserProfileContent() {
                       </td>
                     </tr>
                   ) : (
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     filteredComplaints.map((c: any) => (
-                      // eslint-disable-line @typescript-eslint/no-explicit-any
                       <tr
                         key={c.id}
                         onClick={() => router.push(`/complaints/${c.id}`)}

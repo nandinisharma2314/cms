@@ -82,8 +82,8 @@ export default function TeamsPage() {
   useEffect(() => {
     api
       .hierarchy()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => {
-        // eslint-disable-line @typescript-eslint/no-explicit-any
         if (data && Object.keys(data).length > 0) {
           assignColors(data);
           setHierarchy(data);
