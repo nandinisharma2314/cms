@@ -586,13 +586,7 @@ export interface PerformanceRow {
 }
 
 export type QuestMetric =
-  | "speed_bonus"
-  | "five_star"
-  | "four_star"
-  | "on_time"
-  | "zero_reopen"
-  | "total_resolved"
-  | "total_points";
+  "speed_bonus" | "five_star" | "four_star" | "on_time" | "zero_reopen" | "total_resolved" | "total_points";
 
 export interface QuestConfig {
   id: string;
@@ -1725,10 +1719,7 @@ export const api = {
         { method: "PUT", body: data },
       ),
     backfill: () =>
-      request<{ complaints_scanned: number; transactions_created: number }>(
-        "/rewards/admin/backfill",
-        { method: "POST" },
-      ),
+      request<{ complaints_scanned: number; transactions_created: number }>("/rewards/admin/backfill", { method: "POST" }),
     listQuests: () => request<RewardQuest[]>("/rewards/quests"),
     getQuestsConfig: () => request<QuestConfig[]>("/rewards/quests/config"),
     createQuest: (data: Omit<QuestConfig, "id"> & { id?: string }) =>

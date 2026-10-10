@@ -142,10 +142,8 @@ function EndUserProfileContent() {
         {/* User Info Small Card */}
         <div className="px-2 py-1  flex flex-col  shrink-0">
           <div className="flex items-center gap-3">
-            <div className="   flex items-center justify-center text-xl font-extrabold text-slate-700 shrink-0">
-            </div>
-            <div>
-            </div>
+            <div className="   flex items-center justify-center text-xl font-extrabold text-slate-700 shrink-0"></div>
+            <div></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2  ">
             <div className="flex items-center gap-3">
@@ -165,30 +163,10 @@ function EndUserProfileContent() {
 
         {/* KPI Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 mb-2">
-          <KpiTile
-            label="Total Complaints"
-            value={stats.total_complaints}
-            icon={ShieldAlert}
-            tone="brand"
-          />
-          <KpiTile
-            label="Open"
-            value={stats.open_complaints}
-            icon={Clock}
-            tone="warning"
-          />
-          <KpiTile
-            label="Resolved"
-            value={stats.resolved_complaints}
-            icon={CheckCircle2}
-            tone="success"
-          />
-          <KpiTile
-            label="Rejected"
-            value={stats.rejected_complaints}
-            icon={XCircle}
-            tone="danger"
-          />
+          <KpiTile label="Total Complaints" value={stats.total_complaints} icon={ShieldAlert} tone="brand" />
+          <KpiTile label="Open" value={stats.open_complaints} icon={Clock} tone="warning" />
+          <KpiTile label="Resolved" value={stats.resolved_complaints} icon={CheckCircle2} tone="success" />
+          <KpiTile label="Rejected" value={stats.rejected_complaints} icon={XCircle} tone="danger" />
         </div>
 
         {/* Complaints Section (No Card) */}
@@ -238,15 +216,14 @@ function EndUserProfileContent() {
                       </td>
                     </tr>
                   ) : (
-                    filteredComplaints.map((c: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+                    filteredComplaints.map((c: any) => (
+                      // eslint-disable-line @typescript-eslint/no-explicit-any
                       <tr
                         key={c.id}
                         onClick={() => router.push(`/complaints/${c.id}`)}
                         className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
                       >
-                        <td className="px-4 py-5 text-sm font-mono font-medium text-slate-500">
-                          {c.id}
-                        </td>
+                        <td className="px-4 py-5 text-sm font-mono font-medium text-slate-500">{c.id}</td>
                         <td className="px-4 py-5 text-base font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
                           {c.title || "(No subject provided)"}
                         </td>
@@ -277,7 +254,5 @@ function EndUserProfileContent() {
 }
 
 export default function EndUserPage() {
-  return (
-    <EndUserProfileContent />
-  );
+  return <EndUserProfileContent />;
 }

@@ -259,10 +259,7 @@ function getInitials(name: string) {
 }
 
 function AgentEndUsers() {
-  const { data, loading, error } = useApiData(
-    () => api.endUsers.list({ page_size: 50 }),
-    []
-  );
+  const { data, loading, error } = useApiData(() => api.endUsers.list({ page_size: 50 }), []);
 
   if (loading) {
     return <div className="py-12 text-center text-sm text-slate-500">Loading end users...</div>;
@@ -284,7 +281,6 @@ function AgentEndUsers() {
 
   return (
     <div className="space-y-4">
-     
       <div className="overflow-x-auto  border border-slate-200 bg-white shadow-sm mt-4">
         <table className="w-full text-left text-[11px] text-slate-600">
           <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
@@ -303,13 +299,13 @@ function AgentEndUsers() {
                       {getInitials(m.name)}
                     </div>
                     <div className="min-w-0">
-                      <div className="font-bold text-slate-900 text-xs truncate group-hover:text-blue-700 transition-colors">{m.name}</div>
+                      <div className="font-bold text-slate-900 text-xs truncate group-hover:text-blue-700 transition-colors">
+                        {m.name}
+                      </div>
                     </div>
                   </Link>
                 </td>
-                <td className="px-2 py-2 text-[11px] font-medium text-slate-700 truncate max-w-[100px]">
-                  {m.mobile}
-                </td>
+                <td className="px-2 py-2 text-[11px] font-medium text-slate-700 truncate max-w-[100px]">{m.mobile}</td>
                 <td className="px-2 py-2 hidden sm:table-cell text-[11px] font-medium text-slate-700 truncate max-w-[120px]">
                   {m.email}
                 </td>
@@ -411,295 +407,289 @@ export default function TeamsPage() {
   const filteredManagers = managers?.filter((m) => !locationFilter || m.primary_location?.name === locationFilter);
   const filteredMembers = data?.members.filter((m) => !locationFilter || m.primary_location?.name === locationFilter);
 
-
-
   return (
     <div className="space-y-4 -mt-5 sm:-mt-2">
-        <PageHeader
-          title="Team"
-          description="Live supervision portal: monitor team performance, workload distribution, and SLA adherence."
-          actions={
-            <div className="flex flex-wrap items-center gap-2 pb-1 sm:pb-0 justify-end w-full sm:w-auto">
-              {/* Custom Date Filters */}
-              {periodPreset === "custom" && (
-                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200">
-                  <input
-                    type="date"
-                    value={customDateFrom}
-                    onChange={(e) => setCustomDateFrom(e.target.value)}
-                    className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
-                    placeholder="From"
-                  />
-                  <span className="text-slate-300">-</span>
-                  <input
-                    type="date"
-                    value={customDateTo}
-                    onChange={(e) => setCustomDateTo(e.target.value)}
-                    className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
-                    placeholder="To"
-                  />
-                </div>
-              )}
-
-              
-
-             
-            </div>
-          }
-        />
-
-        <ErrorBanner message={actionError ?? loadError} />
-        <Notice message={notice} />
-
-        {viewMode === "overview" ? (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-800">Teams Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredManagers?.map((manager) => (
-                <Card
-                  key={manager.id}
-                  className="p-5 flex flex-col gap-4 border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all duration-200 bg-gradient-to-br from-white to-slate-50/50"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex gap-3 items-center">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
-                        {getInitials(manager.name)}
-                      </div>
-                      <div>
-                        <Link
-                          href={`/users/staff/${manager.id}`}
-                          className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1"
-                        >
-                          {manager.primary_department?.name || manager.name}&apos;s Team
-                        </Link>
-                        <p className="text-xs font-medium text-slate-500 line-clamp-1">{manager.role.name}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-lg border border-slate-100 p-3 text-xs text-slate-600 flex flex-col gap-2.5 mt-1">
-                    <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                      <span className="text-slate-400 font-medium">Team Lead:</span>
-                      <Link
-                        href={`/users/staff/${manager.id}`}
-                        className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
-                      >
-                        {manager.name}
-                      </Link>
-                    </div>
-                    {manager.reports_to && (
-                      <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                        <span className="text-slate-400 font-medium">Manager:</span>
-                        <Link
-                          href={`/users/staff/${manager.reports_to.id}`}
-                          className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
-                        >
-                          {manager.reports_to.name}
-                        </Link>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 pt-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="truncate font-medium">{manager.primary_location?.name || "Global / Multiple"}</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 mt-auto grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedManagerId(manager.id);
-                        setViewMode("dashboard");
-                        setLocationFilter(""); // reset filter on drilldown
-                      }}
-                      className={primaryButtonClass + " !py-2 flex justify-center text-xs"}
-                    >
-                      View Members
-                    </button>
-                    <Link
-                      href={`/users/staff/${manager.id}`}
-                      className={secondaryButtonClass + " !py-2 flex justify-center text-xs bg-white hover:bg-slate-50"}
-                    >
-                      Lead Profile
-                    </Link>
-                  </div>
-                </Card>
-              ))}
-              {filteredManagers?.length === 0 && (
-                <div className="col-span-full py-12 text-center text-slate-500 bg-white border border-dashed rounded-xl">
-                  No teams found matching your filters.
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            {managers && managers.length > 1 && (
-              <div className="flex items-center">
-                <button
-                  onClick={() => {
-                    setViewMode("overview");
-                    setSelectedManagerId("");
-                    setLocationFilter(""); // reset
-                  }}
-                  className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Back to Teams Overview
-                </button>
+      <PageHeader
+        title="Team"
+        description="Live supervision portal: monitor team performance, workload distribution, and SLA adherence."
+        actions={
+          <div className="flex flex-wrap items-center gap-2 pb-1 sm:pb-0 justify-end w-full sm:w-auto">
+            {/* Custom Date Filters */}
+            {periodPreset === "custom" && (
+              <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200">
+                <input
+                  type="date"
+                  value={customDateFrom}
+                  onChange={(e) => setCustomDateFrom(e.target.value)}
+                  className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
+                  placeholder="From"
+                />
+                <span className="text-slate-300">-</span>
+                <input
+                  type="date"
+                  value={customDateTo}
+                  onChange={(e) => setCustomDateTo(e.target.value)}
+                  className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
+                  placeholder="To"
+                />
               </div>
             )}
+          </div>
+        }
+      />
 
-            {/* Aggregated KPI Cards */}
-            {agg ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-                <KpiTile label="Team Size" value={data.team_size} subtext="Supervised staff" icon={Users} tone="info" />
-                <KpiTile
-                  label="Active Pending"
-                  value={agg.pending}
-                  subtext={`${agg.total_assigned} total`}
-                  icon={Clock}
-                  tone={agg.pending > 15 ? "warning" : "neutral"}
-                />
-                <KpiTile
-                  label="Resolved"
-                  value={agg.resolved}
-                  subtext={`${agg.avg_resolution_hours ?? "—"}h avg res.`}
-                  icon={CheckCircle2}
-                  tone="success"
-                />
-                <KpiTile
-                  label="Response SLA"
-                  value={agg.response_sla_pct !== null ? `${agg.response_sla_pct}%` : "—"}
-                  subtext={`${agg.avg_response_hours ?? "—"}h avg`}
-                  icon={Timer}
-                  tone={
-                    agg.response_sla_pct === null
-                      ? "neutral"
-                      : agg.response_sla_pct >= 90
-                        ? "success"
-                        : agg.response_sla_pct >= 75
-                          ? "warning"
-                          : "danger"
-                  }
-                />
-                <KpiTile
-                  label="Resolution SLA"
-                  value={agg.resolution_sla_pct !== null ? `${agg.resolution_sla_pct}%` : "—"}
-                  subtext={`${agg.sla_breaches} breaches`}
-                  icon={ShieldCheck}
-                  tone={
-                    agg.resolution_sla_pct === null
-                      ? "neutral"
-                      : agg.resolution_sla_pct >= 90
-                        ? "success"
-                        : agg.resolution_sla_pct >= 75
-                          ? "warning"
-                          : "danger"
-                  }
-                />
-                <KpiTile
-                  label="Customer Rating"
-                  value={agg.avg_rating !== null ? `${agg.avg_rating} / 5` : "—"}
-                  subtext={`${agg.reopen_pct ?? 0}% reopen`}
-                  icon={Star}
-                  tone={agg.avg_rating && agg.avg_rating >= 4 ? "success" : "neutral"}
-                />
-              </div>
-            ) : null}
+      <ErrorBanner message={actionError ?? loadError} />
+      <Notice message={notice} />
 
-            {/* Member Cards Grid */}
-            <div className="space-y-4">
-             
-
-              {loading ? (
-                <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
-                  Loading team performance...
+      {viewMode === "overview" ? (
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-slate-800">Teams Overview</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredManagers?.map((manager) => (
+              <Card
+                key={manager.id}
+                className="p-5 flex flex-col gap-4 border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all duration-200 bg-gradient-to-br from-white to-slate-50/50"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex gap-3 items-center">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
+                      {getInitials(manager.name)}
+                    </div>
+                    <div>
+                      <Link
+                        href={`/users/staff/${manager.id}`}
+                        className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1"
+                      >
+                        {manager.primary_department?.name || manager.name}&apos;s Team
+                      </Link>
+                      <p className="text-xs font-medium text-slate-500 line-clamp-1">{manager.role.name}</p>
+                    </div>
+                  </div>
                 </div>
-              ) : !data || filteredMembers?.length === 0 ? (
-                <>
-                  {data?.members.length === 0 ? (
-                    <AgentEndUsers />
-                  ) : (
-                    <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
-                      No members match the selected filters.
+
+                <div className="bg-white rounded-lg border border-slate-100 p-3 text-xs text-slate-600 flex flex-col gap-2.5 mt-1">
+                  <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                    <span className="text-slate-400 font-medium">Team Lead:</span>
+                    <Link
+                      href={`/users/staff/${manager.id}`}
+                      className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
+                    >
+                      {manager.name}
+                    </Link>
+                  </div>
+                  {manager.reports_to && (
+                    <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-400 font-medium">Manager:</span>
+                      <Link
+                        href={`/users/staff/${manager.reports_to.id}`}
+                        className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
+                      >
+                        {manager.reports_to.name}
+                      </Link>
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <table className="w-full text-left text-sm text-slate-600">
-                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3">Member</th>
-                        <th className="px-4 py-3 hidden sm:table-cell">Role</th>
-                        <th className="px-4 py-3 hidden md:table-cell">Location</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredMembers?.map((m) => (
-                        <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-4 py-3">
-                            <Link href={`/users/staff/${m.id}`} className="flex items-center gap-3 w-fit">
-                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs sm:text-sm shrink-0 group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors">
-                                {getInitials(m.name)}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-700 transition-colors">{m.name}</div>
-                                <div className="text-[11px] sm:hidden font-semibold text-blue-600 mt-0.5 truncate">{m.role}</div>
-                              </div>
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 hidden sm:table-cell text-xs font-medium text-slate-700">
-                            {m.role}
-                          </td>
-                          <td className="px-4 py-3 hidden md:table-cell text-xs text-slate-500">
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5" />
-                              <span className="truncate">{m.primary_location?.name || "Global / Multiple"}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => toggleAvailability(m)}
-                              title={`Click to toggle availability. Currently ${m.is_available ? "Online" : "Away"}`}
-                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors text-xs font-medium"
-                            >
-                              <span className={`flex w-2.5 h-2.5 rounded-full shadow-sm ${m.is_available ? "bg-emerald-500" : "bg-amber-500"}`} />
-                              {m.is_available ? "Online" : "Away"}
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              type="button"
-                              className="text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors shadow-xs"
-                              onClick={() => setSelectedMember(m)}
-                            >
-                              Manage
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="truncate font-medium">{manager.primary_location?.name || "Global / Multiple"}</span>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {selectedMember && data && (
-          <MemberComplaintsModal
-            member={selectedMember}
-            teamMembers={data.members}
-            onClose={() => setSelectedMember(null)}
-            onReassigned={(msg) => {
-              setNotice(msg);
-              reload();
-            }}
-          />
-        )}
-      </div>
+                <div className="pt-2 mt-auto grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedManagerId(manager.id);
+                      setViewMode("dashboard");
+                      setLocationFilter(""); // reset filter on drilldown
+                    }}
+                    className={primaryButtonClass + " !py-2 flex justify-center text-xs"}
+                  >
+                    View Members
+                  </button>
+                  <Link
+                    href={`/users/staff/${manager.id}`}
+                    className={secondaryButtonClass + " !py-2 flex justify-center text-xs bg-white hover:bg-slate-50"}
+                  >
+                    Lead Profile
+                  </Link>
+                </div>
+              </Card>
+            ))}
+            {filteredManagers?.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-500 bg-white border border-dashed rounded-xl">
+                No teams found matching your filters.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {managers && managers.length > 1 && (
+            <div className="flex items-center">
+              <button
+                onClick={() => {
+                  setViewMode("overview");
+                  setSelectedManagerId("");
+                  setLocationFilter(""); // reset
+                }}
+                className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back to Teams Overview
+              </button>
+            </div>
+          )}
+
+          {/* Aggregated KPI Cards */}
+          {agg ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+              <KpiTile label="Team Size" value={data.team_size} subtext="Supervised staff" icon={Users} tone="info" />
+              <KpiTile
+                label="Active Pending"
+                value={agg.pending}
+                subtext={`${agg.total_assigned} total`}
+                icon={Clock}
+                tone={agg.pending > 15 ? "warning" : "neutral"}
+              />
+              <KpiTile
+                label="Resolved"
+                value={agg.resolved}
+                subtext={`${agg.avg_resolution_hours ?? "—"}h avg res.`}
+                icon={CheckCircle2}
+                tone="success"
+              />
+              <KpiTile
+                label="Response SLA"
+                value={agg.response_sla_pct !== null ? `${agg.response_sla_pct}%` : "—"}
+                subtext={`${agg.avg_response_hours ?? "—"}h avg`}
+                icon={Timer}
+                tone={
+                  agg.response_sla_pct === null
+                    ? "neutral"
+                    : agg.response_sla_pct >= 90
+                      ? "success"
+                      : agg.response_sla_pct >= 75
+                        ? "warning"
+                        : "danger"
+                }
+              />
+              <KpiTile
+                label="Resolution SLA"
+                value={agg.resolution_sla_pct !== null ? `${agg.resolution_sla_pct}%` : "—"}
+                subtext={`${agg.sla_breaches} breaches`}
+                icon={ShieldCheck}
+                tone={
+                  agg.resolution_sla_pct === null
+                    ? "neutral"
+                    : agg.resolution_sla_pct >= 90
+                      ? "success"
+                      : agg.resolution_sla_pct >= 75
+                        ? "warning"
+                        : "danger"
+                }
+              />
+              <KpiTile
+                label="Customer Rating"
+                value={agg.avg_rating !== null ? `${agg.avg_rating} / 5` : "—"}
+                subtext={`${agg.reopen_pct ?? 0}% reopen`}
+                icon={Star}
+                tone={agg.avg_rating && agg.avg_rating >= 4 ? "success" : "neutral"}
+              />
+            </div>
+          ) : null}
+
+          {/* Member Cards Grid */}
+          <div className="space-y-4">
+            {loading ? (
+              <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
+                Loading team performance...
+              </div>
+            ) : !data || filteredMembers?.length === 0 ? (
+              <>
+                {data?.members.length === 0 ? (
+                  <AgentEndUsers />
+                ) : (
+                  <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
+                    No members match the selected filters.
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Member</th>
+                      <th className="px-4 py-3 hidden sm:table-cell">Role</th>
+                      <th className="px-4 py-3 hidden md:table-cell">Location</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredMembers?.map((m) => (
+                      <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-4 py-3">
+                          <Link href={`/users/staff/${m.id}`} className="flex items-center gap-3 w-fit">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs sm:text-sm shrink-0 group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors">
+                              {getInitials(m.name)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-700 transition-colors">
+                                {m.name}
+                              </div>
+                              <div className="text-[11px] sm:hidden font-semibold text-blue-600 mt-0.5 truncate">{m.role}</div>
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell text-xs font-medium text-slate-700">{m.role}</td>
+                        <td className="px-4 py-3 hidden md:table-cell text-xs text-slate-500">
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5" />
+                            <span className="truncate">{m.primary_location?.name || "Global / Multiple"}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleAvailability(m)}
+                            title={`Click to toggle availability. Currently ${m.is_available ? "Online" : "Away"}`}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors text-xs font-medium"
+                          >
+                            <span
+                              className={`flex w-2.5 h-2.5 rounded-full shadow-sm ${m.is_available ? "bg-emerald-500" : "bg-amber-500"}`}
+                            />
+                            {m.is_available ? "Online" : "Away"}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors shadow-xs"
+                            onClick={() => setSelectedMember(m)}
+                          >
+                            Manage
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedMember && data && (
+        <MemberComplaintsModal
+          member={selectedMember}
+          teamMembers={data.members}
+          onClose={() => setSelectedMember(null)}
+          onReassigned={(msg) => {
+            setNotice(msg);
+            reload();
+          }}
+        />
+      )}
+    </div>
   );
 }

@@ -116,12 +116,7 @@ export function ChangeAvatarModal({ onClose }: { onClose: () => void }) {
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
           <div>
             {me.avatar_url && !selectedFile && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={busy}
-                className={dangerButtonClass}
-              >
+              <button type="button" onClick={handleDelete} disabled={busy} className={dangerButtonClass}>
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 Remove photo
               </button>
@@ -133,22 +128,12 @@ export function ChangeAvatarModal({ onClose }: { onClose: () => void }) {
               Cancel
             </button>
             {selectedFile ? (
-              <button
-                type="button"
-                onClick={handleUpload}
-                disabled={busy}
-                className={primaryButtonClass}
-              >
+              <button type="button" onClick={handleUpload} disabled={busy} className={primaryButtonClass}>
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                 Save photo
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy}
-                className={primaryButtonClass}
-              >
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy} className={primaryButtonClass}>
                 <Camera className="w-3.5 h-3.5" />
                 Choose photo
               </button>

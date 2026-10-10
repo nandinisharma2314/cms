@@ -303,14 +303,8 @@ export function CommandPalette() {
         id: "action-toggle-availability",
         category: "Actions",
         title: me.is_available ? "Set Status to Busy / Away" : "Set Status to Available",
-        description: me.is_available
-          ? "Pause automatic ticket assignment to you"
-          : "Resume receiving auto-assigned complaints",
-        icon: me.is_available ? (
-          <UserX className="w-4 h-4 text-rose-500" />
-        ) : (
-          <UserCheck className="w-4 h-4 text-emerald-600" />
-        ),
+        description: me.is_available ? "Pause automatic ticket assignment to you" : "Resume receiving auto-assigned complaints",
+        icon: me.is_available ? <UserX className="w-4 h-4 text-rose-500" /> : <UserCheck className="w-4 h-4 text-emerald-600" />,
         badge: me.is_available ? "Available" : "Away",
         onSelect: async () => {
           try {
@@ -362,10 +356,7 @@ export function CommandPalette() {
     // 2. Filtered static items
     const filteredStatic = staticItems.filter((item) => {
       if (!q) return true;
-      return (
-        item.title.toLowerCase().includes(q) ||
-        (item.description && item.description.toLowerCase().includes(q))
-      );
+      return item.title.toLowerCase().includes(q) || (item.description && item.description.toLowerCase().includes(q));
     });
 
     return [...complaints, ...filteredStatic];
@@ -453,7 +444,9 @@ export function CommandPalette() {
             <div className="py-12 text-center space-y-2">
               <Compass className="w-8 h-8 text-slate-300 mx-auto" />
               <p className="text-sm font-semibold text-slate-600">No matching commands or tickets found</p>
-              <p className="text-xs text-slate-400">Try searching for &quot;Complaints&quot;, &quot;Rewards&quot;, &quot;CMP-&quot;, or &quot;Team&quot;</p>
+              <p className="text-xs text-slate-400">
+                Try searching for &quot;Complaints&quot;, &quot;Rewards&quot;, &quot;CMP-&quot;, or &quot;Team&quot;
+              </p>
             </div>
           ) : (
             allFilteredItems.map((item, idx) => {
@@ -490,14 +483,10 @@ export function CommandPalette() {
                           </span>
                         )}
                       </div>
-                      {item.description && (
-                        <p className="text-[11px] text-slate-500 truncate">{item.description}</p>
-                      )}
+                      {item.description && <p className="text-[11px] text-slate-500 truncate">{item.description}</p>}
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
-                    {item.category}
-                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">{item.category}</span>
                 </div>
               );
             })

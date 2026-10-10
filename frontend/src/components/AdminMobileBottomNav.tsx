@@ -40,10 +40,7 @@ export function AdminMobileBottomNav() {
       ? { name: "Reports", icon: BarChart3, href: "/reports" }
       : { name: "Notifications", icon: Bell, href: "/notifications" };
 
-  const rightItems: NavItem[] = [
-    middleItem,
-    { name: "Teams", icon: Users, href: "/my-team" },
-  ];
+  const rightItems: NavItem[] = [middleItem, { name: "Teams", icon: Users, href: "/my-team" }];
 
   const renderItem = (item: NavItem) => {
     const isActive = item.exact ? pathname === item.href : pathname?.startsWith(item.href);

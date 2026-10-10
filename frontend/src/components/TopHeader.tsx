@@ -318,7 +318,6 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       <div className="flex-1 sm:hidden" />
 
       <div className="flex items-center gap-1.5 sm:gap-3 ml-auto">
-        
         <div
           className="hidden xl:flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl"
           title={me.scopes.map(scopeLabel).join("\n") || scopeSummary}

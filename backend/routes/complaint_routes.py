@@ -295,7 +295,7 @@ def classification_options(ctx: AccessContext = Depends(get_access_context)):
 
 @router.get("/{complaint_id}")
 def get_complaint(complaint_id: str, ctx: AccessContext = Depends(require_permission("complaint.view"))):
-    return staff_detail(ctx, _get_scoped_for_viewing(ctx, complaint_id))
+    return staff_detail(ctx, _get_scoped(ctx, complaint_id))
 
 
 @router.post("/quick-create", status_code=status.HTTP_201_CREATED)

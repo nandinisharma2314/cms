@@ -53,7 +53,8 @@ function LogoUpload({ initialLogoUrl, onUpload }: { initialLogoUrl: string | nul
               try {
                 await api.settings.uploadLogo(file);
                 onUpload();
-              } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+              } catch (err: any) {
+                // eslint-disable-line @typescript-eslint/no-explicit-any
                 setError(err.message);
               } finally {
                 setUploading(false);

@@ -179,7 +179,9 @@ function CertificateModal({
         <div className="absolute bottom-3 right-3 text-2xl select-none opacity-40">⚜️</div>
 
         <div className="text-center space-y-1">
-          <p className="text-[11px] font-black uppercase tracking-widest text-amber-700">CivicCare Municipal Service Excellence</p>
+          <p className="text-[11px] font-black uppercase tracking-widest text-amber-700">
+            CivicCare Municipal Service Excellence
+          </p>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">CERTIFICATE OF RECOGNITION</h2>
           <p className="text-xs text-slate-500 italic">Official Performance & Public Redressal Honor</p>
         </div>
@@ -192,7 +194,8 @@ function CertificateModal({
             {userName}
           </h3>
           <p className="text-xs text-slate-600 max-w-md mx-auto pt-2 leading-relaxed">
-            In recognition of exemplary commitment to citizen complaint resolution, continuous high SLA turnaround, and attaining the elite standing of:
+            In recognition of exemplary commitment to citizen complaint resolution, continuous high SLA turnaround, and attaining
+            the elite standing of:
           </p>
           <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-50 border border-amber-300/80 shadow-xs">
             <span className="text-2xl">{tier.badge}</span>
@@ -241,7 +244,15 @@ function CertificateModal({
 // ---------------------------------------------------------------------------
 // Manual Point Adjustment Modal (Add & Deduct Modes)
 // ---------------------------------------------------------------------------
-function SearchableStaffSelect({ users, value, onChange }: { users: StaffUser[], value: number | "", onChange: (v: number | "") => void }) {
+function SearchableStaffSelect({
+  users,
+  value,
+  onChange,
+}: {
+  users: StaffUser[];
+  value: number | "";
+  onChange: (v: number | "") => void;
+}) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -257,19 +268,21 @@ function SearchableStaffSelect({ users, value, onChange }: { users: StaffUser[],
 
   return (
     <div className="relative" ref={ref}>
-      <div 
-        className={`${inputClass} flex items-center justify-between cursor-pointer ${!selected ? "text-slate-500" : "text-slate-800"}`} 
+      <div
+        className={`${inputClass} flex items-center justify-between cursor-pointer ${!selected ? "text-slate-500" : "text-slate-800"}`}
         onClick={() => setOpen(!open)}
       >
-        <span className="truncate block font-medium">{selected ? `${selected.name} (${selected.role.name} — ${selected.email})` : "Select staff recipient…"}</span>
+        <span className="truncate block font-medium">
+          {selected ? `${selected.name} (${selected.role.name} — ${selected.email})` : "Select staff recipient…"}
+        </span>
         <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
       </div>
       {open && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] max-h-64 flex flex-col overflow-hidden">
           <div className="p-2 border-b border-slate-100 shrink-0">
-            <input 
+            <input
               autoFocus
-              type="text" 
+              type="text"
               className="w-full h-8 px-3 text-[13px] bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               placeholder="Search by name, role or email…"
               value={search}
@@ -292,7 +305,9 @@ function SearchableStaffSelect({ users, value, onChange }: { users: StaffUser[],
                   }}
                 >
                   <div className={`font-semibold ${u.id === value ? "text-blue-700" : "text-slate-800"}`}>{u.name}</div>
-                  <div className={`text-[11px] mt-0.5 ${u.id === value ? "text-blue-500" : "text-slate-500"}`}>{u.role.name} — {u.email}</div>
+                  <div className={`text-[11px] mt-0.5 ${u.id === value ? "text-blue-500" : "text-slate-500"}`}>
+                    {u.role.name} — {u.email}
+                  </div>
                 </button>
               ))
             )}
@@ -354,7 +369,10 @@ function ManualAdjustmentModal({
             <Award className="w-5 h-5 text-amber-600" />
             <h3 className="text-sm font-bold text-slate-900">Manual Point Adjustment</h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer">
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -395,20 +413,22 @@ function ManualAdjustmentModal({
 
           {/* Staff User */}
           <Field label="Staff Member">
-            <SearchableStaffSelect
-              users={users}
-              value={selectedUserId}
-              onChange={(v) => setSelectedUserId(v)}
-            />
+            <SearchableStaffSelect users={users} value={selectedUserId} onChange={(v) => setSelectedUserId(v)} />
           </Field>
 
           {/* Points Amount with clear +/- indicator */}
           <Field
             label={mode === "add" ? "Points to Add" : "Points to Deduct"}
-            hint={mode === "add" ? "Points will be credited to balance & lifetime" : "Points will be deducted and tier/badge will recalibrate"}
+            hint={
+              mode === "add"
+                ? "Points will be credited to balance & lifetime"
+                : "Points will be deducted and tier/badge will recalibrate"
+            }
           >
             <div className="relative">
-              <div className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-black text-sm ${mode === "add" ? "text-emerald-600" : "text-rose-600"}`}>
+              <div
+                className={`absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-black text-sm ${mode === "add" ? "text-emerald-600" : "text-rose-600"}`}
+              >
                 {mode === "add" ? "+" : "-"}
               </div>
               <input
@@ -458,7 +478,11 @@ function ManualAdjustmentModal({
           <Field label="Detailed Explanation" hint="Recorded in permanent audit log and sent to employee">
             <input
               className={inputClass}
-              placeholder={mode === "add" ? "e.g. Cleared emergency flood complaints during storm warning" : "e.g. Marked ticket resolved before actual repairs were verified"}
+              placeholder={
+                mode === "add"
+                  ? "e.g. Cleared emergency flood complaints during storm warning"
+                  : "e.g. Marked ticket resolved before actual repairs were verified"
+              }
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               required
@@ -473,9 +497,7 @@ function ManualAdjustmentModal({
               type="submit"
               disabled={action.busy || !selectedUserId}
               className={`py-2 px-4 rounded-xl text-xs font-bold text-white shadow-xs cursor-pointer disabled:opacity-50 transition-all ${
-                mode === "add"
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : "bg-rose-600 hover:bg-rose-700"
+                mode === "add" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
               }`}
             >
               {action.busy ? "Applying…" : mode === "add" ? "Add Points" : "Deduct Points"}
@@ -711,9 +733,7 @@ function RedemptionReviewModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-sm font-bold text-slate-900">
-              Review Redemption Request #{redemption.id}
-            </h3>
+            <h3 className="text-sm font-bold text-slate-900">Review Redemption Request #{redemption.id}</h3>
           </div>
           <button
             onClick={onClose}
@@ -756,10 +776,10 @@ function RedemptionReviewModal({
                       redemption.status === "fulfilled"
                         ? "bg-emerald-100 text-emerald-800"
                         : redemption.status === "approved"
-                        ? "bg-blue-100 text-blue-800"
-                        : redemption.status === "rejected"
-                        ? "bg-rose-100 text-rose-800"
-                        : "bg-amber-100 text-amber-800"
+                          ? "bg-blue-100 text-blue-800"
+                          : redemption.status === "rejected"
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100 text-amber-800"
                     }`}
                   >
                     {redemption.status.toUpperCase()}
@@ -827,7 +847,8 @@ function RedemptionReviewModal({
               <div>
                 <p className="font-bold">Automatic Points Refund</p>
                 <p className="text-[11px] text-amber-800 mt-0.5">
-                  Rejecting this claim will immediately refund <strong>+{redemption.points_spent} points</strong> back to {redemption.user_name}&apos;s balance and record a ledger entry.
+                  Rejecting this claim will immediately refund <strong>+{redemption.points_spent} points</strong> back to{" "}
+                  {redemption.user_name}&apos;s balance and record a ledger entry.
                 </p>
               </div>
             </div>
@@ -857,8 +878,8 @@ function RedemptionReviewModal({
                 status === "fulfilled"
                   ? "bg-emerald-600 hover:bg-emerald-700"
                   : status === "rejected"
-                  ? "bg-rose-600 hover:bg-rose-700"
-                  : "bg-blue-600 hover:bg-blue-700"
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
               {busy ? "Saving Decision…" : `Confirm ${status.toUpperCase()}`}
@@ -1125,7 +1146,9 @@ function ChampionshipConfigModal({
             <span className="text-xl">🏆</span>
             <div>
               <h3 className="text-sm font-bold text-slate-900">Configure Inter-Department Championship Cup</h3>
-              <p className="text-[11px] text-slate-500">Customize tournament title, season label, trophies, and scoring weights</p>
+              <p className="text-[11px] text-slate-500">
+                Customize tournament title, season label, trophies, and scoring weights
+              </p>
             </div>
           </div>
           <button
@@ -1290,11 +1313,16 @@ export default function RewardsPage() {
     () => api.rewards.getChampionshipConfig(),
     [],
   );
-  const { data: deptCup, loading: deptCupLoading, reload: reloadDeptCup } = useApiData<DepartmentCupEntry[]>(
-    () => api.rewards.departmentLeaderboard({ location_id: cupLoc }),
-    [cupLoc],
-  );
-  const { data: scorecard, loading: scorecardLoading, reload: reloadScorecard } = useApiData<PublicScorecard>(() => api.publicScorecard(), []);
+  const {
+    data: deptCup,
+    loading: deptCupLoading,
+    reload: reloadDeptCup,
+  } = useApiData<DepartmentCupEntry[]>(() => api.rewards.departmentLeaderboard({ location_id: cupLoc }), [cupLoc]);
+  const {
+    data: scorecard,
+    loading: scorecardLoading,
+    reload: reloadScorecard,
+  } = useApiData<PublicScorecard>(() => api.publicScorecard(), []);
 
   // Quest Management Modal State
   const [questModalOpen, setQuestModalOpen] = useState(false);
@@ -1535,11 +1563,7 @@ export default function RewardsPage() {
 
   const openReviewModal = (redemption: RewardRedemption) => {
     setReviewingRedemption(redemption);
-    setReviewStatus(
-      redemption.status === "pending"
-        ? "approved"
-        : (redemption.status as "approved" | "fulfilled" | "rejected"),
-    );
+    setReviewStatus(redemption.status === "pending" ? "approved" : (redemption.status as "approved" | "fulfilled" | "rejected"));
     setReviewAdminNotes(redemption.admin_notes || "");
     setReviewModalOpen(true);
   };
@@ -1575,7 +1599,11 @@ export default function RewardsPage() {
   const [lbDept, setLbDept] = useState<number | undefined>(undefined);
   const [lbLoc, setLbLoc] = useState<number | undefined>(undefined);
 
-  const { data: leaderboard, loading: lbLoading, reload: reloadLeaderboard } = useApiData<LeaderboardEntry[]>(
+  const {
+    data: leaderboard,
+    loading: lbLoading,
+    reload: reloadLeaderboard,
+  } = useApiData<LeaderboardEntry[]>(
     () => api.rewards.leaderboard({ timeframe: lbTimeframe, department_id: lbDept, location_id: lbLoc, limit: 30 }),
     [lbTimeframe, lbDept, lbLoc],
   );
@@ -1766,11 +1794,7 @@ export default function RewardsPage() {
                     <RotateCcw className={`w-4 h-4 ${syncAction.busy ? "animate-spin" : ""}`} />
                     {syncAction.busy ? "Syncing..." : "Sync Past Points"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setAdjustModalOpen(true)}
-                    className={primaryButtonClass}
-                  >
+                  <button type="button" onClick={() => setAdjustModalOpen(true)} className={primaryButtonClass}>
                     <Plus className="w-4 h-4" /> Manual Adjustment
                   </button>
                 </>
@@ -1787,7 +1811,9 @@ export default function RewardsPage() {
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Available Balance</p>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-2xl font-black text-amber-900">{mySummary.balance}</span>
-                  <span className="text-xs font-bold text-amber-700">{mySummary.currency_symbol} {mySummary.currency_name}</span>
+                  <span className="text-xs font-bold text-amber-700">
+                    {mySummary.currency_symbol} {mySummary.currency_name}
+                  </span>
                 </div>
               </div>
               <div className="w-11 h-11 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-700 text-xl font-bold">
@@ -1839,7 +1865,9 @@ export default function RewardsPage() {
                 <div className="flex justify-between items-center text-[10px] text-slate-500 mt-1.5 font-medium">
                   <span>{mySummary.tier.progress_pct}% completed</span>
                   {mySummary.tier.next_tier ? (
-                    <span>{mySummary.tier.points_to_next_tier} pts to {mySummary.tier.next_tier}</span>
+                    <span>
+                      {mySummary.tier.points_to_next_tier} pts to {mySummary.tier.next_tier}
+                    </span>
                   ) : (
                     <span className="text-purple-700 font-bold">Top Tier Reached! 👑</span>
                   )}
@@ -1975,11 +2003,7 @@ export default function RewardsPage() {
 
         {/* 2. Main Navigation Tabs */}
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("leaderboard")}
-            className={tabClass(activeTab === "leaderboard")}
-          >
+          <button type="button" onClick={() => setActiveTab("leaderboard")} className={tabClass(activeTab === "leaderboard")}>
             <span className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-amber-600" />
               Leaderboard & Rankings
@@ -1997,22 +2021,14 @@ export default function RewardsPage() {
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("scorecard")}
-            className={tabClass(activeTab === "scorecard")}
-          >
+          <button type="button" onClick={() => setActiveTab("scorecard")} className={tabClass(activeTab === "scorecard")}>
             <span className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               Civic Scorecard
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("perks")}
-            className={tabClass(activeTab === "perks")}
-          >
+          <button type="button" onClick={() => setActiveTab("perks")} className={tabClass(activeTab === "perks")}>
             <span className="flex items-center gap-2">
               <Gift className="w-4 h-4 text-fuchsia-600" />
               Perks Redemption
@@ -2020,11 +2036,7 @@ export default function RewardsPage() {
           </button>
 
           {canManage && (
-            <button
-              type="button"
-              onClick={() => setActiveTab("audit")}
-              className={tabClass(activeTab === "audit")}
-            >
+            <button type="button" onClick={() => setActiveTab("audit")} className={tabClass(activeTab === "audit")}>
               <span className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-blue-600" />
                 Rewards Audit & Intelligence
@@ -2071,13 +2083,7 @@ export default function RewardsPage() {
                   ))}
                 </select>
 
-                <LocationHierarchyFilter
-                  tree={locationNodes}
-                  value={lbLoc}
-                  onChange={setLbLoc}
-                  layout="horizontal"
-                  compact
-                />
+                <LocationHierarchyFilter tree={locationNodes} value={lbLoc} onChange={setLbLoc} layout="horizontal" compact />
               </div>
             </div>
 
@@ -2089,7 +2095,11 @@ export default function RewardsPage() {
                   <div className="absolute top-3 left-3 text-sm font-bold text-slate-400">2</div>
                   <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-600 font-bold text-lg overflow-hidden mb-2">
                     {leaderboard[1].user.avatar_url ? (
-                      <img src={resolveAvatarUrl(leaderboard[1].user.avatar_url)!} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={resolveAvatarUrl(leaderboard[1].user.avatar_url)!}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       initials(leaderboard[1].user.name)
                     )}
@@ -2108,7 +2118,11 @@ export default function RewardsPage() {
                   </div>
                   <div className="w-20 h-20 rounded-full bg-amber-100 border-3 border-amber-400 flex items-center justify-center text-amber-800 font-bold text-xl overflow-hidden mb-2 shadow-sm">
                     {leaderboard[0].user.avatar_url ? (
-                      <img src={resolveAvatarUrl(leaderboard[0].user.avatar_url)!} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={resolveAvatarUrl(leaderboard[0].user.avatar_url)!}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       initials(leaderboard[0].user.name)
                     )}
@@ -2125,7 +2139,11 @@ export default function RewardsPage() {
                   <div className="absolute top-3 left-3 text-sm font-bold text-amber-700/60">3</div>
                   <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-300/80 flex items-center justify-center text-amber-700 font-bold text-lg overflow-hidden mb-2">
                     {leaderboard[2].user.avatar_url ? (
-                      <img src={resolveAvatarUrl(leaderboard[2].user.avatar_url)!} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={resolveAvatarUrl(leaderboard[2].user.avatar_url)!}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       initials(leaderboard[2].user.name)
                     )}
@@ -2150,7 +2168,9 @@ export default function RewardsPage() {
               </div>
 
               {lbLoading ? (
-                <div className="p-8"><Spinner /></div>
+                <div className="p-8">
+                  <Spinner />
+                </div>
               ) : !leaderboard || leaderboard.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 text-xs">
                   No reward transactions found for this timeframe and location selection.
@@ -2181,7 +2201,11 @@ export default function RewardsPage() {
                               <div className="flex items-center gap-2.5">
                                 <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold text-[10px] flex items-center justify-center shrink-0 overflow-hidden">
                                   {row.user.avatar_url ? (
-                                    <img src={resolveAvatarUrl(row.user.avatar_url)!} alt="" className="w-full h-full object-cover" />
+                                    <img
+                                      src={resolveAvatarUrl(row.user.avatar_url)!}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                    />
                                   ) : (
                                     initials(row.user.name)
                                   )}
@@ -2309,13 +2333,7 @@ export default function RewardsPage() {
                 <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-indigo-600" /> Filter Region:
                 </span>
-                <LocationHierarchyFilter
-                  tree={locationNodes}
-                  value={cupLoc}
-                  onChange={setCupLoc}
-                  layout="horizontal"
-                  compact
-                />
+                <LocationHierarchyFilter tree={locationNodes} value={cupLoc} onChange={setCupLoc} layout="horizontal" compact />
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
                 Aggregating points & SLA performance across selected jurisdiction
@@ -2323,11 +2341,11 @@ export default function RewardsPage() {
             </div>
 
             {deptCupLoading ? (
-              <div className="p-12"><Spinner /></div>
-            ) : !deptCup || deptCup.length === 0 ? (
-              <div className="p-16 text-center text-slate-400 text-xs">
-                No department reward statistics recorded yet.
+              <div className="p-12">
+                <Spinner />
               </div>
+            ) : !deptCup || deptCup.length === 0 ? (
+              <div className="p-16 text-center text-slate-400 text-xs">No department reward statistics recorded yet.</div>
             ) : (
               <>
                 {/* Department Podium (if >= 3 depts) */}
@@ -2340,7 +2358,9 @@ export default function RewardsPage() {
                         {championshipConfig?.trophies?.[1] || deptCup[1].trophy}
                       </div>
                       <h4 className="text-sm font-extrabold text-slate-800">{deptCup[1].department_name}</h4>
-                      <p className="text-[11px] text-slate-500">{deptCup[1].total_resolved} resolved ({deptCup[1].sla_compliance_pct}% on-time)</p>
+                      <p className="text-[11px] text-slate-500">
+                        {deptCup[1].total_resolved} resolved ({deptCup[1].sla_compliance_pct}% on-time)
+                      </p>
                       <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-full text-xs font-black text-slate-800">
                         {championshipConfig?.trophies?.[1] || "🥈"} {deptCup[1].total_points} pts
                       </div>
@@ -2360,7 +2380,9 @@ export default function RewardsPage() {
                         {championshipConfig?.trophies?.[0] || deptCup[0].trophy}
                       </div>
                       <h4 className="text-base font-black text-slate-900">{deptCup[0].department_name}</h4>
-                      <p className="text-xs text-amber-700 font-medium">{deptCup[0].total_resolved} resolved ({deptCup[0].sla_compliance_pct}% on-time)</p>
+                      <p className="text-xs text-amber-700 font-medium">
+                        {deptCup[0].total_resolved} resolved ({deptCup[0].sla_compliance_pct}% on-time)
+                      </p>
                       <div className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-100 text-amber-900 rounded-full text-sm font-black shadow-xs">
                         {championshipConfig?.trophies?.[0] || "🥇"} {deptCup[0].total_points} pts
                       </div>
@@ -2378,7 +2400,9 @@ export default function RewardsPage() {
                         {championshipConfig?.trophies?.[2] || deptCup[2].trophy}
                       </div>
                       <h4 className="text-sm font-extrabold text-slate-800">{deptCup[2].department_name}</h4>
-                      <p className="text-[11px] text-slate-500">{deptCup[2].total_resolved} resolved ({deptCup[2].sla_compliance_pct}% on-time)</p>
+                      <p className="text-[11px] text-slate-500">
+                        {deptCup[2].total_resolved} resolved ({deptCup[2].sla_compliance_pct}% on-time)
+                      </p>
                       <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 bg-amber-50 rounded-full text-xs font-black text-amber-900">
                         {championshipConfig?.trophies?.[2] || "🥉"} {deptCup[2].total_points} pts
                       </div>
@@ -2417,22 +2441,19 @@ export default function RewardsPage() {
                         {deptCup.map((dept) => (
                           <tr key={dept.department_id} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-3 px-4 font-bold text-slate-700 text-sm">
-                              {(championshipConfig?.trophies && championshipConfig.trophies[dept.rank - 1]) || dept.trophy}{dept.rank}
+                              {(championshipConfig?.trophies && championshipConfig.trophies[dept.rank - 1]) || dept.trophy}
+                              {dept.rank}
                             </td>
-                            <td className="py-3 px-4 font-bold text-slate-800">
-                              {dept.department_name}
-                            </td>
-                            <td className="py-3 px-4 text-center text-slate-700 font-semibold">
-                              {dept.total_resolved}
-                            </td>
+                            <td className="py-3 px-4 font-bold text-slate-800">{dept.department_name}</td>
+                            <td className="py-3 px-4 text-center text-slate-700 font-semibold">{dept.total_resolved}</td>
                             <td className="py-3 px-4 text-center">
                               <span
                                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                   dept.sla_compliance_pct >= 90
                                     ? "bg-emerald-100 text-emerald-800"
                                     : dept.sla_compliance_pct >= 75
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-amber-100 text-amber-800"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-amber-100 text-amber-800"
                                 }`}
                               >
                                 {dept.sla_compliance_pct}%
@@ -2445,9 +2466,7 @@ export default function RewardsPage() {
                                 <span className="text-slate-400">—</span>
                               )}
                             </td>
-                            <td className="py-3 px-4 text-right font-black text-amber-700 text-sm">
-                              {dept.total_points} 🪙
-                            </td>
+                            <td className="py-3 px-4 text-right font-black text-amber-700 text-sm">{dept.total_points} 🪙</td>
                           </tr>
                         ))}
                       </tbody>
@@ -2486,11 +2505,11 @@ export default function RewardsPage() {
             </div>
 
             {scorecardLoading ? (
-              <div className="p-12"><Spinner /></div>
-            ) : !scorecard ? (
-              <div className="p-16 text-center text-slate-400 text-xs">
-                Unable to load civic scorecard data.
+              <div className="p-12">
+                <Spinner />
               </div>
+            ) : !scorecard ? (
+              <div className="p-16 text-center text-slate-400 text-xs">Unable to load civic scorecard data.</div>
             ) : (
               <>
                 {/* 4 Macro Metrics */}
@@ -2575,8 +2594,8 @@ export default function RewardsPage() {
                                   d.resolution_rate_pct >= 90
                                     ? "bg-emerald-100 text-emerald-800"
                                     : d.resolution_rate_pct >= 75
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-amber-100 text-amber-800"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-amber-100 text-amber-800"
                                 }`}
                               >
                                 {d.resolution_rate_pct}%
@@ -2653,9 +2672,7 @@ export default function RewardsPage() {
                           {canManage && (
                             <span
                               className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                                perk.is_active
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-slate-200 text-slate-700"
+                                perk.is_active ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"
                               }`}
                             >
                               {perk.is_active ? "Active" : "Inactive"}
@@ -2663,9 +2680,7 @@ export default function RewardsPage() {
                           )}
                         </div>
                       </div>
-                      <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                        {perk.title}
-                      </h4>
+                      <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">{perk.title}</h4>
                       <p className="text-xs text-slate-500 mt-1 line-clamp-2">{perk.description}</p>
                     </div>
 
@@ -2700,15 +2715,15 @@ export default function RewardsPage() {
                             !perk.is_active
                               ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                               : canAfford
-                              ? "bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-xs"
-                              : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                                ? "bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-400 cursor-not-allowed"
                           }`}
                         >
                           {!perk.is_active
                             ? "Unavailable"
                             : canAfford
-                            ? "Redeem Perk"
-                            : `Need ${perk.points_cost - (mySummary?.balance ?? 0)} more`}
+                              ? "Redeem Perk"
+                              : `Need ${perk.points_cost - (mySummary?.balance ?? 0)} more`}
                         </button>
                       </div>
                     </div>
@@ -2751,9 +2766,7 @@ export default function RewardsPage() {
               </div>
 
               {!myRedemptions || myRedemptions.items.length === 0 ? (
-                <div className="p-12 text-center text-slate-400 text-xs">
-                  No redemption requests found for this filter.
-                </div>
+                <div className="p-12 text-center text-slate-400 text-xs">No redemption requests found for this filter.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
@@ -2802,10 +2815,10 @@ export default function RewardsPage() {
                                 r.status === "fulfilled"
                                   ? "bg-emerald-100 text-emerald-800"
                                   : r.status === "approved"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : r.status === "rejected"
-                                  ? "bg-rose-100 text-rose-800"
-                                  : "bg-amber-100 text-amber-800"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : r.status === "rejected"
+                                      ? "bg-rose-100 text-rose-800"
+                                      : "bg-amber-100 text-amber-800"
                               }`}
                             >
                               {r.status.toUpperCase()}
@@ -2913,12 +2926,18 @@ export default function RewardsPage() {
                     type="button"
                     onClick={() => applyPreset(p)}
                     className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                      datePreset === p
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      datePreset === p ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {p === "all" ? "All Time" : p === "today" ? "Today" : p === "7d" ? "Last 7 Days" : p === "30d" ? "Last 30 Days" : "Custom"}
+                    {p === "all"
+                      ? "All Time"
+                      : p === "today"
+                        ? "Today"
+                        : p === "7d"
+                          ? "Last 7 Days"
+                          : p === "30d"
+                            ? "Last 30 Days"
+                            : "Custom"}
                   </button>
                 ))}
 
@@ -3119,7 +3138,8 @@ export default function RewardsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     {statsData.by_rule?.map((r) => (
                       <span key={r.rule} className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-700">
-                        {RULE_LABELS[r.rule]?.icon || "🪙"} {RULE_LABELS[r.rule]?.label || r.rule}: <strong className="text-slate-900">{r.points} pts</strong> ({r.count})
+                        {RULE_LABELS[r.rule]?.icon || "🪙"} {RULE_LABELS[r.rule]?.label || r.rule}:{" "}
+                        <strong className="text-slate-900">{r.points} pts</strong> ({r.count})
                       </span>
                     ))}
                     {(!statsData.by_rule || statsData.by_rule.length === 0) && (
@@ -3143,7 +3163,9 @@ export default function RewardsPage() {
               </div>
 
               {auditLoading ? (
-                <div className="p-12"><Spinner /></div>
+                <div className="p-12">
+                  <Spinner />
+                </div>
               ) : !transactionsData || transactionsData.items.length === 0 ? (
                 <div className="p-16 text-center text-slate-400 text-xs">
                   No reward transactions found matching the selected filter criteria.
@@ -3201,9 +3223,7 @@ export default function RewardsPage() {
                                   <span className="text-slate-400">Mgr:</span> {String(tx.breakdown?.manager)}
                                 </p>
                               )}
-                              {!tx.breakdown?.supervisor && !tx.breakdown?.manager && (
-                                <span className="text-slate-400">—</span>
-                              )}
+                              {!tx.breakdown?.supervisor && !tx.breakdown?.manager && <span className="text-slate-400">—</span>}
                             </div>
                           </td>
 
@@ -3255,11 +3275,11 @@ export default function RewardsPage() {
 
                           {/* Description */}
                           <td className="py-3 px-4 text-slate-600 max-w-xs">
-                            <p className="line-clamp-2" title={tx.description}>{tx.description}</p>
+                            <p className="line-clamp-2" title={tx.description}>
+                              {tx.description}
+                            </p>
                             {tx.granted_by_name && (
-                              <span className="text-[10px] text-slate-400 block mt-0.5">
-                                By: {tx.granted_by_name}
-                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">By: {tx.granted_by_name}</span>
                             )}
                           </td>
                         </tr>
@@ -3310,11 +3330,7 @@ export default function RewardsPage() {
 
         {/* Certificate Modal */}
         {certificateOpen && mySummary?.tier && (
-          <CertificateModal
-            userName={me.name}
-            tier={mySummary.tier}
-            onClose={() => setCertificateOpen(false)}
-          />
+          <CertificateModal userName={me.name} tier={mySummary.tier} onClose={() => setCertificateOpen(false)} />
         )}
 
         {/* Celebration Modal */}

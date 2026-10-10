@@ -119,13 +119,11 @@ function Aside() {
   );
 }
 
-
-
 export default function AdminRegisterComplaintPage() {
   const router = useRouter();
   const { me, can } = useSession();
   const { limits, phone } = useConfig();
-  
+
   const { data: options, error: loadError } = useApiData(() => api.complaints.classificationOptions(), []);
 
   const [departmentId, setDepartmentId] = useState<number | null>(null);
@@ -136,7 +134,7 @@ export default function AdminRegisterComplaintPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [details, setDetails] = useState("");
-  
+
   const [step, setStep] = useState<Step>(1);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -146,19 +144,13 @@ export default function AdminRegisterComplaintPage() {
   const departments = useMemo(() => (options?.departments ?? []).filter((d) => coversDepartment(me, d.id)), [options, me]);
   const department = departments.find((d) => d.id === departmentId) ?? null;
   const category = department?.categories.find((c) => c.id === categoryId) ?? null;
-  
+
   const canSetPriority = can("complaint.reclassify");
   const priorityChanged = priorityId !== null && category !== null && priorityId !== category.default_priority.id;
-  
+
   const effectiveLocationId = locationId;
 
-  const detailsValid = Boolean(
-    department && 
-    category && 
-    title.trim() && 
-    description.trim() && 
-    effectiveLocationId !== null
-  );
+  const detailsValid = Boolean(department && category && title.trim() && description.trim() && effectiveLocationId !== null);
 
   const next = () => {
     setError(null);
@@ -166,7 +158,7 @@ export default function AdminRegisterComplaintPage() {
     if (effectiveLocationId === null) return setError("Choose a location.");
     if (!title.trim() || !description.trim()) return setError("Fill in the title and description.");
     if (priorityChanged && !priorityReason.trim()) return setError("Please provide a reason for the priority override.");
-    
+
     setStep(2);
   };
 
@@ -202,9 +194,7 @@ export default function AdminRegisterComplaintPage() {
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="max-w-sm rounded-2xl bg-white p-6 text-center shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
           <h1 className="text-[17px] font-bold text-[#0b1a3f]">Permission denied</h1>
-          <p className="mt-2 text-[14px] leading-snug text-slate-500">
-            You don&apos;t have permission to create complaints.
-          </p>
+          <p className="mt-2 text-[14px] leading-snug text-slate-500">You don&apos;t have permission to create complaints.</p>
           <Link
             href="/dashboard"
             className="mt-4 inline-block rounded-xl bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white"
@@ -284,7 +274,9 @@ export default function AdminRegisterComplaintPage() {
               {/* Location Section */}
               <div className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-xs font-bold text-slate-900">Location <span className="text-red-500">*</span></h3>
+                  <h3 className="text-xs font-bold text-slate-900">
+                    Location <span className="text-red-500">*</span>
+                  </h3>
                 </div>
                 <div className="relative z-0">
                   <LocationPicker value={locationId} onChange={setLocationId} />
@@ -310,9 +302,13 @@ export default function AdminRegisterComplaintPage() {
                       }}
                       className={`${fieldBox} appearance-none pr-10`}
                     >
-                      <option value="" disabled>Choose a department</option>
+                      <option value="" disabled>
+                        Choose a department
+                      </option>
                       {departments.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
                       ))}
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
@@ -336,9 +332,13 @@ export default function AdminRegisterComplaintPage() {
                       onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
                       className={`${fieldBox} appearance-none pr-10`}
                     >
-                      <option value="" disabled>Choose a category</option>
+                      <option value="" disabled>
+                        Choose a category
+                      </option>
                       {department?.categories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
                       ))}
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
@@ -366,16 +366,22 @@ export default function AdminRegisterComplaintPage() {
                   >
                     <option value="">{category ? `Default (${category.default_priority.name})` : "Category default"}</option>
                     {options?.priorities.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
                     ))}
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
                     <ChevronDown size={16} aria-hidden="true" />
                   </div>
                 </div>
-                {!canSetPriority && <p className="text-[11px] font-semibold text-slate-400">Set by the category. You don&apos;t have permission to reclassify priority.</p>}
+                {!canSetPriority && (
+                  <p className="text-[11px] font-semibold text-slate-400">
+                    Set by the category. You don&apos;t have permission to reclassify priority.
+                  </p>
+                )}
               </div>
-              
+
               {priorityChanged && (
                 <div className="flex flex-col gap-1.5 z-0 relative">
                   <label htmlFor="priorityReason" className="text-xs font-bold text-slate-900">
@@ -460,7 +466,6 @@ export default function AdminRegisterComplaintPage() {
                 </div>
                 <Counter value={details} max={limits.additional_details} />
               </div>
-
             </div>
           )}
 
@@ -480,9 +485,7 @@ export default function AdminRegisterComplaintPage() {
                   title: "Location",
                   icon: MapPin,
                   goTo: 1 as Step,
-                  rows: [
-                    ["Location", "Selected location"],
-                  ],
+                  rows: [["Location", "Selected location"]],
                 },
                 {
                   title: "Details",
@@ -491,7 +494,9 @@ export default function AdminRegisterComplaintPage() {
                   rows: [
                     ["Department", department.name],
                     ["Category", category.name],
-                    ...(priorityChanged ? [["Priority Override", options?.priorities.find(p=>p.id===priorityId)?.name || "Priority"]] : []),
+                    ...(priorityChanged
+                      ? [["Priority Override", options?.priorities.find((p) => p.id === priorityId)?.name || "Priority"]]
+                      : []),
                     ["Title", title],
                     ["Description", description],
                   ],

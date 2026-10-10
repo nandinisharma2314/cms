@@ -120,204 +120,220 @@ function ReportContent({ id }: { id: number }) {
 
       <table className="w-full">
         <thead className="hidden print:table-header-group">
-          <tr><td><div className="h-10"></div></td></tr>
+          <tr>
+            <td>
+              <div className="h-10"></div>
+            </td>
+          </tr>
         </thead>
         <tbody>
           <tr>
             <td>
               <div className="max-w-4xl mx-auto p-6 print:px-8 print:py-0 font-sans text-slate-800">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b-2 border-slate-200 pb-4 mb-4">
-          <div className="flex items-center">
-            <div>
-              <h1 className="text-2xl font-bold uppercase text-slate-900 tracking-wide">
-                {config.organisation_name || "Organization Name"}
-              </h1>
-              <div className="text-sm text-slate-500 font-medium uppercase mt-1 tracking-wider">Performance Review 2026</div>
-              {(config.support?.email || config.support?.phone) && (
-                <div className="text-xs text-slate-500 mt-2 font-medium flex items-center gap-2">
-                  {config.support.email && <span>{config.support.email}</span>}
-                  {config.support.email && config.support.phone && <span className="text-slate-300">•</span>}
-                  {config.support.phone && <span>{config.support.phone}</span>}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="text-right flex flex-col items-end gap-1">
-            <div className="text-sm font-bold text-red-600 tracking-wider">CONFIDENTIAL</div>
-          </div>
-        </div>
-
-        {/* User Card */}
-        <div className="border border-slate-200 rounded-lg p-5 mb-4 bg-white shadow-sm flex items-center gap-6">
-          <div className="relative">
-            <div className="w-24 h-24 bg-red-600 text-white rounded-lg flex items-center justify-center text-3xl font-bold">
-              {initials}
-            </div>
-            <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-0.5 shadow-sm">
-              <CheckCircle className="w-6 h-6 text-green-500 fill-white" />
-            </div>
-          </div>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-slate-900">{staff.name}</h2>
-            <div className="text-sm font-semibold text-slate-500 tracking-wider mb-4 mt-1">
-              <span className="uppercase">{staff.role || "Staff Member"}</span>
-              {staff.location && <span className="normal-case"> &bull; {staff.location}</span>}
-            </div>
-
-            <div className="flex flex-row flex-wrap gap-x-12 gap-y-4 mt-2">
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Workplace</div>
-                <div className="text-xs font-semibold text-slate-700">{staff.department || "—"}</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Reports To</div>
-                <div className="text-xs font-semibold text-slate-700">{staff.superior_name || "—"}</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Email</div>
-                <div className="text-xs font-semibold text-slate-700">{staff.email || "—"}</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Mobile Number</div>
-                <div className="text-xs font-semibold text-slate-700">{staff.mobile || "—"}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-3 gap-6 mb-4">
-          {/* Overall Rating */}
-          <div className="border border-slate-200 rounded-lg p-5 bg-slate-50 flex flex-col items-center justify-center relative shadow-sm h-40">
-            <div className="absolute top-4 left-4 text-xs font-bold text-slate-500 tracking-wider uppercase">Overall Rating</div>
-            <div className="mt-6 flex flex-col items-center relative w-full h-full justify-end pb-2">
-              <svg className="w-40 h-20" viewBox="0 0 160 80">
-                <path d="M 10 80 A 70 70 0 0 1 150 80" stroke="#e2e8f0" strokeWidth="16" fill="none" />
-                <path
-                  d="M 10 80 A 70 70 0 0 1 150 80"
-                  stroke="#3b82f6"
-                  strokeWidth="16"
-                  fill="none"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  strokeLinecap="round"
-                  className="transition-all duration-1000 ease-out"
-                />
-              </svg>
-              <div className="absolute bottom-2 flex flex-col items-center justify-center mt-2">
-                <span className="text-2xl font-black text-slate-800 leading-none">{ratingOutOf5.toFixed(1)}</span>
-                <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Out of 5.0</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Velocity Metrics */}
-          <div className="col-span-2 border border-slate-200 rounded-lg p-5 bg-slate-50 relative shadow-sm h-40">
-            <div className="absolute top-4 left-4 text-xs font-bold text-slate-500 tracking-wider uppercase">
-              Velocity Metrics
-            </div>
-            <div className="absolute top-4 right-4 text-xs font-bold text-slate-500 tracking-wider uppercase">Current Period</div>
-
-            <div className="mt-8 grid grid-cols-5 gap-6 h-full">
-              <div className="col-span-2 flex flex-col items-center justify-center border-r border-slate-200 pr-4 mt-2">
-                <div className="text-6xl font-black text-slate-800 leading-none">{total}</div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-2">Total Complaints</div>
-              </div>
-              <div className="col-span-3 flex flex-col justify-center gap-4 pl-2">
-                <div className="space-y-1 mt-4">
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm font-bold text-slate-700">Solved Complaints</span>
-                    <span className="text-sm font-bold text-green-600">
-                      {solved} ({solvedPct.toFixed(0)}%)
-                    </span>
+                {/* Header */}
+                <div className="flex items-start justify-between border-b-2 border-slate-200 pb-4 mb-4">
+                  <div className="flex items-center">
+                    <div>
+                      <h1 className="text-2xl font-bold uppercase text-slate-900 tracking-wide">
+                        {config.organisation_name || "Organization Name"}
+                      </h1>
+                      <div className="text-sm text-slate-500 font-medium uppercase mt-1 tracking-wider">
+                        Performance Review 2026
+                      </div>
+                      {(config.support?.email || config.support?.phone) && (
+                        <div className="text-xs text-slate-500 mt-2 font-medium flex items-center gap-2">
+                          {config.support.email && <span>{config.support.email}</span>}
+                          {config.support.email && config.support.phone && <span className="text-slate-300">•</span>}
+                          {config.support.phone && <span>{config.support.phone}</span>}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 rounded-full" style={{ width: `${solvedPct}%` }} />
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <div className="text-sm font-bold text-red-600 tracking-wider">CONFIDENTIAL</div>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm font-bold text-slate-700">Unsolved Complaints</span>
-                    <span className="text-sm font-bold text-orange-500">
-                      {unsolved} ({unsolvedPct.toFixed(0)}%)
-                    </span>
+
+                {/* User Card */}
+                <div className="border border-slate-200 rounded-lg p-5 mb-4 bg-white shadow-sm flex items-center gap-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 bg-red-600 text-white rounded-lg flex items-center justify-center text-3xl font-bold">
+                      {initials}
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-0.5 shadow-sm">
+                      <CheckCircle className="w-6 h-6 text-green-500 fill-white" />
+                    </div>
                   </div>
-                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-400 rounded-full" style={{ width: `${unsolvedPct}%` }} />
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold text-slate-900">{staff.name}</h2>
+                    <div className="text-sm font-semibold text-slate-500 tracking-wider mb-4 mt-1">
+                      <span className="uppercase">{staff.role || "Staff Member"}</span>
+                      {staff.location && <span className="normal-case"> &bull; {staff.location}</span>}
+                    </div>
+
+                    <div className="flex flex-row flex-wrap gap-x-12 gap-y-4 mt-2">
+                      <div>
+                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Workplace</div>
+                        <div className="text-xs font-semibold text-slate-700">{staff.department || "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Reports To</div>
+                        <div className="text-xs font-semibold text-slate-700">{staff.superior_name || "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Email</div>
+                        <div className="text-xs font-semibold text-slate-700">{staff.email || "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Mobile Number</div>
+                        <div className="text-xs font-semibold text-slate-700">{staff.mobile || "—"}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Performance Indicators */}
-        <div className="border border-slate-200 rounded-lg p-5 bg-white shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-bold text-slate-700 tracking-wider uppercase">Performance Indicators</h3>
-            <div className="text-xs font-bold text-slate-400 tracking-wider uppercase">{ratingOutOf5.toFixed(1)}/5 AVG</div>
-          </div>
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-3 gap-6 mb-4">
+                  {/* Overall Rating */}
+                  <div className="border border-slate-200 rounded-lg p-5 bg-slate-50 flex flex-col items-center justify-center relative shadow-sm h-40">
+                    <div className="absolute top-4 left-4 text-xs font-bold text-slate-500 tracking-wider uppercase">
+                      Overall Rating
+                    </div>
+                    <div className="mt-6 flex flex-col items-center relative w-full h-full justify-end pb-2">
+                      <svg className="w-40 h-20" viewBox="0 0 160 80">
+                        <path d="M 10 80 A 70 70 0 0 1 150 80" stroke="#e2e8f0" strokeWidth="16" fill="none" />
+                        <path
+                          d="M 10 80 A 70 70 0 0 1 150 80"
+                          stroke="#3b82f6"
+                          strokeWidth="16"
+                          fill="none"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={strokeDashoffset}
+                          strokeLinecap="round"
+                          className="transition-all duration-1000 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute bottom-2 flex flex-col items-center justify-center mt-2">
+                        <span className="text-2xl font-black text-slate-800 leading-none">{ratingOutOf5.toFixed(1)}</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Out of 5.0</span>
+                      </div>
+                    </div>
+                  </div>
 
-          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-            <Indicator row={staff} label="Complaints" field="total" desc="Total complaints handled" />
-            <Indicator row={staff} label="Pending" field="pending" desc="Currently open or in progress" />
-            <Indicator row={staff} label="Resolved" field="resolved" desc="Successfully closed" />
-            <Indicator row={staff} label="Rejected" field="rejected" desc="Invalid or duplicate" />
-            <Indicator
-              row={staff}
-              label="Avg response"
-              field="avg_response_hours"
-              desc="Time to first response"
-              format={formatHours}
-            />
-            <Indicator
-              row={staff}
-              label="Avg resolution"
-              field="avg_resolution_hours"
-              desc="Time to resolution"
-              format={formatHours}
-            />
-            <Indicator
-              row={staff}
-              label="Response SLA"
-              field="response_sla_pct"
-              desc="Response targets met"
-              format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
-            />
-            <Indicator
-              row={staff}
-              label="Resolution SLA"
-              field="resolution_sla_pct"
-              desc="Resolution targets met"
-              format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
-            />
-            <Indicator row={staff} label="Missed a target" field="sla_breaches" desc="SLA breaches" />
-            <Indicator row={staff} label="Escalated now" field="escalated_now" desc="Currently escalated" />
-            <Indicator
-              row={staff}
-              label="Rating"
-              field="avg_rating"
-              desc="End user feedback"
-              format={(v) => (v !== null ? `${v.toFixed(1)} / 5` : "—")}
-            />
-            <Indicator row={staff} label="Reopened" field="reopened" desc="Complaints reopened after resolution" />
-          </div>
-        </div>
+                  {/* Velocity Metrics */}
+                  <div className="col-span-2 border border-slate-200 rounded-lg p-5 bg-slate-50 relative shadow-sm h-40">
+                    <div className="absolute top-4 left-4 text-xs font-bold text-slate-500 tracking-wider uppercase">
+                      Velocity Metrics
+                    </div>
+                    <div className="absolute top-4 right-4 text-xs font-bold text-slate-500 tracking-wider uppercase">
+                      Current Period
+                    </div>
 
-        <StaffComplaints complaints={staff.recent_complaints} />
+                    <div className="mt-8 grid grid-cols-5 gap-6 h-full">
+                      <div className="col-span-2 flex flex-col items-center justify-center border-r border-slate-200 pr-4 mt-2">
+                        <div className="text-6xl font-black text-slate-800 leading-none">{total}</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-2">Total Complaints</div>
+                      </div>
+                      <div className="col-span-3 flex flex-col justify-center gap-4 pl-2">
+                        <div className="space-y-1 mt-4">
+                          <div className="flex justify-between items-end">
+                            <span className="text-sm font-bold text-slate-700">Solved Complaints</span>
+                            <span className="text-sm font-bold text-green-600">
+                              {solved} ({solvedPct.toFixed(0)}%)
+                            </span>
+                          </div>
+                          <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-green-500 rounded-full" style={{ width: `${solvedPct}%` }} />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-end">
+                            <span className="text-sm font-bold text-slate-700">Unsolved Complaints</span>
+                            <span className="text-sm font-bold text-orange-500">
+                              {unsolved} ({unsolvedPct.toFixed(0)}%)
+                            </span>
+                          </div>
+                          <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-orange-400 rounded-full" style={{ width: `${unsolvedPct}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-        {/* Footer */}
-        <div className="mt-6 flex justify-between items-center text-[9px] font-semibold text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4">
-          <div>Generated: {new Date().toLocaleString()}</div>
-          <div>{config.organisation_name || "KVON TECH"} ERP • PERFORMANCE REVIEW</div>
-        </div>
+                {/* Performance Indicators */}
+                <div className="border border-slate-200 rounded-lg p-5 bg-white shadow-sm">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-slate-700 tracking-wider uppercase">Performance Indicators</h3>
+                    <div className="text-xs font-bold text-slate-400 tracking-wider uppercase">
+                      {ratingOutOf5.toFixed(1)}/5 AVG
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+                    <Indicator row={staff} label="Complaints" field="total" desc="Total complaints handled" />
+                    <Indicator row={staff} label="Pending" field="pending" desc="Currently open or in progress" />
+                    <Indicator row={staff} label="Resolved" field="resolved" desc="Successfully closed" />
+                    <Indicator row={staff} label="Rejected" field="rejected" desc="Invalid or duplicate" />
+                    <Indicator
+                      row={staff}
+                      label="Avg response"
+                      field="avg_response_hours"
+                      desc="Time to first response"
+                      format={formatHours}
+                    />
+                    <Indicator
+                      row={staff}
+                      label="Avg resolution"
+                      field="avg_resolution_hours"
+                      desc="Time to resolution"
+                      format={formatHours}
+                    />
+                    <Indicator
+                      row={staff}
+                      label="Response SLA"
+                      field="response_sla_pct"
+                      desc="Response targets met"
+                      format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
+                    />
+                    <Indicator
+                      row={staff}
+                      label="Resolution SLA"
+                      field="resolution_sla_pct"
+                      desc="Resolution targets met"
+                      format={(v) => (v !== null ? `${v.toFixed(0)}%` : "—")}
+                    />
+                    <Indicator row={staff} label="Missed a target" field="sla_breaches" desc="SLA breaches" />
+                    <Indicator row={staff} label="Escalated now" field="escalated_now" desc="Currently escalated" />
+                    <Indicator
+                      row={staff}
+                      label="Rating"
+                      field="avg_rating"
+                      desc="End user feedback"
+                      format={(v) => (v !== null ? `${v.toFixed(1)} / 5` : "—")}
+                    />
+                    <Indicator row={staff} label="Reopened" field="reopened" desc="Complaints reopened after resolution" />
+                  </div>
+                </div>
+
+                <StaffComplaints complaints={staff.recent_complaints} />
+
+                {/* Footer */}
+                <div className="mt-6 flex justify-between items-center text-[9px] font-semibold text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4">
+                  <div>Generated: {new Date().toLocaleString()}</div>
+                  <div>{config.organisation_name || "KVON TECH"} ERP • PERFORMANCE REVIEW</div>
+                </div>
               </div>
             </td>
           </tr>
         </tbody>
         <tfoot className="hidden print:table-footer-group">
-          <tr><td><div className="h-10"></div></td></tr>
+          <tr>
+            <td>
+              <div className="h-10"></div>
+            </td>
+          </tr>
         </tfoot>
       </table>
 

@@ -358,11 +358,7 @@ export default function ProfilePage() {
                 {avatarUploading ? (
                   <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                 ) : profile.avatar_url ? (
-                  <img
-                    src={resolveAvatarUrl(profile.avatar_url)!}
-                    alt={profile.name}
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={resolveAvatarUrl(profile.avatar_url)!} alt={profile.name} className="h-full w-full object-cover" />
                 ) : (
                   initials(profile.name)
                 )}

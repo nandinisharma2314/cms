@@ -4,11 +4,7 @@ import React, { useMemo } from "react";
 import { MapPin, X } from "lucide-react";
 import { LocationNode } from "@/lib/api";
 
-export function findNodePath(
-  nodes: LocationNode[],
-  targetId: number,
-  currentPath: LocationNode[] = [],
-): LocationNode[] | null {
+export function findNodePath(nodes: LocationNode[], targetId: number, currentPath: LocationNode[] = []): LocationNode[] | null {
   for (const node of nodes) {
     const path = [...currentPath, node];
     if (node.id === targetId) return path;
@@ -68,15 +64,7 @@ export function LocationHierarchyFilter({
       const selectedNode = activeLocationPath && activeLocationPath[depth] ? activeLocationPath[depth] : null;
       const typeLabel =
         currentNodes[0]?.type_name ||
-        (depth === 0
-          ? "Country"
-          : depth === 1
-          ? "State"
-          : depth === 2
-          ? "District"
-          : depth === 3
-          ? "City"
-          : "Area / Zone");
+        (depth === 0 ? "Country" : depth === 1 ? "State" : depth === 2 ? "District" : depth === 3 ? "City" : "Area / Zone");
 
       levels.push({
         depth,
@@ -118,11 +106,7 @@ export function LocationHierarchyFilter({
   const resolvedSelectClass = selectClassName || defaultSelectClass;
 
   if (!safeTree.length) {
-    return (
-      <div className={`text-xs text-slate-400 italic ${className}`}>
-        No locations configured
-      </div>
-    );
+    return <div className={`text-xs text-slate-400 italic ${className}`}>No locations configured</div>;
   }
 
   return (
@@ -131,9 +115,7 @@ export function LocationHierarchyFilter({
       {showBreadcrumb && activeLocationPath && activeLocationPath.length > 0 && (
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-xs font-semibold self-start shadow-2xs">
           <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-          <span className="truncate max-w-xs md:max-w-md">
-            {activeLocationPath.map((n) => n.name).join(" › ")}
-          </span>
+          <span className="truncate max-w-xs md:max-w-md">{activeLocationPath.map((n) => n.name).join(" › ")}</span>
           <button
             type="button"
             onClick={() => onChange(undefined)}
@@ -152,16 +134,14 @@ export function LocationHierarchyFilter({
           layout === "horizontal"
             ? "flex flex-wrap items-center gap-2"
             : layout === "grid"
-            ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5"
-            : "flex flex-col gap-2"
+              ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5"
+              : "flex flex-col gap-2"
         }
       >
         {locationLevels.map((lvl) => (
           <div key={lvl.depth} className={layout === "grid" ? "space-y-1" : "flex items-center gap-1.5"}>
             {layout === "grid" && (
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                {lvl.label}
-              </label>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">{lvl.label}</label>
             )}
             <select
               className={resolvedSelectClass}

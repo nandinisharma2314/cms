@@ -269,43 +269,42 @@ export function EndUsersList() {
     <div className="flex flex-col h-full">
       <div className="shrink-0">
         <PageHeader
-        title="End users"
-        description={`People who sign in to the end-user portal with a one-time code sent to their ${channelNames(otp.channels)}.`}
-        actions={
-          <>
-            <div className="relative group">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" />
-              <input
-                type="search"
-                className={`${inputClass} pl-9 pr-4 py-2 w-56 focus:w-72 transition-all bg-white shadow-sm border-slate-200`}
-                placeholder="Search users..."
-                aria-label="Search end users"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <button className={secondaryButtonClass} onClick={() => run(() => api.endUsers.exportCsv(term || undefined))}>
-              <Download className="w-3.5 h-3.5" /> Export CSV
-            </button>
-            {can("end_user.import") && (
-              <button className={secondaryButtonClass} onClick={() => setImportOpen(true)} disabled={!reference}>
-                <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
+          title="End users"
+          description={`People who sign in to the end-user portal with a one-time code sent to their ${channelNames(otp.channels)}.`}
+          actions={
+            <>
+              <div className="relative group">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" />
+                <input
+                  type="search"
+                  className={`${inputClass} pl-9 pr-4 py-2 w-56 focus:w-72 transition-all bg-white shadow-sm border-slate-200`}
+                  placeholder="Search users..."
+                  aria-label="Search end users"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <button className={secondaryButtonClass} onClick={() => run(() => api.endUsers.exportCsv(term || undefined))}>
+                <Download className="w-3.5 h-3.5" /> Export CSV
               </button>
-            )}
-            {can("end_user.create") && (
-              <button className={primaryButtonClass} onClick={() => setForm({ editing: null })} disabled={!reference}>
-                <UserPlus className="w-3.5 h-3.5" /> Add end user
-              </button>
-            )}
-          </>
-        }
-      />
-      <ErrorBanner message={actionError ?? loadError ?? referenceError} />
-      <Notice message={notice} />
-
+              {can("end_user.import") && (
+                <button className={secondaryButtonClass} onClick={() => setImportOpen(true)} disabled={!reference}>
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
+                </button>
+              )}
+              {can("end_user.create") && (
+                <button className={primaryButtonClass} onClick={() => setForm({ editing: null })} disabled={!reference}>
+                  <UserPlus className="w-3.5 h-3.5" /> Add end user
+                </button>
+              )}
+            </>
+          }
+        />
+        <ErrorBanner message={actionError ?? loadError ?? referenceError} />
+        <Notice message={notice} />
       </div>
 
       <Card className="mt-4 overflow-x-auto overflow-y-auto flex-1 min-h-0 mb-4 relative">

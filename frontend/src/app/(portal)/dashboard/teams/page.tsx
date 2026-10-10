@@ -31,7 +31,7 @@ function assignColors(node: HierarchyNode, depth: number = 0) {
   node.color = scheme.color;
   node.bgColor = scheme.bgColor;
   if (node.children) {
-    node.children.forEach(child => assignColors(child, depth + 1));
+    node.children.forEach((child) => assignColors(child, depth + 1));
   }
 }
 
@@ -57,7 +57,9 @@ function OrgNode({ node }: { node: HierarchyNode }) {
         </div>
         <div className="mt-1 text-center px-1">
           <h3 className="text-[11px] sm:text-[12px] font-bold text-slate-800 leading-tight whitespace-nowrap">{node.name}</h3>
-          <p className="text-[9px] sm:text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-[1px] whitespace-nowrap">{node.role}</p>
+          <p className="text-[9px] sm:text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-[1px] whitespace-nowrap">
+            {node.role}
+          </p>
         </div>
       </div>
       {node.children && node.children.length > 0 && (
@@ -78,8 +80,10 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.hierarchy()
-      .then((data: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    api
+      .hierarchy()
+      .then((data: any) => {
+        // eslint-disable-line @typescript-eslint/no-explicit-any
         if (data && Object.keys(data).length > 0) {
           assignColors(data);
           setHierarchy(data);
@@ -91,7 +95,9 @@ export default function TeamsPage() {
 
   return (
     <div className="flex flex-col items-center md:flex-1 md:min-h-0 md:overflow-hidden bg-slate-50/50 p-3 sm:p-6 w-full max-w-full">
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .org-tree ul {
           padding-top: 12px;
           position: relative;
@@ -160,13 +166,17 @@ export default function TeamsPage() {
           height: 12px;
           transform: translateX(-50%);
         }
-      `}} />
+      `,
+        }}
+      />
       <div className="w-full flex flex-col items-center flex-1">
         <div className="mb-3 sm:mb-6 text-center px-2 pt-4">
-          <h1 className="text-base sm:text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">Organization Hierarchy</h1>
+          <h1 className="text-base sm:text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
+            Organization Hierarchy
+          </h1>
           <p className="mt-0.5 text-[9px] sm:text-sm text-slate-500">View your reporting structure.</p>
         </div>
-        
+
         {/* Tree Container */}
         <div className="relative rounded-xl sm:rounded-3xl border border-slate-200 bg-white p-2 sm:p-8 shadow-sm org-tree w-full overflow-auto flex flex-col justify-center flex-1">
           {loading ? (

@@ -22,13 +22,7 @@ function formatDuration(ms: number): string {
   return `${minutes}m`;
 }
 
-export function LiveSlaTicker({
-  complaint,
-  showEscalation = true,
-}: {
-  complaint: ComplaintData;
-  showEscalation?: boolean;
-}) {
+export function LiveSlaTicker({ complaint, showEscalation = true }: { complaint: ComplaintData; showEscalation?: boolean }) {
   const [, setTick] = useState(0);
 
   // Ticking timer: re-render every 30 seconds to update live countdown
@@ -84,9 +78,7 @@ export function LiveSlaTicker({
     const fallbackState = currentSla(complaint.sla);
     const badge = fallbackState ? SLA_BADGE[fallbackState] : null;
     return badge ? (
-      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.className}`}>
-        {badge.label}
-      </span>
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.className}`}>{badge.label}</span>
     ) : null;
   }
 
