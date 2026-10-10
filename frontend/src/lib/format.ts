@@ -4,14 +4,12 @@
  * the organisation's time zone (Settings), so everyone reads the same clock.
  */
 
-let displayTimeZone = "UTC";
-// Until the time zone is set in Settings, times are shown in UTC and labelled as such
-// (rather than in each viewer's own zone, which would make people see different clocks).
-let labelZone = true;
+let displayTimeZone = "Asia/Kolkata";
+let labelZone = false;
 
 export function setDisplayTimeZone(timeZone: string | null) {
-  displayTimeZone = timeZone ?? "UTC";
-  labelZone = timeZone === null;
+  displayTimeZone = timeZone ?? "Asia/Kolkata";
+  labelZone = false;
 }
 
 const zoneLabel = () => (labelZone ? { timeZoneName: "short" as const } : {});
@@ -28,6 +26,7 @@ export function formatDateTime(iso: string | null | undefined): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
     timeZone: displayTimeZone,
     ...zoneLabel(),
   });
