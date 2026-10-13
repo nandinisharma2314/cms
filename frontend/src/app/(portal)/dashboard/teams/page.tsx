@@ -56,7 +56,9 @@ function OrgNode({ node }: { node: HierarchyNode }) {
           )}
         </div>
         <div className="mt-1 px-1 text-center md:mt-2">
-          <h3 className="whitespace-nowrap text-[11px] font-bold leading-tight text-slate-800 sm:text-[12px] md:text-[15px]">{node.name}</h3>
+          <h3 className="whitespace-nowrap text-[11px] font-bold leading-tight text-slate-800 sm:text-[12px] md:text-[15px]">
+            {node.name}
+          </h3>
           <p className="mt-[1px] whitespace-nowrap text-[9px] font-semibold uppercase tracking-wide text-slate-500 sm:text-[10px] md:text-[12px]">
             {node.role}
           </p>

@@ -300,15 +300,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
         <BrandMark theme="light" />
       </Link>
 
-      {can("complaint.view") ? (
-        <div
-          onClick={openCommandPalette}
-        
-        >
-         
-         
-        </div>
-      ) : null}
+      {can("complaint.view") ? <div onClick={openCommandPalette}></div> : null}
       <div className="flex-1 sm:hidden" />
 
       <div className="flex items-center gap-1.5 sm:gap-3 ml-auto">
