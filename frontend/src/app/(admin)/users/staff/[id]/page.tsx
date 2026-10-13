@@ -97,7 +97,7 @@ export default function MemberProfilePage() {
           <PageHeader title={`${user.name}'s Profile`} description={`${user.role.name} • ${user.email}`} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Main Info & Hierarchy */}
           <div className="lg:col-span-1 space-y-6">
             <Card className="p-6 border-slate-200">
@@ -189,7 +189,7 @@ export default function MemberProfilePage() {
           </div>
 
           {/* Performance & Workload */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 flex flex-col gap-6">
             <div>
               <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider text-slate-500">
                 Performance Overview (30 Days)
@@ -222,15 +222,15 @@ export default function MemberProfilePage() {
               </div>
             </div>
 
-            <div>
+            <div className="flex flex-col min-h-0 flex-1">
               <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider text-slate-500">Active Workload</h3>
-              <Card className="overflow-hidden">
+              <Card className="overflow-hidden flex flex-col min-h-0 flex-1">
                 {complaintsLoading ? (
                   <div className="py-8 text-center text-xs text-slate-400">Loading active complaints...</div>
                 ) : !complaints || complaints.length === 0 ? (
                   <div className="py-8 text-center text-xs text-slate-400">No complaints currently assigned to this member.</div>
                 ) : (
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-slate-100 overflow-y-auto max-h-[calc(100vh-22rem)] scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
                     {complaints.map((c) => (
                       <div key={c.id} className="p-3.5 hover:bg-slate-50/80 flex items-center justify-between gap-4">
                         <div className="min-w-0 flex-1">
