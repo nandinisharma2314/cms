@@ -265,7 +265,7 @@ def list_redemptions(
     ctx: AccessContext = Depends(require_permission("rewards.view")),
 ):
     filter_user_id = user_id
-    if not ctx.has("rewards.manage") and not ctx.user.is_super_admin:
+    if not ctx.has("rewards.manage") and not ctx.is_super_admin:
         filter_user_id = ctx.user.id
 
     return reward_service.list_redemptions(
