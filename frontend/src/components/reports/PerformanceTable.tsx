@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Users, XCircle } from "lucide-react";
 import { PerformanceRow } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatHours } from "@/lib/format";
@@ -60,6 +60,7 @@ export function PerformanceTable({
   onPrintStaffId,
   selectedRowIds,
   onSelectionChange,
+  onShowAllUsers,
 }: {
   rows: PerformanceRow[];
   nameLabel: string;
@@ -67,6 +68,7 @@ export function PerformanceTable({
   onPrintStaffId?: (id: number) => void;
   selectedRowIds?: number[];
   onSelectionChange?: (ids: number[]) => void;
+  onShowAllUsers?: () => void;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "total", desc: true });
   const sorted = [...rows].sort((a, b) => {
@@ -93,7 +95,23 @@ export function PerformanceTable({
     </th>
   );
 
-  if (rows.length === 0) return <p className="p-6 text-center text-xs text-slate-400">No complaints in this period.</p>;
+  if (rows.length === 0) {
+    return (
+      <div className="p-8 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
+        <p>No complaints in this period.</p>
+        {onShowAllUsers && (
+          <button
+            type="button"
+            onClick={onShowAllUsers}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+          >
+            <Users className="w-3.5 h-3.5" />
+            Show All Users
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="relative overflow-x-auto">
       <table className="w-full text-xs">

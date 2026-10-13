@@ -26,10 +26,11 @@ from statistics import median
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from config import REPORT_DEFAULT_DAYS, REPORT_MAX_DAYS, REPORT_WEEKLY_AFTER_DAYS
-from models import Complaint, ComplaintEvent, Department, Location, Priority, User
+from models import Complaint, ComplaintEvent, Department, Location, Priority, User, UserScope
 from services import settings_service
 from services.access_service import AccessContext
 from services.location_service import location_types_by_depth, path_ids, path_names
@@ -305,9 +306,51 @@ def _performance_row(name: str, rows: list[Row], extra: dict | None = None) -> d
     }
 
 
-def by_agent(db: Session, rows: list[Row]) -> list[dict]:
-    """Per current handler. Unassigned complaints are grouped separately."""
+def by_agent(
+    db: Session,
+    rows: list[Row],
+    all_users: bool = False,
+    ctx: AccessContext | None = None,
+    filters: Filters | None = None,
+) -> list[dict]:
+    """Per current handler. Unassigned complaints are grouped separately.
+    When all_users=True, includes all active staff users in the viewer's scope."""
     groups = _grouped(rows, lambda r: r.assignee_id)
+
+    if all_users and ctx is not None:
+        user_query = db.query(User).filter(User.is_active.is_(True))
+        if filters and filters.department_id is not None:
+            user_query = user_query.filter(
+                or_(
+                    User.primary_department_id == filters.department_id,
+                    User.scopes.any(UserScope.department_id == filters.department_id),
+                )
+            )
+        all_staff = user_query.all()
+        if filters and filters.location is not None:
+            loc_path = filters.location.path
+            all_staff = [
+                u for u in all_staff
+                if (
+                    (u.primary_location and u.primary_location.path.startswith(loc_path))
+                    or any(s.location is None or s.location.path.startswith(loc_path) for s in u.scopes)
+                )
+            ]
+        if not ctx.is_super_admin:
+            all_staff = [
+                u for u in all_staff
+                if ctx.covers(
+                    u.primary_department_id,
+                    u.primary_location.path if u.primary_location else None,
+                ) or any(
+                    ctx.covers(s.department_id, s.location.path if s.location else None)
+                    for s in u.scopes
+                )
+            ]
+        for u in all_staff:
+            if u.id not in groups:
+                groups[u.id] = []
+
     users = {u.id: u for u in db.query(User).filter(User.id.in_([k for k in groups if k is not None])).all()}
 
     loc_objs = []
@@ -325,8 +368,11 @@ def by_agent(db: Session, rows: list[Row]) -> list[dict]:
     result = []
     for user_id, group in groups.items():
         if user_id is None:
-            result.append(_performance_row("Unassigned (department queue)", group, {"id": None, "role": None}))
+            if group:
+                result.append(_performance_row("Unassigned (department queue)", group, {"id": None, "role": None}))
         else:
+            if user_id not in users:
+                continue
             user = users[user_id]
             dept = (
                 user.primary_department.name
@@ -338,11 +384,11 @@ def by_agent(db: Session, rows: list[Row]) -> list[dict]:
                 if user.primary_location
                 else (user.scopes[0].location if user.scopes and user.scopes[0].location else None)
             )
-            loc_str = " > ".join(names_by_id[loc_obj.id]) if loc_obj else None
+            loc_str = " > ".join(names_by_id[loc_obj.id]) if loc_obj and loc_obj.id in names_by_id else None
 
             result.append(_performance_row(user.name, group, {
                 "id": user.id,
-                "role": user.role.name,
+                "role": user.role.name if user.role else None,
                 "email": user.email,
                 "mobile": user.mobile,
                 "department": dept,
@@ -360,7 +406,7 @@ def by_agent(db: Session, rows: list[Row]) -> list[dict]:
                     } for c in group
                 ]
             }))
-    return sorted(result, key=lambda r: (r["id"] is None, -r["total"]))
+    return sorted(result, key=lambda r: (r["id"] is None, -r["total"], (r["name"] or "").lower()))
 
 
 def by_department(db: Session, rows: list[Row]) -> list[dict]:

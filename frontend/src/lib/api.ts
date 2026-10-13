@@ -664,6 +664,7 @@ export type ReportQuery = {
   department_id?: number;
   location_id?: number;
   priority_id?: number;
+  all_users?: boolean;
 };
 
 export type AuditQuery = {

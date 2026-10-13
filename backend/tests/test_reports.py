@@ -85,6 +85,10 @@ def test_performance_tables(client, login, parks):
     row = next(a for a in agents if a["name"] == "Parks Agent")
     assert (row["total"], row["resolved"], row["response_sla_pct"], row["avg_rating"]) == (2, 1, 50.0, 4.0)
 
+    agents_all = client.get("/reports/agents", params={"all_users": "true"}, headers=root).json()
+    assert any(a["name"] == "Parks Agent" for a in agents_all)
+    assert len(agents_all) >= len(agents)
+
     departments = client.get("/reports/departments", headers=root).json()
     assert next(d for d in departments if d["name"] == "Parks")["total"] == 2
 

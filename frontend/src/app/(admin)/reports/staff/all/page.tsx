@@ -256,11 +256,15 @@ function AllReportsContent() {
   const searchParams = useSearchParams();
   const date_from = searchParams.get("date_from") ?? undefined;
   const date_to = searchParams.get("date_to") ?? undefined;
+  const all_users = searchParams.get("all_users") !== "false";
 
   const config = useConfig();
   useDocumentTitle("Bulk Staff Performance Review");
 
-  const { data: rows, error } = useApiData(() => api.reports.table("agents", { date_from, date_to }), [date_from, date_to]);
+  const { data: rows, error } = useApiData(
+    () => api.reports.table("agents", { date_from, date_to, all_users }),
+    [date_from, date_to, all_users],
+  );
 
   useEffect(() => {
     if (searchParams?.get("print") === "true" && rows) {
