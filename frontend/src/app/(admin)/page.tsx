@@ -4,10 +4,10 @@ import { StaffMobileDashboard } from "@/components/StaffMobileDashboard";
 export default function HomePage() {
   return (
     <>
-      <div className="block md:hidden">
+      <div className="block lg:hidden">
         <StaffMobileDashboard />
       </div>
-      <div className="hidden md:flex flex-col gap-5">
+      <div className="hidden lg:flex flex-col gap-5">
         <DashboardView />
       </div>
     </>

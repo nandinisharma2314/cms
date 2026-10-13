@@ -303,16 +303,10 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       {can("complaint.view") ? (
         <div
           onClick={openCommandPalette}
-          className="relative flex-1 max-w-lg hidden sm:flex items-center h-11 pl-10 pr-3.5 bg-white border border-slate-200/90 rounded-xl hover:border-slate-300 hover:shadow-xs transition-all cursor-pointer group select-none"
-          title="Open Command Palette (Ctrl + Space)"
+        
         >
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors pointer-events-none" />
-          <span className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors flex-1 truncate">
-            Search tickets, navigate, or run commands…
-          </span>
-          <kbd className="hidden md:inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-mono font-bold text-slate-500 shadow-2xs group-hover:bg-slate-200/80 transition-colors">
-            Ctrl + Space
-          </kbd>
+         
+         
         </div>
       ) : null}
       <div className="flex-1 sm:hidden" />

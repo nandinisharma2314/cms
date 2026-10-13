@@ -40,24 +40,24 @@ function OrgNode({ node }: { node: HierarchyNode }) {
     <li>
       <div className="inline-flex flex-col items-center">
         <div
-          className={`relative flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-full shadow-sm transition-transform hover:scale-105 z-10 ${node.bgColor} ${
+          className={`relative z-10 flex h-9 w-9 items-center justify-center rounded-full shadow-sm transition-transform hover:scale-105 sm:h-12 sm:w-12 md:h-16 md:w-16 ${node.bgColor} ${
             node.isMe ? "ring-2 ring-indigo-500 ring-offset-1" : "border border-white"
           }`}
         >
           {node.avatar_url ? (
-            <img src={resolveAvatarUrl(node.avatar_url)!} alt={node.name} className="w-full h-full rounded-full object-cover" />
+            <img src={resolveAvatarUrl(node.avatar_url)!} alt={node.name} className="h-full w-full rounded-full object-cover" />
           ) : (
-            <span className={`text-[12px] sm:text-[14px] font-bold ${node.color}`}>{node.initials}</span>
+            <span className={`text-[12px] font-bold sm:text-[14px] md:text-[18px] ${node.color}`}>{node.initials}</span>
           )}
           {node.isMe && (
-            <span className="absolute -top-1 -right-1 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[8px] font-bold text-white shadow-sm z-20">
+            <span className="absolute -right-1 -top-1 z-20 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[8px] font-bold text-white shadow-sm md:px-2 md:py-1 md:text-[10px]">
               You
             </span>
           )}
         </div>
-        <div className="mt-1 text-center px-1">
-          <h3 className="text-[11px] sm:text-[12px] font-bold text-slate-800 leading-tight whitespace-nowrap">{node.name}</h3>
-          <p className="text-[9px] sm:text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-[1px] whitespace-nowrap">
+        <div className="mt-1 px-1 text-center md:mt-2">
+          <h3 className="whitespace-nowrap text-[11px] font-bold leading-tight text-slate-800 sm:text-[12px] md:text-[15px]">{node.name}</h3>
+          <p className="mt-[1px] whitespace-nowrap text-[9px] font-semibold uppercase tracking-wide text-slate-500 sm:text-[10px] md:text-[12px]">
             {node.role}
           </p>
         </div>
