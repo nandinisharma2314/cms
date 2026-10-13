@@ -224,11 +224,11 @@ function UserMenu() {
             <Link
               href="/rewards"
               onClick={() => setMenuOpen(false)}
-              className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-amber-800 hover:bg-amber-50 cursor-pointer"
+              className="hidden sm:flex w-full items-center justify-between px-3.5 py-2 text-xs font-medium text-amber-800 hover:bg-amber-50 cursor-pointer"
             >
               <span className="flex items-center gap-2">
                 <Award className="w-3.5 h-3.5 text-amber-600" />
-                Rewards & Recognition
+                Rewards &amp; Recognition
               </span>
               <span className="font-bold text-[11px] text-amber-700">🪙 {me.reward_points_balance ?? 0}</span>
             </Link>

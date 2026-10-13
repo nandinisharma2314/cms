@@ -256,11 +256,34 @@ export function Modal({
       }
     };
     document.addEventListener("keydown", onKey);
-    const { overflow } = document.body.style;
+
+    // Prevent touchmove on the backdrop so mobile doesn't scroll the page behind
+    const preventTouch = (e: TouchEvent) => {
+      // Allow scrolling inside the dialog panel itself
+      if (dialog && dialog.contains(e.target as Node)) return;
+      e.preventDefault();
+    };
+    document.addEventListener("touchmove", preventTouch, { passive: false });
+
+    // Lock body scroll (and <html> — mobile Chrome sometimes scrolls the root element)
+    const { overflow: bodyOverflow } = document.body.style;
+    const { overflow: htmlOverflow } = document.documentElement.style;
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    // Lock the admin layout's inner scroll container.
+    // The modal is portaled to <body> so closest() won't find it —
+    // query the document directly instead.
+    const scrollHost = document.querySelector<HTMLElement>("[data-scroll-host]");
+    const scrollHostOverflow = scrollHost ? scrollHost.style.overflowY : "";
+    if (scrollHost) scrollHost.style.overflowY = "hidden";
+
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = overflow;
+      document.removeEventListener("touchmove", preventTouch);
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = htmlOverflow;
+      if (scrollHost) scrollHost.style.overflowY = scrollHostOverflow;
       previous?.focus();
     };
   }, []);
@@ -271,6 +294,12 @@ export function Modal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      onTouchMove={(e) => {
+        // Block backdrop touch-scroll; allow scroll inside the dialog panel
+        if (!dialogRef.current?.contains(e.target as Node)) {
+          e.preventDefault();
+        }
+      }}
     >
       <div
         ref={dialogRef}
