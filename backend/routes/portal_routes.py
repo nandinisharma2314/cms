@@ -19,6 +19,7 @@ from services import (
     attachment_service, audit_service, messaging, notification_service, otp_service, routing_service, settings_service,
     token_service, workflow_service,
 )
+from services.access_service import check_user_tenure, tenure_status_of
 from services.complaint_service import (
     DETAIL_OPTIONS, LIST_OPTIONS, clean_complaint_text, end_user_detail, group_counts, register_complaint,
     resolve_classification, serialize_complaints,
@@ -119,12 +120,18 @@ def _profile(db: Session, end_user: EndUser) -> dict:
         "address": end_user.address,
         "notify_sms": end_user.notify_sms,
         "notify_email": end_user.notify_email,
+        "join_date": end_user.join_date.isoformat() if end_user.join_date else None,
+        "end_date": end_user.end_date.isoformat() if end_user.end_date else None,
+        "tenure_status": tenure_status_of(end_user),
         "role": {"key": role.key, "name": role.name},
         "permissions": sorted(p.key for p in role.permissions),
     }
 
 
 def _session(response: Response, db: Session, end_user: EndUser, request: Request) -> dict:
+    allowed, detail, _ = check_user_tenure(end_user)
+    if not allowed:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail)
     end_user.last_login_at = utcnow()
     audit_service.record(
         db, actor=end_user, action="auth.login", entity_type="end_user", entity_id=end_user.id,
@@ -219,6 +226,9 @@ def select_account(payload: SelectAccount, request: Request, response: Response,
     end_user = db.get(EndUser, payload.end_user_id)
     if end_user is None or not end_user.is_active:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "This account is no longer active")
+    allowed, detail, _ = check_user_tenure(end_user)
+    if not allowed:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail)
     return _session(response, db, end_user, request)
 
 

@@ -513,6 +513,28 @@ export default function ProfilePage() {
                       <input id="pan" disabled value={profile.pan_number ?? "—"} className={fieldClass} readOnly />
                     </IconField>
                   </div>
+
+                  {/* Joining Date */}
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="join_date">Joining date</Label>
+                    <IconField icon={<Calendar size={16} />}>
+                      <input id="join_date" disabled value={profile.join_date ?? "—"} className={fieldClass} readOnly />
+                    </IconField>
+                  </div>
+
+                  {/* Tenure End Date */}
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="end_date">Tenure end date</Label>
+                    <IconField icon={<Calendar size={16} />}>
+                      <input
+                        id="end_date"
+                        disabled
+                        value={profile.end_date ? profile.end_date : "Permanent (No end date)"}
+                        className={fieldClass}
+                        readOnly
+                      />
+                    </IconField>
+                  </div>
                 </div>
               )}
 

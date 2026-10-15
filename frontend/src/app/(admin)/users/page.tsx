@@ -45,6 +45,8 @@ interface FormState {
   scopes: ScopeInput[];
   is_available: boolean;
   custom_permissions: Record<string, boolean>; // key -> boolean (true=granted, false=revoked)
+  join_date: string;
+  end_date: string;
 }
 
 function toForm(user: StaffUser): FormState {
@@ -66,6 +68,8 @@ function toForm(user: StaffUser): FormState {
     scopes: user.scopes.map((s) => ({ department_id: s.department?.id ?? null, location_id: s.location?.id ?? null })),
     is_available: user.is_available,
     custom_permissions: customPerms,
+    join_date: user.join_date ?? (user.created_at ? user.created_at.split("T")[0] : new Date().toISOString().split("T")[0]),
+    end_date: user.end_date ?? "",
   };
 }
 
@@ -105,6 +109,8 @@ function UserForm({
             scopes: [],
             is_available: true,
             custom_permissions: {},
+            join_date: new Date().toISOString().split("T")[0],
+            end_date: "",
           },
     [editing],
   );
@@ -119,6 +125,7 @@ function UserForm({
   const [mobileError, setMobileError] = useState<string | null>(null);
   const [aadharError, setAadharError] = useState<string | null>(null);
   const [panError, setPanError] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const problems = !editing && form.password ? passwordProblems(form.password, rules) : [];
 
   const assignableDepartments = useMemo(() => {
@@ -179,11 +186,17 @@ function UserForm({
     const mErr = form.mobile.trim() ? validatePhone(form.mobile) : null;
     const aErr = form.aadhar.trim() && form.aadhar.trim().length !== 12 ? "Aadhar must be exactly 12 digits." : null;
     const pErr = form.pan_card.trim() && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.pan_card.trim()) ? "Invalid PAN format." : null;
+    const dErr = !form.join_date
+      ? "Join date is required."
+      : form.end_date && form.end_date < form.join_date
+      ? "End date cannot be earlier than join date."
+      : null;
     setNameError(nErr);
     setMobileError(mErr);
     setAadharError(aErr);
     setPanError(pErr);
-    if (nErr || mErr || aErr || pErr) return;
+    setDateError(dErr);
+    if (nErr || mErr || aErr || pErr || dErr) return;
     if (form.role_id === null) {
       setError("Choose a role.");
       return;
@@ -215,6 +228,11 @@ function UserForm({
         }
         if (form.aadhar.trim() !== initial.aadhar) changes.aadhar = form.aadhar.trim() || null;
         if (form.pan_card.trim() !== initial.pan_card) changes.pan_card = form.pan_card.trim() || null;
+        if (form.join_date !== initial.join_date) changes.join_date = form.join_date;
+        if (form.end_date !== initial.end_date) {
+          if (form.end_date.trim()) changes.end_date = form.end_date.trim();
+          else changes.clear_end_date = true;
+        }
         if (form.role_id !== initial.role_id) changes.role_id = form.role_id;
         if (form.reports_to_id !== initial.reports_to_id) {
           if (form.reports_to_id === null) changes.clear_reports_to = true;
@@ -253,6 +271,8 @@ function UserForm({
           primary_location_id: form.primary_location_id,
           scopes: form.scopes,
           custom_permissions: customPermsInput,
+          join_date: form.join_date,
+          end_date: form.end_date.trim() || null,
         });
         onSaved(`${form.name} created. They must choose their own password when they first sign in.`);
       }
@@ -403,6 +423,76 @@ function UserForm({
               ))}
             </select>
           </Field>
+        </div>
+
+        {/* Tenure & Access Validity */}
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-indigo-600" />
+              <h4 className="text-xs font-semibold text-slate-800">Tenure & Access Period</h4>
+            </div>
+            {editing?.tenure_status && (
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  editing.tenure_status === "active"
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                    : editing.tenure_status === "expired"
+                    ? "bg-rose-100 text-rose-800 border border-rose-200"
+                    : "bg-amber-100 text-amber-800 border border-amber-200"
+                }`}
+              >
+                Tenure {editing.tenure_status}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field
+              label="Join Date (Required)"
+              hint="Tenure start date. User can sign in on or after this date."
+              error={dateError}
+            >
+              <input
+                type="date"
+                required
+                className={inputClass}
+                value={form.join_date}
+                onChange={(e) => {
+                  setForm({ ...form, join_date: e.target.value });
+                  setDateError(null);
+                }}
+              />
+            </Field>
+            <Field
+              label="End Date (Optional)"
+              hint="Access auto-expires after this date without manual deactivation. Leave blank for indefinite tenure."
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={form.end_date}
+                  onChange={(e) => {
+                    setForm({ ...form, end_date: e.target.value });
+                    setDateError(null);
+                  }}
+                />
+                {form.end_date && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm({ ...form, end_date: "" });
+                      setDateError(null);
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2.5 py-2 rounded-lg border border-slate-200 bg-white shrink-0"
+                    title="Clear end date to make tenure permanent"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </Field>
+          </div>
         </div>
 
         {/* Primary Workplace Assignment */}
@@ -676,6 +766,7 @@ function UsersList() {
               <th className="px-4 py-5 font-semibold">Workplace</th>
               <th className="px-4 py-5 font-semibold">Scope</th>
               <th className="px-4 py-5 font-semibold">Reports to</th>
+              <th className="px-4 py-5 font-semibold">Tenure</th>
               <th className="px-4 py-5 font-semibold">Status</th>
               <th className="px-4 py-5 font-semibold">Last sign-in</th>
               <th className="px-5 py-5">
@@ -685,11 +776,11 @@ function UsersList() {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
-              <TableMessage colSpan={8}>Loading…</TableMessage>
+              <TableMessage colSpan={9}>Loading…</TableMessage>
             ) : !data ? (
-              <TableMessage colSpan={8}>The list could not be loaded (see the message above).</TableMessage>
+              <TableMessage colSpan={9}>The list could not be loaded (see the message above).</TableMessage>
             ) : data.items.length === 0 ? (
-              <TableMessage colSpan={8}>{term || roleFilter ? "Nobody matches." : "No staff users under you yet."}</TableMessage>
+              <TableMessage colSpan={9}>{term || roleFilter ? "Nobody matches." : "No staff users under you yet."}</TableMessage>
             ) : (
               data.items.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50/70 align-top">
@@ -732,8 +823,37 @@ function UsersList() {
                     )}
                   </td>
                   <td className="px-4 py-5 text-slate-600">{u.reports_to?.name ?? "—"}</td>
+                  <td className="px-4 py-5 text-slate-600">
+                    <div className="space-y-1">
+                      {u.tenure_status === "expired" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Expired
+                        </span>
+                      ) : u.tenure_status === "pending" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Upcoming
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Active
+                        </span>
+                      )}
+                      <div className="text-[10px] text-slate-500 leading-tight">
+                        <div>From: <span className="font-mono font-medium text-slate-700">{u.join_date || "—"}</span></div>
+                        <div>To: <span className="font-mono font-medium text-slate-700">{u.end_date || "Permanent"}</span></div>
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-4 py-5 space-y-1">
                     <StatusPill active={u.is_active} />
+                    {u.tenure_status === "expired" && (
+                      <span className="block w-fit px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        Tenure Expired
+                      </span>
+                    )}
                     {u.is_active && !u.is_available && (
                       <span className="block w-fit px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">
                         Unavailable

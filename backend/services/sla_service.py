@@ -233,15 +233,20 @@ def next_up(
     this complaint: first along the reporting line, otherwise the closest
     holder of `permission` above them in scope."""
     candidate, seen = (from_user.reports_to if from_user else None), set()
+    from services.access_service import check_user_tenure
     while candidate is not None and candidate.id not in seen:
         seen.add(candidate.id)
-        if candidate.is_active and covers(candidate, complaint) and _holds(candidate, permission):
+        allowed, _, _ = check_user_tenure(candidate)
+        if candidate.is_active and allowed and covers(candidate, complaint) and _holds(candidate, permission):
             return candidate
         candidate = candidate.reports_to
 
     best, best_rank = None, None
     users = db.query(User).options(selectinload(User.scopes)).filter(User.is_active.is_(True)).all()
     for user in users:
+        allowed, _, _ = check_user_tenure(user)
+        if not allowed:
+            continue
         if from_user is not None and user.id == from_user.id:
             continue
         if not _holds(user, permission) or not covers(user, complaint):

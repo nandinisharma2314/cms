@@ -11,7 +11,7 @@ import config
 from database import get_db
 from models import RESET_APPROVED, RESET_PENDING, RESET_REJECTED, PasswordResetTicket, User, max_length
 from services import audit_service, rate_limit_service, token_service
-from services.access_service import AccessContext
+from services.access_service import AccessContext, check_user_tenure
 from services.user_service import can_handle_reset_ticket, find_staff_by_identifier, login_identifier_key, \
     serialize_users, visible_reset_tickets
 from utils.auth_middleware import (
@@ -88,6 +88,9 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been deactivated")
+    allowed, detail, _ = check_user_tenure(user)
+    if not allowed:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail)
 
     rate_limit_service.reset(db, "login_failures", failure_key)
     user.last_login_at = utcnow()

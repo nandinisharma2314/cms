@@ -3,20 +3,22 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from datetime import date
+import re
+
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from models import EndUser, Location, Complaint, max_length
 from services import audit_service, notification_service, token_service
-from services.access_service import AccessContext
+from services.access_service import AccessContext, tenure_status_of
 from services.complaint_service import serialize_complaints
 from services.import_service import read_upload, run_import
 from services.location_service import location_types_by_depth, path_names, require_usable, serialize_location
 from services.phone_service import phone_format
 from utils.auth_middleware import get_access_context, require_permission
 from utils.csv_export import csv_response
-from utils.security import normalize_email
+from utils.security import normalize_email, utcnow
 from utils.search import text_match
 from utils.text import single_line
-import re
 
 router = APIRouter()
 
@@ -29,6 +31,8 @@ class CreateEndUserRequest(BaseModel):
     location_id: int | None = None
     aadhar: str
     pan_card: str
+    join_date: date | None = None
+    end_date: date | None = None
 
 
 class UpdateEndUserRequest(BaseModel):
@@ -41,6 +45,9 @@ class UpdateEndUserRequest(BaseModel):
     is_active: bool | None = None
     aadhar: str | None = None
     pan_card: str | None = None
+    join_date: date | None = None
+    end_date: date | None = None
+    clear_end_date: bool = False
 
 
 def serialize_end_users(db: Session, end_users: list[EndUser]) -> list[dict]:
@@ -57,6 +64,9 @@ def serialize_end_users(db: Session, end_users: list[EndUser]) -> list[dict]:
             "aadhar": e.aadhar,
             "pan_card": e.pan_card,
             "avatar_url": e.avatar_url,
+            "join_date": e.join_date.isoformat() if e.join_date else None,
+            "end_date": e.end_date.isoformat() if e.end_date else None,
+            "tenure_status": tenure_status_of(e),
             "created_at": e.created_at.isoformat(),
             "last_login_at": e.last_login_at.isoformat() if e.last_login_at else None,
         }
@@ -149,7 +159,11 @@ def create_end_user(payload: CreateEndUserRequest, request: Request,
     location = _location(ctx, payload.location_id) if payload.location_id is not None else None
     if location is None:
         ctx.require_covers_location(None)
-    end_user = EndUser(**values, location=location)
+    join_date = payload.join_date or utcnow().date()
+    end_date = payload.end_date
+    if end_date and end_date < join_date:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "End date cannot be earlier than join date")
+    end_user = EndUser(**values, location=location, join_date=join_date, end_date=end_date)
     db.add(end_user)
     try:
         db.flush()
@@ -176,9 +190,19 @@ def update_end_user(
         "external_id": end_user.external_id, "name": end_user.name, "mobile": end_user.mobile,
         "email": end_user.email, "location_id": end_user.location_id, "is_active": end_user.is_active,
         "aadhar": end_user.aadhar, "pan_card": end_user.pan_card,
+        "join_date": str(end_user.join_date) if end_user.join_date else None,
+        "end_date": str(end_user.end_date) if end_user.end_date else None,
     }
     for key, value in _clean(db, payload.name, payload.mobile, payload.email, payload.external_id, payload.aadhar, payload.pan_card).items():
         setattr(end_user, key, value)
+    if payload.join_date is not None:
+        end_user.join_date = payload.join_date
+    if payload.clear_end_date:
+        end_user.end_date = None
+    elif payload.end_date is not None:
+        end_user.end_date = payload.end_date
+    if end_user.end_date and end_user.join_date and end_user.end_date < end_user.join_date:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "End date cannot be earlier than join date")
     if payload.clear_location:
         ctx.require_covers_location(None)
         end_user.location = None
@@ -197,6 +221,8 @@ def update_end_user(
         "external_id": end_user.external_id, "name": end_user.name, "mobile": end_user.mobile,
         "email": end_user.email, "location_id": end_user.location_id, "is_active": end_user.is_active,
         "aadhar": end_user.aadhar, "pan_card": end_user.pan_card,
+        "join_date": str(end_user.join_date) if end_user.join_date else None,
+        "end_date": str(end_user.end_date) if end_user.end_date else None,
     }
     changes = audit_service.diff(before, after)
     if "is_active" in changes and not end_user.is_active:

@@ -216,6 +216,8 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     # Off (e.g. on leave) = skipped by automatic complaint routing.
     is_available = Column(Boolean, default=True, nullable=False)
+    join_date = Column(Date, default=lambda: utcnow().date(), nullable=False)
+    end_date = Column(Date, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
     last_login_at = Column(DateTime, nullable=True)
@@ -276,6 +278,8 @@ class EndUser(Base):
     # Whether complaint updates are also sent by SMS / email (when the organisation enables those channels).
     notify_sms = Column(Boolean, default=True, nullable=False)
     notify_email = Column(Boolean, default=True, nullable=False)
+    join_date = Column(Date, default=lambda: utcnow().date(), nullable=False)
+    end_date = Column(Date, nullable=True)
 
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)

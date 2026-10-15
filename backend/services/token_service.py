@@ -85,6 +85,12 @@ def rotate(db: Session, raw_refresh: str | None, principal_type: str) -> tuple[P
         _revoke_family(db, token.family_id)
         db.commit()
         raise invalid
+    from services.access_service import check_user_tenure
+    allowed, _, _ = check_user_tenure(principal)
+    if not allowed:
+        _revoke_family(db, token.family_id)
+        db.commit()
+        raise invalid
     raw_new = _new_refresh(db, principal_type, principal.id, token.family_id)
     db.commit()
     return principal, create_access_token(principal_type, principal.id, principal.token_version), raw_new

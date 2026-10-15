@@ -60,12 +60,12 @@ const ACTIONS: QuickAction[] = [
 ];
 
 export function QuickActionsBar() {
-  const { can } = useSession();
+  const { me, can } = useSession();
   const [open, setOpen] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const visible = ACTIONS.filter((a) => a.permissions.every(can));
+  const visible = ACTIONS.filter((a) => (a.id === "register" && me?.is_super_admin ? false : a.permissions.every(can)));
 
   useEffect(() => {
     if (!open) return;

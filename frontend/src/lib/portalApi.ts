@@ -68,6 +68,9 @@ export interface Profile {
   /** Government-issued identity numbers (read-only, set by admin). */
   aadhaar_number?: string | null;
   pan_number?: string | null;
+  join_date?: string;
+  end_date?: string | null;
+  tenure_status?: "active" | "expired" | "pending";
 }
 
 export interface PortalDepartment {

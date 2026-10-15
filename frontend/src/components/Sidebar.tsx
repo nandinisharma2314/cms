@@ -17,6 +17,7 @@ import {
   Home,
   MapPin,
   ScrollText,
+  Send,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -35,12 +36,20 @@ interface NavItem {
   icon: React.ElementType;
   /** Shown when the user holds any of these; no list = everyone. */
   anyOf?: string[];
+  hideSuperAdmin?: boolean;
 }
 
 // Driven by permissions, not role names, so custom roles get the right menu automatically.
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/complaints", label: "Complaints", icon: FileText, anyOf: ["complaint.view"] },
+  {
+    href: "/complaints?created_by=me",
+    label: "My Raised Complaints",
+    icon: Send,
+    anyOf: ["complaint.create"],
+    hideSuperAdmin: true,
+  },
   { href: "/escalated", label: "Escalated to me", icon: ArrowUpCircle, anyOf: ["complaint.assign"] },
   {
     href: "/rejection-requests",
@@ -160,8 +169,20 @@ export function Sidebar({
   onCloseMobile: () => void;
 }) {
   const pathname = usePathname();
-  const { canAny } = useSession();
-  const items = NAV_ITEMS.filter((item) => !item.anyOf || canAny(...item.anyOf));
+  const { me, canAny } = useSession();
+  const search = React.useSyncExternalStore(
+    (callback) => {
+      window.addEventListener("popstate", callback);
+      return () => window.removeEventListener("popstate", callback);
+    },
+    () => (typeof window !== "undefined" ? window.location.search : ""),
+    () => "",
+  );
+
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.hideSuperAdmin && me.is_super_admin) return false;
+    return !item.anyOf || canAny(...item.anyOf);
+  });
   // On phones the drawer always shows labels.
   const narrow = collapsed && !mobileOpen;
 
@@ -204,8 +225,18 @@ export function Sidebar({
 
         <nav className="sidebar-nav flex-1 overflow-y-auto px-3.5 py-4 space-y-1">
           {items.map((item) => {
-            const itemPath = item.href.split("?")[0];
-            const active = itemPath === "/" ? pathname === "/" : pathname === itemPath || pathname.startsWith(itemPath + "/");
+            const [itemPath, itemQuery] = item.href.split("?");
+            let active = false;
+            if (itemPath === "/") {
+              active = pathname === "/";
+            } else if (itemQuery) {
+              active = pathname === itemPath && search.includes(itemQuery);
+            } else {
+              const hasCreatedBy = search.includes("created_by=me");
+              active =
+                (pathname === itemPath || pathname.startsWith(itemPath + "/")) &&
+                (!hasCreatedBy || itemPath !== "/complaints");
+            }
             return <SidebarItem key={item.href} item={item} active={active} narrow={narrow} />;
           })}
         </nav>

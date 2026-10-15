@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import EndUser, Role, User
-from services.access_service import AccessContext
+from services.access_service import AccessContext, check_user_tenure
 from services.permission_catalog import END_USER_ROLE_KEY
 from utils.security import PRINCIPAL_END_USER, PRINCIPAL_STAFF, decode_access_token
 
@@ -49,6 +49,9 @@ def _load_staff(credentials: HTTPAuthorizationCredentials | None, db: Session) -
     user = db.get(User, principal_id)
     if user is None or not user.is_active or user.token_version != version:
         raise _unauthorized("Your session has ended. Please sign in again.")
+    allowed, detail, _ = check_user_tenure(user)
+    if not allowed:
+        raise _unauthorized(detail)
     return user
 
 
@@ -93,6 +96,9 @@ def get_current_end_user(
     end_user = db.get(EndUser, principal_id)
     if end_user is None or not end_user.is_active or end_user.token_version != version:
         raise _unauthorized("Your session has ended. Please sign in again.")
+    allowed, detail, _ = check_user_tenure(end_user)
+    if not allowed:
+        raise _unauthorized(detail)
     return end_user
 
 

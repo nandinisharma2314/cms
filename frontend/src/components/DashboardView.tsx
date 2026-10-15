@@ -54,12 +54,18 @@ export function DashboardView() {
   const { me, can } = useSession();
   const { ui } = useConfig();
   const canViewComplaints = can("complaint.view");
+  const canCreate = !me.is_super_admin && can("complaint.create");
+  const [complaintTab, setComplaintTab] = React.useState<"scope" | "mine">("scope");
 
   // Every number below is already limited to the user's department/location scope by the API.
   const stats = useApiData(() => (canViewComplaints ? api.complaints.stats() : Promise.resolve(undefined)), [canViewComplaints]);
   const recent = useApiData(
     () => (canViewComplaints ? api.complaints.list({ page_size: ui.dashboard_recent_items }) : Promise.resolve(undefined)),
     [canViewComplaints, ui.dashboard_recent_items],
+  );
+  const myRaised = useApiData(
+    () => (canCreate ? api.complaints.list({ created_by: "me", page_size: ui.dashboard_recent_items }) : Promise.resolve(undefined)),
+    [canCreate, ui.dashboard_recent_items],
   );
   const m = stats.data?.metrics;
   const metrics: MetricCardData[] = m
@@ -137,26 +143,68 @@ export function DashboardView() {
           )}
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
-            {(recent.loading || recent.data) && (
+            {(recent.loading || recent.data || myRaised.loading || myRaised.data) && (
               <Card className="xl:col-span-8 overflow-hidden">
                 <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                  <h2 className="text-base font-bold text-slate-800">
-                    Latest complaints
-                    {recent.data && (
-                      <span className="ml-2 text-xs text-slate-400 font-medium">
-                        ({recent.data.total.toLocaleString()} in your scope)
-                      </span>
+                  <div className="flex items-center gap-3">
+                    {canCreate ? (
+                      <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setComplaintTab("scope")}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            complaintTab === "scope"
+                              ? "bg-white text-slate-800 shadow-xs"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          Latest in scope
+                          {recent.data && (
+                            <span className="ml-1.5 text-[11px] text-slate-400 font-semibold">
+                              ({recent.data.total})
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setComplaintTab("mine")}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            complaintTab === "mine"
+                              ? "bg-white text-blue-600 shadow-xs"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          Raised by you
+                          {myRaised.data && (
+                            <span className="ml-1.5 text-[11px] font-semibold text-blue-500">
+                              ({myRaised.data.total})
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <h2 className="text-base font-bold text-slate-800">
+                        Latest complaints
+                        {recent.data && (
+                          <span className="ml-2 text-xs text-slate-400 font-medium">
+                            ({recent.data.total.toLocaleString()} in your scope)
+                          </span>
+                        )}
+                      </h2>
                     )}
-                  </h2>
-                  <Link href="/complaints" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+                  </div>
+                  <Link
+                    href={complaintTab === "mine" ? "/complaints?created_by=me" : "/complaints"}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  >
                     View all
                   </Link>
                 </div>
                 <ComplaintTable
                   compact
-                  complaints={recent.data?.items ?? []}
-                  loading={recent.loading}
-                  emptyText="No complaints in your scope yet."
+                  complaints={(complaintTab === "mine" ? myRaised.data?.items : recent.data?.items) ?? []}
+                  loading={complaintTab === "mine" ? myRaised.loading : recent.loading}
+                  emptyText={complaintTab === "mine" ? "You haven't raised any complaints yet." : "No complaints in your scope yet."}
                 />
               </Card>
             )}

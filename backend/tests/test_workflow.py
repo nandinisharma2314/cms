@@ -1,5 +1,5 @@
 """Routing, assignment, the status workflow, comments and the timeline."""
-from conftest import ADMIN, CITY_AGENT, ELEC_AGENT, ELEC_MANAGER, ELEC_SUPERVISOR, SUPER_ADMIN, first_login
+from conftest import ADMIN, CITY_AGENT, ELEC_AGENT, ELEC_MANAGER, ELEC_SUPERVISOR, SUPER_ADMIN, WATER_MANAGER, first_login
 from factories import email
 
 
@@ -395,3 +395,54 @@ def test_classification_options_for_the_register_and_reclassify_forms(client, lo
     assert [p["name"] for p in body["priorities"]][:4] == ["Critical", "High", "Medium", "Low"]
     agent = client.get("/complaints/classification-options", headers=login(ELEC_AGENT))
     assert agent.status_code == 403
+
+
+def test_staff_register_and_view_own_complaints(client, login):
+    root = login(SUPER_ADMIN)
+    elec_mgr = login(ELEC_MANAGER)
+    water_mgr = login(WATER_MANAGER)
+    elec_dept, light = category_id(client, root, "Electricity", "Street Light")
+    loc = location_id(client, root, "India", "Rajasthan", "Jaipur", "Jaipur", "Mansarovar", portal=False)
+
+    # 1. Super Admin cannot register complaints
+    forbidden = client.post(
+        "/complaints",
+        headers=root,
+        data={
+            "title": "Super Admin attempt",
+            "description": "Should fail",
+            "department_id": elec_dept,
+            "category_id": light,
+            "location_id": loc,
+        },
+    )
+    assert forbidden.status_code == 403
+
+    # 2. Staff user below super admin registers complaint
+    res = client.post(
+        "/complaints",
+        headers=elec_mgr,
+        data={
+            "title": "Manager office light broken",
+            "description": "Flickering lights in room 204",
+            "department_id": elec_dept,
+            "category_id": light,
+            "location_id": loc,
+        },
+    )
+    assert res.status_code == 201, res.text
+    complaint_id = res.json()["id"]
+
+    # 3. Staff user sees it in their "created_by=me" queue
+    own_list = client.get("/complaints", params={"created_by": "me"}, headers=elec_mgr).json()
+    assert complaint_id in {c["id"] for c in own_list["items"]}
+
+    # 4. Another staff user in Water department does NOT see it in their created_by queue
+    other_own = client.get("/complaints", params={"created_by": "me"}, headers=water_mgr).json()
+    assert complaint_id not in {c["id"] for c in other_own["items"]}
+
+    # 5. Creator can view their complaint details
+    detail_res = client.get(f"/complaints/{complaint_id}", headers=elec_mgr)
+    assert detail_res.status_code == 200
+    assert detail_res.json()["title"] == "Manager office light broken"
+

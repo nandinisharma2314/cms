@@ -27,7 +27,13 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
   const { ui } = useConfig();
   const [filters, setFilters] = useState<ComplaintFilters>(initial);
   useDocumentTitle(
-    filters.escalated === "me" ? "Escalated to me" : filters.escalated === "any" ? "Escalated complaints" : "Complaints",
+    filters.created_by === "me"
+      ? "Raised by me"
+      : filters.escalated === "me"
+        ? "Escalated to me"
+        : filters.escalated === "any"
+          ? "Escalated complaints"
+          : "Complaints",
   );
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -114,25 +120,69 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
       <div className="shrink-0">
         <PageHeader
           title={
-            filters.escalated === "me"
-              ? "Complaints (Escalated to me)"
-              : filters.escalated === "any"
-                ? "Escalated complaints"
-                : "Complaints"
+            filters.created_by === "me"
+              ? "Complaints (Raised by me)"
+              : filters.escalated === "me"
+                ? "Complaints (Escalated to me)"
+                : filters.escalated === "any"
+                  ? "Escalated complaints"
+                  : "Complaints"
           }
           description={
-            filters.escalated === "me"
-              ? "Complaints where an SLA target was missed and escalated to you for supervision."
-              : filters.escalated === "any"
-                ? "Complaints across the system currently in an escalated state."
-                : me.is_super_admin
-                  ? "All complaints in the system."
-                  : "Complaints inside your department and location scope."
+            filters.created_by === "me"
+              ? "Complaints you have personally registered across all departments and locations."
+              : filters.escalated === "me"
+                ? "Complaints where an SLA target was missed and escalated to you for supervision."
+                : filters.escalated === "any"
+                  ? "Complaints across the system currently in an escalated state."
+                  : me.is_super_admin
+                    ? "All complaints in the system."
+                    : "Complaints inside your department and location scope."
           }
         />
       </div>
 
       <div className="flex flex-col gap-3 shrink-0 mt-2 sm:mt-4">
+        {/* Scope Switcher Bar (All in scope / Assigned to me / Raised by me) */}
+        {!me.is_super_admin && (
+          <div className="flex items-center gap-1 p-1 bg-slate-200/60 rounded-xl w-fit">
+            <button
+              type="button"
+              onClick={() => set({ created_by: "", assigned: "" })}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                !filters.created_by && filters.assigned !== "me"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              All complaints
+            </button>
+            <button
+              type="button"
+              onClick={() => set({ created_by: "", assigned: "me" })}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                filters.assigned === "me" && !filters.created_by
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Assigned to me
+            </button>
+            {can("complaint.create") && (
+              <button
+                type="button"
+                onClick={() => set({ created_by: "me", assigned: "" })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filters.created_by === "me"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>Raised by me</span>
+              </button>
+            )}
+          </div>
+        )}
         {/* Controls row */}
         <div className="flex flex-col lg:flex-row lg:items-center gap-3">
           <div className="flex items-center gap-1.5 sm:gap-2 w-full lg:w-auto">
@@ -323,6 +373,21 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
               </span>
             )}
 
+            {/* Created by filter chip */}
+            {filters.created_by && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-semibold">
+                <span>Raised by me</span>
+                <button
+                  type="button"
+                  onClick={() => set({ created_by: "" })}
+                  className="hover:text-blue-950 cursor-pointer"
+                  title="Remove raised by me filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
             {/* Reset all button */}
             <button
               type="button"
@@ -347,7 +412,13 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             <ComplaintTable
               complaints={data?.items ?? []}
               loading={loading}
-              emptyText={filters.escalated === "any" ? "No escalated complaints found." : "No complaints match your filters."}
+              emptyText={
+                filters.created_by === "me"
+                  ? "You haven't registered any complaints yet."
+                  : filters.escalated === "any"
+                    ? "No escalated complaints found."
+                    : "No complaints match your filters."
+              }
               onActionCompleted={reload}
             />
           </Card>
@@ -405,12 +476,12 @@ function ComplaintsRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <ComplaintsList initial={initial} />;
+  return <ComplaintsList key={params.toString()} initial={initial} />;
 }
 
 export default function ComplaintsPage() {
   return (
-    <RequirePermission anyOf={["complaint.view"]}>
+    <RequirePermission anyOf={["complaint.view", "complaint.create"]}>
       <Suspense>
         <ComplaintsRoute />
       </Suspense>

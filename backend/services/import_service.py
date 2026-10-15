@@ -16,7 +16,7 @@ import io
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import date, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -30,7 +30,7 @@ from services.location_service import create_location, find_child, is_usable, lo
 from services.phone_service import phone_format
 from utils.security import normalize_email, utcnow
 
-END_USER_COLUMNS = ["user_id", "name", "mobile", "email", "aadhar", "pan_card"]
+END_USER_COLUMNS = ["user_id", "name", "mobile", "email", "aadhar", "pan_card", "join_date", "end_date"]
 # Every column the end-user import reads besides the location levels ("external_id" is accepted for "user_id").
 END_USER_KEY_COLUMNS = (*END_USER_COLUMNS, "external_id")
 LOOKUP_CHUNK = 500
@@ -287,6 +287,8 @@ class _EndUserRow:
     aadhar: str | None
     pan_card: str | None
     level_names: list[str]
+    join_date: date
+    end_date: date | None = None
 
 
 def _existing_end_users(db: Session, parsed: list[_EndUserRow]) -> list[EndUser]:
@@ -344,7 +346,30 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
         except ValueError as exc:
             result.fail(row_number, str(exc), row)
             continue
-        parsed.append(_EndUserRow(row_number, row, external_id, name, mobile, email, aadhar, pan_card, level_names))
+        raw_join = (row.get("join_date") or "").strip()
+        join_date = None
+        if raw_join:
+            try:
+                join_date = date.fromisoformat(raw_join)
+            except ValueError:
+                result.fail(row_number, "join_date must be in YYYY-MM-DD format", row)
+                continue
+        else:
+            join_date = utcnow().date()
+
+        raw_end = (row.get("end_date") or "").strip()
+        end_date = None
+        if raw_end:
+            try:
+                end_date = date.fromisoformat(raw_end)
+            except ValueError:
+                result.fail(row_number, "end_date must be in YYYY-MM-DD format", row)
+                continue
+            if end_date < join_date:
+                result.fail(row_number, "end_date cannot be earlier than join_date", row)
+                continue
+
+        parsed.append(_EndUserRow(row_number, row, external_id, name, mobile, email, aadhar, pan_card, level_names, join_date, end_date))
 
     # Everything that already exists for these identifiers, in a few queries.
     by_external: dict[str, EndUser] = {}
@@ -459,6 +484,8 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
                 "email": p.email,
                 "aadhar": p.aadhar if ("aadhar" in headers) else existing.aadhar,
                 "pan_card": p.pan_card if ("pan_card" in headers) else existing.pan_card,
+                "join_date": p.join_date if ("join_date" in headers) else existing.join_date,
+                "end_date": p.end_date if ("end_date" in headers) else existing.end_date,
                 "location_id": location.id if location is not None else existing.location_id,
             }
             if all(getattr(existing, k) == v for k, v in new_values.items()):
@@ -482,6 +509,7 @@ def import_end_users(db: Session, ctx: AccessContext, content: bytes) -> ImportR
             target = EndUser(
                 external_id=p.external_id, name=p.name, mobile=p.mobile, email=p.email,
                 aadhar=p.aadhar, pan_card=p.pan_card,
+                join_date=p.join_date, end_date=p.end_date,
                 location_id=location.id if location is not None else None,
             )
             db.add(target)

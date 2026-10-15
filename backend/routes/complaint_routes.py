@@ -4,6 +4,7 @@ use /portal/complaints instead."""
 from datetime import date, datetime, time
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
 from config import DASHBOARD_COMPARISON_DAYS, DASHBOARD_TREND_DAYS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, NOTE_MAX_LENGTH
@@ -91,19 +92,12 @@ def pending_rejections_for(ctx: AccessContext) -> int:
 
 
 def _get_scoped(ctx: AccessContext, generated_id: str, detail: bool = True) -> Complaint:
-    query = _scoped(ctx).filter(Complaint.generated_id == generated_id)
-    if detail:
-        query = query.options(*DETAIL_OPTIONS)
-    complaint = query.first()
-    if complaint is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found")
-    return complaint
-
-
-def _get_scoped_for_viewing(ctx: AccessContext, generated_id: str, detail: bool = True) -> Complaint:
-    # Allow viewing if in location scope, regardless of department
+    # Scoped to department and location, unless the complaint was registered by the user
     query = ctx.db.query(Complaint).join(Location, Complaint.location_id == Location.id)
-    query = ctx.apply_scope(query, None, Location.path).filter(Complaint.generated_id == generated_id)
+    scope_clause = ctx.scope_clause(Complaint.department_id, Location.path)
+    if scope_clause is not None and not ctx.is_super_admin:
+        query = query.filter(or_(scope_clause, Complaint.created_by_user_id == ctx.user.id))
+    query = query.filter(Complaint.generated_id == generated_id)
     if detail:
         query = query.options(*DETAIL_OPTIONS)
     complaint = query.first()
@@ -182,13 +176,20 @@ def list_complaints(
     created_by: str | None = None,
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
-    ctx: AccessContext = Depends(require_permission("complaint.view")),
+    ctx: AccessContext = Depends(get_access_context),
 ):
     """`status_filter` takes comma-separated status keys; `group` is open /
     in_progress / resolved / rejected; `assigned` is "me", "unassigned" or a
     user id; `sla` is "breached" or "at_risk"; `escalated` is "me" or "any"."""
+    if not (ctx.has("complaint.view") or (created_by == "me" and ctx.has("complaint.create"))):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Missing permission: complaint.view")
     page, page_size = max(page, 1), min(max(page_size, 1), MAX_PAGE_SIZE)
-    query = _scoped(ctx)
+    if created_by == "me":
+        query = ctx.db.query(Complaint).join(Location, Complaint.location_id == Location.id).filter(Complaint.created_by_user_id == ctx.user.id)
+    elif created_by:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "created_by must be 'me'")
+    else:
+        query = _scoped(ctx)
     if status_filter:
         wanted = [s for s in status_filter.split(",") if s]
         unknown = [s for s in wanted if s not in STATUS_LABELS]
@@ -248,8 +249,6 @@ def list_complaints(
         query = query.filter(Complaint.escalated_to_id.isnot(None))
     elif escalated:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "escalated must be 'me' or 'any'")
-    if created_by == "me":
-        query = query.filter(Complaint.created_by_user_id == ctx.user.id)
     if search and search.strip():
         term = search.strip()
         query = query.filter(
@@ -294,8 +293,103 @@ def classification_options(ctx: AccessContext = Depends(get_access_context)):
 
 
 @router.get("/{complaint_id}")
-def get_complaint(complaint_id: str, ctx: AccessContext = Depends(require_permission("complaint.view"))):
-    return staff_detail(ctx, _get_scoped_for_viewing(ctx, complaint_id))
+def get_complaint(complaint_id: str, ctx: AccessContext = Depends(get_access_context)):
+    complaint = _get_scoped(ctx, complaint_id)
+    if not (ctx.has("complaint.view") or (complaint.created_by_user_id == ctx.user.id and ctx.has("complaint.create"))):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Missing permission: complaint.view")
+    return staff_detail(ctx, complaint)
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_complaint_endpoint(
+    request: Request,
+    title: str = Form(...),
+    description: str = Form(...),
+    department_id: int = Form(...),
+    category_id: int = Form(...),
+    location_id: int | None = Form(None),
+    additional_details: str | None = Form(None),
+    priority_id: int | None = Form(None),
+    priority_reason: str | None = Form(None),
+    end_user_id: int | None = Form(None),
+    end_user_name: str | None = Form(None),
+    end_user_phone: str | None = Form(None),
+    files: list[UploadFile] = File(default=[]),
+    ctx: AccessContext = Depends(require_permission("complaint.create")),
+):
+    """Staff registering a complaint, supporting file uploads and matching end-user registration flow."""
+    if ctx.is_super_admin:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Super Admin cannot register complaints. Only roles below Super Admin can register complaints."
+        )
+    db = ctx.db
+    title, description, additional_details = clean_complaint_text(title, description, additional_details)
+    end_user = None
+    contact_name = contact_phone = None
+    if end_user_id is not None:
+        end_user = db.get(EndUser, end_user_id)
+        if end_user is None or not end_user.is_active:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "End user not found or inactive")
+    elif end_user_name and end_user_name.strip():
+        contact_name = single_line(end_user_name, "Name", max_length(Complaint.end_user_name), required=False)
+        if end_user_phone and end_user_phone.strip():
+            fmt = phone_format(db)
+            contact_phone = fmt.normalize(end_user_phone)
+            if contact_phone is None:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Mobile must be {fmt.describe()}")
+    else:
+        contact_name = ctx.user.name
+        contact_phone = ctx.user.mobile
+
+    resolved_location_id = (
+        location_id if location_id is not None
+        else (end_user.location_id if end_user
+        else (ctx.user.primary_location_id if getattr(ctx.user, "primary_location_id", None)
+        else None))
+    )
+    if resolved_location_id is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No location specified or assigned. Please choose a location.",
+        )
+    department, category, location = resolve_classification(db, department_id, category_id, resolved_location_id)
+    ctx.require_covers(department.id, location.path)
+    priority, p_reason = category.default_priority, None
+    if priority_id is not None and priority_id != priority.id:
+        ctx.require("complaint.reclassify")
+        priority = priority_service.get_active(db, priority_id)
+        p_reason = multi_line(priority_reason, "The reason for the priority", NOTE_MAX_LENGTH)
+
+    stored = attachment_service.StoredFiles()
+    try:
+        complaint = register_complaint(
+            db, department=department, category=category, location=location, priority=priority, title=title,
+            description=description, additional_details=additional_details, end_user=end_user, created_by=ctx.user,
+            end_user_name=contact_name, end_user_phone=contact_phone,
+        )
+        if files:
+            attachment_service.save_attachments(db, complaint, files, ctx.user, stored)
+        summary = (f"Registered {complaint.generated_id} ({department.name}, {location.name}) by {ctx.user.name}"
+                   f"{f' for {end_user.name}' if end_user else ''}")
+        changes = None
+        if p_reason is not None:
+            summary += f"; priority {priority.name} instead of {category.default_priority.name}: {p_reason}"
+            changes = {"priority": [category.default_priority.name, priority.name]}
+        audit_service.record(
+            db, actor=ctx.user, action="complaint.create", entity_type="complaint", entity_id=complaint.generated_id,
+            summary=summary, changes=changes, request=request,
+        )
+        db.commit()
+    except BaseException:
+        db.rollback()
+        stored.discard()
+        raise
+
+    return {
+        "id": complaint.generated_id,
+        "assignee": complaint.assigned_to.name if complaint.assigned_to else None,
+    }
 
 
 @router.post("/quick-create", status_code=status.HTTP_201_CREATED)
@@ -325,11 +419,16 @@ def quick_create_complaint(
             if contact_phone is None:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Mobile must be {fmt.describe()}")
 
-    resolved_location_id = data.location_id if data.location_id is not None else (end_user.location_id if end_user else None)
+    resolved_location_id = (
+        data.location_id if data.location_id is not None
+        else (end_user.location_id if end_user
+        else (ctx.user.primary_location_id if getattr(ctx.user, "primary_location_id", None)
+        else None))
+    )
     if resolved_location_id is None:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "No location is assigned to this employee. Please assign a location first.",
+            "No location specified or assigned. Please choose a location.",
         )
     department, category, location = resolve_classification(db, data.department_id, data.category_id, resolved_location_id)
     ctx.require_covers(department.id, location.path)

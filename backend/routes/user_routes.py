@@ -14,6 +14,7 @@ from utils.auth_middleware import get_access_context, require_permission
 from utils.security import hash_password, normalize_email, utcnow, validate_password_strength
 from utils.search import text_match
 from utils.text import single_line
+from datetime import date
 import re
 
 router = APIRouter()
@@ -41,6 +42,8 @@ class CreateUserRequest(BaseModel):
     primary_location_id: int | None = None
     aadhar: str | None = None
     pan_card: str | None = None
+    join_date: date | None = None
+    end_date: date | None = None
     scopes: list[ScopeInput] = []
     custom_permissions: list[CustomPermissionInput] = []
 
@@ -59,6 +62,9 @@ class UpdateUserRequest(BaseModel):
     clear_primary_location: bool = False
     aadhar: str | None = None
     pan_card: str | None = None
+    join_date: date | None = None
+    end_date: date | None = None
+    clear_end_date: bool = False
     scopes: list[ScopeInput] | None = None
     custom_permissions: list[CustomPermissionInput] | None = None
     is_available: bool | None = None
@@ -238,10 +244,15 @@ def create_user(payload: CreateUserRequest, request: Request,
         scope_inputs = [{"department_id": payload.primary_department_id, "location_id": payload.primary_location_id}]
     scopes = build_scopes(db, ctx, role, scope_inputs)
     reports_to = validate_reports_to(db, ctx, role, payload.reports_to_id)
+    join_date = payload.join_date or utcnow().date()
+    end_date = payload.end_date
+    if end_date and end_date < join_date:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "End date cannot be earlier than join date")
 
     user = User(
         name=name, email=email, mobile=mobile, role=role,
         aadhar=aadhar, pan_card=pan_card,
+        join_date=join_date, end_date=end_date,
         password_hash=hash_password(payload.password), must_change_password=True,
         reports_to=reports_to, primary_department=primary_dept, primary_location=primary_loc,
         created_by_id=ctx.user.id, scopes=scopes,
@@ -276,6 +287,8 @@ def update_user(
         "name": user.name, "email": user.email, "mobile": user.mobile, "role": user.role.key,
         "reports_to_id": user.reports_to_id, "scopes": scope_snapshot(user.scopes),
         "is_available": user.is_available,
+        "join_date": str(user.join_date) if user.join_date else None,
+        "end_date": str(user.end_date) if user.end_date else None,
     }
 
     if payload.name is not None:
@@ -327,6 +340,15 @@ def update_user(
     elif user.reports_to is not None and not ctx.is_role_below(role, above=user.reports_to.role):
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             f"{user.reports_to.name} is no longer above the new role; choose who {user.name} reports to")
+    if payload.join_date is not None:
+        user.join_date = payload.join_date
+    if payload.clear_end_date:
+        user.end_date = None
+    elif payload.end_date is not None:
+        user.end_date = payload.end_date
+    if user.end_date and user.join_date and user.end_date < user.join_date:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "End date cannot be earlier than join date")
+
     if payload.is_available is not None:
         user.is_available = payload.is_available
     try:
@@ -339,6 +361,8 @@ def update_user(
         "name": user.name, "email": user.email, "mobile": user.mobile, "role": role.key,
         "reports_to_id": user.reports_to_id, "scopes": scope_snapshot(user.scopes),
         "is_available": user.is_available,
+        "join_date": str(user.join_date) if user.join_date else None,
+        "end_date": str(user.end_date) if user.end_date else None,
     }
     changes = audit_service.diff(before, after)
     moved = 0

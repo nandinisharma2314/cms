@@ -4,8 +4,8 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpCircle, ChevronRight } from "lucide-react";
-import { api, ComplaintData, DashboardStats, resolveAvatarUrl } from "@/lib/api";
-import { formatDateTime, initials } from "@/lib/format";
+import { api, ComplaintData, DashboardStats } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { scopeLabel } from "./ScopeEditor";
 import { StatusBadge } from "./ui";
@@ -20,8 +20,7 @@ function greetingFor(hour: number) {
 export function StaffMobileDashboard() {
   const { me, can, setMe } = useSession();
   const canViewComplaints = can("complaint.view");
-  const canAssign = can("complaint.assign");
-  const canCreate = can("complaint.create");
+  const canCreate = !me.is_super_admin && can("complaint.create");
   const isAgent = me.role.key === "agent" || me.role.key === "field_worker";
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -90,12 +89,12 @@ export function StaffMobileDashboard() {
           href: "/complaints?group=open",
         },
         {
-          label: "Escalated",
-          count: pending?.escalated_to_me ?? 0,
+          label: "In Progress",
+          count: m?.in_progress ?? 0,
           tile: "bg-violet-50",
           value: "text-violet-600",
           caption: "text-violet-900/60",
-          href: "/escalated",
+          href: "/complaints?group=in_progress",
         },
         {
           label: "Resolved",
@@ -124,12 +123,12 @@ export function StaffMobileDashboard() {
           href: "/complaints?group=open",
         },
         {
-          label: "Escalated",
-          count: pending?.escalated_to_me ?? 0,
+          label: "In Progress",
+          count: m?.in_progress ?? 0,
           tile: "bg-violet-50",
           value: "text-violet-600",
           caption: "text-violet-900/60",
-          href: "/escalated",
+          href: "/complaints?group=in_progress",
         },
         {
           label: "Resolved",
@@ -155,6 +154,7 @@ export function StaffMobileDashboard() {
           </h1>
           <div className="mt-1 flex flex-col items-start gap-0.5 text-[12px]">
             <span className="font-semibold text-blue-600">{me.role.name}</span>
+            {scopeText && <span className="text-slate-400 text-[11px] truncate">{scopeText}</span>}
             
             {me.reports_to && (
               <span className="text-amber-500 font-medium">Reports to: {me.reports_to.name}</span>
@@ -204,7 +204,7 @@ export function StaffMobileDashboard() {
       </section>
 
       {/* 3. Escalations Alert Banner (if any) */}
-      {canAssign && (pending?.escalated_to_me ?? 0) > 0 && (
+      {(pending?.escalated_to_me ?? 0) > 0 ? (
         <Link
           href="/escalated"
           className="flex items-center justify-between gap-3 rounded-2xl bg-linear-to-r from-violet-50 to-purple-50 border border-violet-100 p-3.5 shadow-xs transition-transform active:scale-[0.99]"
@@ -222,7 +222,43 @@ export function StaffMobileDashboard() {
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-violet-400" />
         </Link>
-      )}
+      ) : (m?.escalated ?? 0) > 0 ? (
+        <Link
+          href="/escalated?escalated=any"
+          className="flex items-center justify-between gap-3 rounded-2xl bg-linear-to-r from-violet-50 to-purple-50 border border-violet-100 p-3.5 shadow-xs transition-transform active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs">
+              <ArrowUpCircle className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[13.5px] font-bold text-violet-950 truncate">
+                {m?.escalated} escalated {m?.escalated === 1 ? "complaint" : "complaints"}
+              </div>
+              <p className="text-[11.5px] text-violet-700">Delayed SLA targets requiring attention</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-violet-400" />
+        </Link>
+      ) : (m?.sla_breached ?? 0) > 0 ? (
+        <Link
+          href="/complaints?sla=breached"
+          className="flex items-center justify-between gap-3 rounded-2xl bg-linear-to-r from-amber-50 to-red-50 border border-amber-100 p-3.5 shadow-xs transition-transform active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white shadow-xs">
+              <ArrowUpCircle className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[13.5px] font-bold text-amber-950 truncate">
+                {m?.sla_breached} delayed {m?.sla_breached === 1 ? "complaint" : "complaints"}
+              </div>
+              <p className="text-[11.5px] text-red-700">SLA breached — immediate action required</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-red-400" />
+        </Link>
+      ) : null}
 
       {/* 4. Recent Requests / Tasks Feed (Matches RecentComplaints.tsx styling) */}
       <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-1 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
@@ -296,57 +332,71 @@ export function StaffMobileDashboard() {
       </section>
 
       {/* 5. Requests You Raised */}
-      {(!loading && createdComplaints && createdComplaints.length > 0) && (
-        <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-1 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
-          <div className="flex items-center justify-between mb-1">
+      {canCreate && !loading && (
+        <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-3 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
+          <div className="flex items-center justify-between mb-2">
             <h2 className="text-[15px] font-bold text-[#0b1a3f]">Requests you raised</h2>
-            <Link
-              href="/complaints?created_by=me"
-              className="flex items-center text-[13px] font-semibold text-blue-600 hover:text-blue-700"
-            >
-              View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
-            </Link>
+            {createdComplaints && createdComplaints.length > 0 && (
+              <Link
+                href="/complaints?created_by=me"
+                className="flex items-center text-[13px] font-semibold text-blue-600 hover:text-blue-700"
+              >
+                View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
+              </Link>
+            )}
           </div>
 
-          <ul>
-            {createdComplaints.map((c) => (
-              <li key={c.id} className="group">
-                <Link href={`/complaints/${encodeURIComponent(c.id)}`} className="flex w-full items-center gap-3 text-left">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
-                  <span className="flex min-w-0 flex-1 items-center gap-2 border-b border-slate-100 py-3 group-last:border-b-0">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-bold text-[#0b1a3f]">{c.title}</span>
-                      <span className="mt-0.5 block truncate text-[12px] text-slate-500">
-                        {c.id}
-                        <span className="mx-1 text-slate-300" aria-hidden="true">
-                          |
+          {!createdComplaints || createdComplaints.length === 0 ? (
+            <div className="py-4 text-center">
+              <p className="text-[12px] text-slate-500 mb-2">You haven&apos;t raised any complaints yet.</p>
+              <Link
+                href="/complaints/new"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition-colors"
+              >
+                + Register complaint
+              </Link>
+            </div>
+          ) : (
+            <ul>
+              {createdComplaints.map((c) => (
+                <li key={c.id} className="group">
+                  <Link href={`/complaints/${encodeURIComponent(c.id)}`} className="flex w-full items-center gap-3 text-left">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
+                    <span className="flex min-w-0 flex-1 items-center gap-2 border-b border-slate-100 py-3 group-last:border-b-0">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-bold text-[#0b1a3f]">{c.title}</span>
+                        <span className="mt-0.5 block truncate text-[12px] text-slate-500">
+                          {c.id}
+                          <span className="mx-1 text-slate-300" aria-hidden="true">
+                            |
+                          </span>
+                          {c.department}
+                          {c.location && (
+                            <>
+                              <span className="mx-1 text-slate-300" aria-hidden="true">
+                                |
+                              </span>
+                              {c.location}
+                            </>
+                          )}
                         </span>
-                        {c.department}
-                        {c.location && (
-                          <>
-                            <span className="mx-1 text-slate-300" aria-hidden="true">
-                              |
-                            </span>
-                            {c.location}
-                          </>
+                        <span className="mt-0.5 block text-[11px] text-slate-400">{formatDateTime(c.created_at)}</span>
+                      </span>
+                      <span className="shrink-0 flex flex-col items-end gap-1">
+                        <StatusBadge status={c.status} label={c.status_label} />
+                        {c.escalation && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600">
+                            <ArrowUpCircle className="w-3 h-3" /> L{c.escalation.level}
+                          </span>
                         )}
                       </span>
-                      <span className="mt-0.5 block text-[11px] text-slate-400">{formatDateTime(c.created_at)}</span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
                     </span>
-                    <span className="shrink-0 flex flex-col items-end gap-1">
-                      <StatusBadge status={c.status} label={c.status_label} />
-                      {c.escalation && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600">
-                          <ArrowUpCircle className="w-3 h-3" /> L{c.escalation.level}
-                        </span>
-                      )}
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
       {avatarOpen && <ChangeAvatarModal onClose={() => setAvatarOpen(false)} />}

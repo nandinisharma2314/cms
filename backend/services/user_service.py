@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from models import RESET_PENDING, Department, Location, PasswordResetTicket, Role, User, UserScope
-from services.access_service import AccessContext
+from services.access_service import AccessContext, tenure_status_of
 from services.location_service import path_names, require_usable, serialize_location
 from services.permission_catalog import SUPER_ADMIN_ROLE_KEY
 from services.phone_service import phone_format
@@ -58,6 +58,9 @@ def serialize_users(db: Session, users: list[User], ctx: AccessContext | None = 
             ],
             "is_active": u.is_active,
             "is_available": u.is_available,
+            "join_date": u.join_date.isoformat() if u.join_date else None,
+            "end_date": u.end_date.isoformat() if u.end_date else None,
+            "tenure_status": tenure_status_of(u),
             "must_change_password": u.must_change_password,
             "created_at": u.created_at.isoformat(),
             "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,

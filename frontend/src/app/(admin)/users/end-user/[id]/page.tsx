@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   XCircle,
   CreditCard,
+  Calendar,
 } from "lucide-react";
 import { api, EndUserProfileResponse } from "@/lib/api";
 import { useApiData } from "@/lib/hooks";
@@ -140,27 +141,80 @@ function EndUserProfileContent() {
       {/* Main Content */}
       <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto custom-scrollbar ">
         {/* User Info Small Card */}
-        <div className="px-2 py-1  flex flex-col  shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="   flex items-center justify-center text-xl font-extrabold text-slate-700 shrink-0">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Account Overview</span>
+              {user.external_id && (
+                <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                  ID: {user.external_id}
+                </span>
+              )}
             </div>
-            <div>
+            <div className="flex items-center gap-2">
+              {user.tenure_status && (
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
+                    user.tenure_status === "expired"
+                      ? "bg-rose-50 text-rose-700 border-rose-200"
+                      : user.tenure_status === "pending"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  }`}
+                >
+                  Tenure {user.tenure_status}
+                </span>
+              )}
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2  ">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-slate-50 text-slate-400">
                 <Mail className="w-4 h-4" />
               </div>
-              <div className="text-sm font-medium text-slate-800">{user.email}</div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Email</div>
+                <div className="text-xs font-medium text-slate-800 break-all">{user.email}</div>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-slate-50 text-slate-400">
                 <Phone className="w-4 h-4" />
               </div>
-              <div className="text-sm font-medium text-slate-800">{user.mobile}</div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Mobile</div>
+                <div className="text-xs font-medium text-slate-800">{user.mobile}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-500">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Join Date</div>
+                <div className="text-xs font-semibold text-slate-800 font-mono">
+                  {user.join_date || (user.created_at ? user.created_at.split("T")[0] : "—")}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-500">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">End Date</div>
+                <div className="text-xs font-semibold text-slate-800 font-mono">
+                  {user.end_date || "Permanent (Ongoing)"}
+                </div>
+              </div>
             </div>
           </div>
+          {user.location && (
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-100 text-xs text-slate-600">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <span>Assigned Location: <strong className="text-slate-800">{user.location.label || user.location.name}</strong></span>
+            </div>
+          )}
         </div>
 
         {/* KPI Stats */}

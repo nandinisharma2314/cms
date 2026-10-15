@@ -1,7 +1,13 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { MapPin, SlidersHorizontal, X } from "lucide-react";
 import { Department, LocationNode, Priority } from "@/lib/api";
 import { inputClass } from "@/components/ui";
+
+const emptySubscribe = () => () => {};
+function useIsClient() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
 
 function findNodePath(nodes: LocationNode[], targetId: number, currentPath: LocationNode[] = []): LocationNode[] | null {
   for (const node of nodes) {
@@ -38,6 +44,8 @@ export interface ReportFilterDrawerProps {
 }
 
 export function ReportFilterDrawer({ open, onClose, filters, onChange, facets }: ReportFilterDrawerProps) {
+  const mounted = useIsClient();
+
   // Close on Escape key press
   useEffect(() => {
     if (!open) return;
@@ -118,11 +126,13 @@ export function ReportFilterDrawer({ open, onClose, filters, onChange, facets }:
     }
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[100] transition-opacity duration-300 ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
@@ -131,15 +141,15 @@ export function ReportFilterDrawer({ open, onClose, filters, onChange, facets }:
 
       {/* Drawer */}
       <div
-        className={`fixed inset-y-0 right-0 z-50 w-full sm:max-w-md bg-white shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "translate-x-full"
+        className={`fixed inset-y-0 right-0 z-[100] w-full sm:max-w-md bg-white shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${
+          open ? "translate-x-0" : "translate-x-full pointer-events-none"
         }`}
         role="dialog"
         aria-modal="true"
         aria-label="Filter Reports"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70 pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="flex items-center gap-2.5">
             <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-blue-100/80 text-blue-600">
               <SlidersHorizontal className="w-4 h-4" />
@@ -159,7 +169,7 @@ export function ReportFilterDrawer({ open, onClose, filters, onChange, facets }:
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="p-5 space-y-6">
             {/* Section: Location Selection */}
             <div>
@@ -225,7 +235,7 @@ export function ReportFilterDrawer({ open, onClose, filters, onChange, facets }:
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-slate-100 bg-white mt-auto">
+        <div className="shrink-0 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-slate-100 bg-white mt-auto">
           <button
             onClick={onClose}
             className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition-colors cursor-pointer"
@@ -234,6 +244,7 @@ export function ReportFilterDrawer({ open, onClose, filters, onChange, facets }:
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

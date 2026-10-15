@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { Calendar, Check, CheckSquare, Clock, Layers, MapPin, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { ComplaintFacets, LocationNode, StatusGroup } from "@/lib/api";
 import { GROUP_LABELS } from "@/lib/status";
 import { inputClass } from "@/components/ui";
+
+const emptySubscribe = () => () => {};
+function useIsClient() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
 
 export interface ComplaintFilters {
   search: string;
@@ -74,6 +80,8 @@ export function ComplaintFilterDrawer({
   canAssign = false,
   totalCount,
 }: ComplaintFilterDrawerProps) {
+  const mounted = useIsClient();
+
   // Close on Escape key press
   useEffect(() => {
     if (!open) return;
@@ -213,11 +221,13 @@ export function ComplaintFilterDrawer({
 
   const activeCount = countActiveFilters(filters);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[100] transition-opacity duration-300 ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
@@ -226,15 +236,15 @@ export function ComplaintFilterDrawer({
 
       {/* Drawer */}
       <div
-        className={`fixed inset-y-0 right-0 z-50 w-full sm:max-w-md bg-white shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "translate-x-full"
+        className={`fixed inset-y-0 right-0 z-[100] w-full sm:max-w-md bg-white shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${
+          open ? "translate-x-0" : "translate-x-full pointer-events-none"
         }`}
         role="dialog"
         aria-modal="true"
         aria-label="Filter Complaints"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70 pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="flex items-center gap-2.5">
             <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-blue-100/80 text-blue-600">
               <SlidersHorizontal className="w-4 h-4" />
@@ -262,7 +272,7 @@ export function ComplaintFilterDrawer({
         </div>
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 text-xs text-slate-700">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5 text-xs text-slate-700">
           {/* Section: Date & Time Filters */}
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -489,6 +499,18 @@ export function ComplaintFilterDrawer({
                   {canAssign && <option value="unassigned">Unassigned</option>}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Submitter / Origin</label>
+                <select
+                  className={inputClass}
+                  value={filters.created_by}
+                  onChange={(e) => onChange({ created_by: e.target.value as ComplaintFilters["created_by"] })}
+                >
+                  <option value="">All submitters</option>
+                  <option value="me">Registered by me</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -530,7 +552,7 @@ export function ComplaintFilterDrawer({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-slate-200/80 bg-slate-50 flex items-center gap-3">
+        <div className="shrink-0 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-200/80 bg-slate-50 flex items-center gap-3">
           <button
             type="button"
             onClick={onReset}
@@ -550,6 +572,7 @@ export function ComplaintFilterDrawer({
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

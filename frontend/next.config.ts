@@ -10,6 +10,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
+  devIndicators: false,
   allowedDevOrigins: [
     "*.pinggy.link",
     "*.pinggy.net",

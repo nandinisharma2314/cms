@@ -48,10 +48,15 @@ function EndUserForm({
   const [aadhar, setAadhar] = useState(editing?.aadhar ?? "");
   const [panCard, setPanCard] = useState(editing?.pan_card ?? "");
   const [locationId, setLocationId] = useState<number | null>(editing?.location?.id ?? null);
+  const [joinDate, setJoinDate] = useState(
+    editing?.join_date ?? (editing?.created_at ? editing.created_at.split("T")[0] : new Date().toISOString().split("T")[0]),
+  );
+  const [endDate, setEndDate] = useState(editing?.end_date ?? "");
   const [nameError, setNameError] = useState<string | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
   const [aadharError, setAadharError] = useState<string | null>(null);
   const [panError, setPanError] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   // End users are placed by location only; any department scope covers them.
   const identityChanged = editing !== null && (mobile !== editing.mobile || email !== editing.email);
@@ -62,11 +67,17 @@ function EndUserForm({
     const mErr = validatePhone(mobile);
     const aErr = aadhar.trim() && aadhar.trim().length !== 12 ? "Aadhar must be exactly 12 digits." : null;
     const pErr = panCard.trim() && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panCard.trim()) ? "Invalid PAN format." : null;
+    const dErr = !joinDate
+      ? "Join date is required."
+      : endDate && endDate < joinDate
+      ? "End date cannot be earlier than join date."
+      : null;
     setNameError(nErr);
     setMobileError(mErr);
     setAadharError(aErr);
     setPanError(pErr);
-    if (nErr || mErr || aErr || pErr) return;
+    setDateError(dErr);
+    if (nErr || mErr || aErr || pErr || dErr) return;
     run(async () => {
       if (locationId === null) {
         throw new Error("Please choose an assigned workplace location for this employee.");
@@ -79,6 +90,11 @@ function EndUserForm({
         if (email !== editing.email) changes.email = email;
         if (aadhar !== editing.aadhar) changes.aadhar = aadhar;
         if (panCard !== editing.pan_card) changes.pan_card = panCard;
+        if (joinDate !== (editing.join_date ?? "")) changes.join_date = joinDate;
+        if (endDate !== (editing.end_date ?? "")) {
+          if (endDate.trim()) changes.end_date = endDate.trim();
+          else changes.clear_end_date = true;
+        }
         if (locationId !== (editing.location?.id ?? null)) {
           changes.location_id = locationId;
         }
@@ -93,6 +109,8 @@ function EndUserForm({
           aadhar,
           pan_card: panCard,
           location_id: locationId,
+          join_date: joinDate,
+          end_date: endDate.trim() || null,
         });
         onSaved(`${name} added. They can now sign in to the portal with their ${signInWith}.`);
       }
@@ -194,6 +212,76 @@ function EndUserForm({
             Mobile and email are how this person signs in. Changing them signs them out everywhere and sends them a notice.
           </p>
         )}
+        {/* Tenure & Portal Access Period */}
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-indigo-600" />
+              <h4 className="text-xs font-semibold text-slate-800">Tenure & Portal Access Period</h4>
+            </div>
+            {editing?.tenure_status && (
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  editing.tenure_status === "active"
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                    : editing.tenure_status === "expired"
+                    ? "bg-rose-100 text-rose-800 border border-rose-200"
+                    : "bg-amber-100 text-amber-800 border border-amber-200"
+                }`}
+              >
+                Tenure {editing.tenure_status}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field
+              label="Join Date (Required)"
+              hint="Tenure start date. User can sign in to the portal on or after this date."
+              error={dateError}
+            >
+              <input
+                type="date"
+                required
+                className={inputClass}
+                value={joinDate}
+                onChange={(e) => {
+                  setJoinDate(e.target.value);
+                  setDateError(null);
+                }}
+              />
+            </Field>
+            <Field
+              label="End Date (Optional)"
+              hint="Access auto-expires after this date without manual admin action. Leave blank for indefinite tenure."
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setDateError(null);
+                  }}
+                />
+                {endDate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEndDate("");
+                      setDateError(null);
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 px-2.5 py-2 rounded-lg border border-slate-200 bg-white shrink-0"
+                    title="Clear end date to make tenure permanent"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </Field>
+          </div>
+        </div>
+
         <Field label="Assigned Location">
           <LocationPicker value={locationId} onChange={setLocationId} />
         </Field>
@@ -316,6 +404,7 @@ export function EndUsersList() {
               <th className="px-4 py-5 font-semibold">Mobile</th>
               <th className="px-4 py-5 font-semibold">Email</th>
               <th className="px-4 py-5 font-semibold">Location</th>
+              <th className="px-4 py-5 font-semibold">Tenure</th>
               <th className="px-4 py-5 font-semibold">Status</th>
               <th className="px-4 py-5 font-semibold">Last sign-in</th>
               <th className="px-5 py-5">
@@ -329,7 +418,7 @@ export function EndUsersList() {
             ) : !data ? (
               <TableMessage colSpan={8}>The list could not be loaded (see the message above).</TableMessage>
             ) : data.items.length === 0 ? (
-              <TableMessage colSpan={7}>{term ? "Nobody matches." : "No end users in your scope yet."}</TableMessage>
+              <TableMessage colSpan={8}>{term ? "Nobody matches." : "No end users in your scope yet."}</TableMessage>
             ) : (
               data.items.map((row) => (
                 <tr key={row.id} className="hover:bg-slate-50/70">
@@ -341,8 +430,37 @@ export function EndUsersList() {
                   <td className="px-4 py-5 text-slate-600">{row.mobile}</td>
                   <td className="px-4 py-5 text-slate-600">{row.email}</td>
                   <td className="px-4 py-5 text-slate-600">{row.location?.label ?? "—"}</td>
-                  <td className="px-4 py-5">
+                  <td className="px-4 py-5 text-slate-600">
+                    <div className="space-y-1">
+                      {row.tenure_status === "expired" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Expired
+                        </span>
+                      ) : row.tenure_status === "pending" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Upcoming
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Active
+                        </span>
+                      )}
+                      <div className="text-[10px] text-slate-500 leading-tight">
+                        <div>From: <span className="font-mono font-medium text-slate-700">{row.join_date || "—"}</span></div>
+                        <div>To: <span className="font-mono font-medium text-slate-700">{row.end_date || "Permanent"}</span></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-5 space-y-1">
                     <StatusPill active={row.is_active} />
+                    {row.tenure_status === "expired" && (
+                      <span className="block w-fit px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        Tenure Expired
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-5 text-slate-500 whitespace-nowrap">{formatDateTime(row.last_login_at)}</td>
                   <td className="px-5 py-5">

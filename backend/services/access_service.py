@@ -167,3 +167,38 @@ class AccessContext:
         if target.id == self.user.id:
             return False
         return self.is_role_below(target.role) and self.contains_all(scopes_of(target))
+
+
+TENURE_ACTIVE = "active"
+TENURE_EXPIRED = "expired"
+TENURE_PENDING = "pending"
+
+
+def check_user_tenure(user) -> tuple[bool, str | None, str]:
+    """
+    Checks if a staff user or end user is within their active tenure window.
+    Returns (is_allowed, error_detail, tenure_status).
+    tenure_status is one of: 'active', 'expired', 'pending'
+    """
+    if getattr(user, "is_super_admin", False) or getattr(getattr(user, "role", None), "key", None) == SUPER_ADMIN_ROLE_KEY:
+        return True, None, TENURE_ACTIVE
+
+    from utils.security import utcnow
+    today = utcnow().date()
+    join_date = getattr(user, "join_date", None)
+    end_date = getattr(user, "end_date", None)
+
+    if join_date and today < join_date:
+        formatted = join_date.strftime("%d %b %Y")
+        return False, f"Account access is scheduled to begin on {formatted}.", TENURE_PENDING
+
+    if end_date and today > end_date:
+        formatted = end_date.strftime("%d %b %Y")
+        return False, f"Account access expired on {formatted}. Please contact your administrator.", TENURE_EXPIRED
+
+    return True, None, TENURE_ACTIVE
+
+
+def tenure_status_of(user) -> str:
+    _, _, status = check_user_tenure(user)
+    return status

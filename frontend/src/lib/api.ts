@@ -54,6 +54,8 @@ export interface UserScope {
   location: LocationRef | null;
 }
 
+export type TenureStatus = "active" | "expired" | "pending";
+
 export interface StaffUser {
   id: number;
   name: string;
@@ -69,6 +71,9 @@ export interface StaffUser {
   custom_permissions?: UserCustomPermission[];
   scopes: UserScope[];
   is_active: boolean;
+  join_date?: string;
+  end_date?: string | null;
+  tenure_status?: TenureStatus;
   /** Off = skipped by automatic complaint routing (e.g. on leave). */
   is_available: boolean;
   must_change_password: boolean;
@@ -167,6 +172,9 @@ export interface EndUserRow {
   avatar_url?: string | null;
   location: LocationRef | null;
   is_active: boolean;
+  join_date?: string;
+  end_date?: string | null;
+  tenure_status?: TenureStatus;
   created_at: string;
   last_login_at: string | null;
 }
@@ -1376,6 +1384,35 @@ export const api = {
       files.forEach((f) => form.append("files", f));
       return request<ComplaintDetail>(`/complaints/${id(complaintId)}/comments`, { method: "POST", body: form });
     },
+    create: (data: {
+      title: string;
+      description: string;
+      department_id: number;
+      category_id: number;
+      location_id?: number | null;
+      additional_details?: string | null;
+      priority_id?: number | null;
+      priority_reason?: string | null;
+      end_user_id?: number | null;
+      end_user_name?: string | null;
+      end_user_phone?: string | null;
+      files?: File[];
+    }) => {
+      const form = new FormData();
+      form.append("title", data.title);
+      form.append("description", data.description);
+      form.append("department_id", String(data.department_id));
+      form.append("category_id", String(data.category_id));
+      if (data.location_id != null) form.append("location_id", String(data.location_id));
+      if (data.additional_details) form.append("additional_details", data.additional_details);
+      if (data.priority_id != null) form.append("priority_id", String(data.priority_id));
+      if (data.priority_reason) form.append("priority_reason", data.priority_reason);
+      if (data.end_user_id != null) form.append("end_user_id", String(data.end_user_id));
+      if (data.end_user_name) form.append("end_user_name", data.end_user_name);
+      if (data.end_user_phone) form.append("end_user_phone", data.end_user_phone);
+      (data.files ?? []).forEach((f) => form.append("files", f));
+      return request<{ id: string; assignee: string | null }>("/complaints", { method: "POST", body: form });
+    },
     quickCreate: (data: {
       title: string;
       description: string;
@@ -1423,6 +1460,8 @@ export const api = {
       primary_location_id?: number | null;
       scopes?: ScopeInput[];
       custom_permissions?: CustomPermissionInput[];
+      join_date?: string;
+      end_date?: string | null;
     }) => request<StaffUser>("/users/", { method: "POST", body: data }),
     /** Only the fields that are sent change. */
     update: (
@@ -1444,6 +1483,9 @@ export const api = {
         scopes: ScopeInput[];
         custom_permissions: CustomPermissionInput[];
         is_available: boolean;
+        join_date: string;
+        end_date: string | null;
+        clear_end_date: boolean;
       }>,
     ) => request<StaffUser>(`/users/${userId}`, { method: "PATCH", body: data }),
     setActive: (userId: number, active: boolean) =>
@@ -1512,6 +1554,8 @@ export const api = {
       aadhar: string;
       pan_card: string;
       location_id: number | null;
+      join_date?: string;
+      end_date?: string | null;
     }) => request<EndUserRow>("/end-users/", { method: "POST", body: data }),
     update: (
       endUserId: number,
@@ -1525,6 +1569,9 @@ export const api = {
         is_active: boolean;
         aadhar: string;
         pan_card: string;
+        join_date: string;
+        end_date: string | null;
+        clear_end_date: boolean;
       }>,
     ) => request<EndUserRow>(`/end-users/${endUserId}`, { method: "PATCH", body: data }),
     importCsv: (file: File, dryRun: boolean) => uploadCsv("/end-users/import", file, dryRun),

@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Award, Bell, Camera, ChevronDown, KeyRound, LogOut, MapPin, Menu, Search, Shield, User } from "lucide-react";
+import { Award, Bell, Camera, ChevronDown, FileText, KeyRound, LogOut, MapPin, Menu, Search, Shield, User } from "lucide-react";
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT, resolveAvatarUrl } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatDateTime, initials } from "@/lib/format";
@@ -239,6 +239,15 @@ function UserMenu() {
           >
             <User className="w-3.5 h-3.5" /> View Profile
           </Link>
+          {!me.is_super_admin && can("complaint.create") && (
+            <Link
+              href="/complaints?created_by=me"
+              onClick={() => setMenuOpen(false)}
+              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer text-left"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-600" /> My Raised Complaints
+            </Link>
+          )}
           <button
             onClick={() => {
               setAvatarOpen(true);
@@ -272,9 +281,7 @@ function UserMenu() {
 }
 
 export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
-  const router = useRouter();
   const { me, can } = useSession();
-  const [search, setSearch] = useState("");
   const scopeSummary = me.is_super_admin
     ? "Entire system"
     : me.scopes.length === 1

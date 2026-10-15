@@ -78,8 +78,12 @@ def _holders(db: Session, permission: str):
 
 
 def _candidates(db: Session, users: list[User], complaint: Complaint) -> list[Candidate]:
+    from services.access_service import check_user_tenure
     matched = []
     for user in users:
+        allowed, _, _ = check_user_tenure(user)
+        if not allowed:
+            continue
         score = scope_specificity(scopes_of(user), complaint.department_id, complaint.location.path)
         if score is not None:
             matched.append((user, score))
@@ -202,8 +206,11 @@ def auto_route(db: Session, complaint: Complaint, actor: User | None = None, at:
 
 
 def still_handles(user: User, complaint: Complaint) -> bool:
+    from services.access_service import check_user_tenure
+    allowed, _, _ = check_user_tenure(user)
     return (
         user.is_active
+        and allowed
         and any(p.key == RESPOND_PERMISSION for p in user.role.permissions)
         and sla_service.covers(user, complaint)
     )

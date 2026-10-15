@@ -20,7 +20,7 @@ from models import (
 from services.permission_catalog import PERMISSIONS, SUPER_ADMIN_ROLE_KEY, SYSTEM_ROLES
 from services.reward_service import get_reward_settings, list_perks
 from services.settings_service import SETTINGS_ID
-from utils.security import hash_password
+from utils.security import hash_password, utcnow
 
 
 DEFAULT_SYSTEM_SETTINGS = {
@@ -203,6 +203,7 @@ def sync_system_data(db: Session) -> list[str]:
                     password_hash=hash_password(admin_password),
                     must_change_password=False,
                     is_active=True,
+                    join_date=utcnow().date(),
                     scopes=[],
                 ))
                 changes.append(f"created initial Super Admin account ({admin_email})")

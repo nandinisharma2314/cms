@@ -27,7 +27,8 @@ function HomeSolid({ className }: { className?: string; strokeWidth?: number }) 
 export function AdminMobileBottomNav() {
   const pathname = usePathname();
   const { me, can } = useSession();
-  const canCreate = can("complaint.create");
+  const isNewComplaint = pathname === "/complaints/new";
+  const canCreate = !me?.is_super_admin && can("complaint.create") && !isNewComplaint;
 
   const leftItems: NavItem[] = [
     { name: "Home", icon: Home, activeIcon: HomeSolid, href: "/", exact: true },
@@ -67,7 +68,7 @@ export function AdminMobileBottomNav() {
   };
 
   return (
-    <nav className="md:hidden fixed inset-x-0 bottom-0 z-50">
+    <nav className="md:hidden fixed inset-x-0 bottom-0 z-40">
       <div className="relative flex h-[76px] items-stretch rounded-t-[28px] bg-white px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_-14px_rgba(15,23,42,0.25)]">
         {leftItems.map(renderItem)}
         {canCreate && <div className="w-[72px] shrink-0" />}

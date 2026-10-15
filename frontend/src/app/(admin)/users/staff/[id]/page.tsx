@@ -105,9 +105,42 @@ export default function MemberProfilePage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between border-b border-slate-100 pb-2">
                   <span className="text-slate-500">Status</span>
-                  <span className={`font-semibold ${user.is_available ? "text-emerald-600" : "text-amber-600"}`}>
-                    {user.is_available ? "Available" : "On Leave"}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`font-semibold ${user.is_available ? "text-emerald-600" : "text-amber-600"}`}>
+                      {user.is_available ? "Available" : "On Leave"}
+                    </span>
+                    {!user.is_active && (
+                      <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">
+                        Deactivated
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2 items-center">
+                  <span className="text-slate-500">Tenure Access</span>
+                  <span
+                    className={`font-semibold text-[11px] px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                      user.tenure_status === "expired"
+                        ? "bg-rose-100 text-rose-800 border border-rose-200"
+                        : user.tenure_status === "pending"
+                        ? "bg-amber-100 text-amber-800 border border-amber-200"
+                        : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                    }`}
+                  >
+                    {user.tenure_status === "expired"
+                      ? "Access Expired"
+                      : user.tenure_status === "pending"
+                      ? "Access Pending"
+                      : "Access Active"}
                   </span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Join Date</span>
+                  <span className="text-slate-800 font-medium font-mono">{user.join_date || new Date(user.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">End Date</span>
+                  <span className="text-slate-800 font-medium font-mono">{user.end_date || "Permanent (Ongoing)"}</span>
                 </div>
                 <div className="flex justify-between border-b border-slate-100 pb-2">
                   <span className="text-slate-500">Department</span>
@@ -122,7 +155,7 @@ export default function MemberProfilePage() {
                   <span className="text-slate-800 font-medium">{user.mobile || "—"}</span>
                 </div>
                 <div className="flex justify-between pb-1">
-                  <span className="text-slate-500">Joined</span>
+                  <span className="text-slate-500">Account Created</span>
                   <span className="text-slate-800 font-medium">{new Date(user.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
