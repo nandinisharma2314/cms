@@ -31,7 +31,11 @@ def serialize_users(db: Session, users: list[User], ctx: AccessContext | None = 
             "reward_points_balance": getattr(u, "reward_points_balance", 0) or 0,
             "lifetime_reward_points": getattr(u, "lifetime_reward_points", 0) or 0,
             "role": serialize_role(u.role),
-            "reports_to": {"id": u.reports_to.id, "name": u.reports_to.name} if u.reports_to else None,
+            "reports_to": (
+                {"id": u.reports_to.id, "name": u.reports_to.name, "designation": u.reports_to.role.name}
+                if u.reports_to
+                else None
+            ),
             "primary_department": (
                 {"id": u.primary_department.id, "name": u.primary_department.name}
                 if u.primary_department

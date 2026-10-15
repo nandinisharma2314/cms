@@ -11,7 +11,7 @@ const geistSans = Geist({
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${geistSans.variable} font-sans flex min-h-full flex-col`}>
+    <div className={`${geistSans.variable} font-sans flex h-[100dvh] flex-col overflow-hidden`}>
       <ConfigProvider>{children}</ConfigProvider>
     </div>
   );

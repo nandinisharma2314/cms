@@ -53,8 +53,8 @@ function LogoUpload({ initialLogoUrl, onUpload }: { initialLogoUrl: string | nul
               try {
                 await api.settings.uploadLogo(file);
                 onUpload();
-              } catch (err: any) {
-                setError(err.message);
+              } catch (err: unknown) {
+                setError((err as Error).message);
               } finally {
                 setUploading(false);
               }

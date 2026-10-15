@@ -117,7 +117,6 @@ def save_attachments(
                                 f"{upload.filename}: file type not allowed (allowed: {', '.join(allowed)})")
 
     from services import storage_service
-    from fastapi.responses import RedirectResponse, Response
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     rows = []

@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -155,9 +154,10 @@ export function StaffMobileDashboard() {
           <div className="mt-1 flex flex-col items-start gap-0.5 text-[12px]">
             <span className="font-semibold text-blue-600">{me.role.name}</span>
             {scopeText && <span className="text-slate-400 text-[11px] truncate">{scopeText}</span>}
-            
             {me.reports_to && (
-              <span className="text-amber-500 font-medium">Reports to: {me.reports_to.name}</span>
+              <span className="text-amber-500 font-medium">
+                {me.reports_to.designation || "Reports to"}: {me.reports_to.name}
+              </span>
             )}
           </div>
         </div>
@@ -176,7 +176,6 @@ export function StaffMobileDashboard() {
             <span className={`h-2 w-2 rounded-full ${me.is_available ? "bg-emerald-500" : "bg-slate-400"}`} />
             {me.is_available ? "Available" : "Off duty"}
           </button>
-         
         </div>
       </div>
 
@@ -285,9 +284,7 @@ export function StaffMobileDashboard() {
             ))}
           </ul>
         ) : !complaints || complaints.length === 0 ? (
-          <p className="py-7 text-center text-[13px] text-slate-500">
-            No active complaints in your queue.
-          </p>
+          <p className="py-7 text-center text-[13px] text-slate-500">No active complaints in your queue.</p>
         ) : (
           <ul>
             {complaints.map((c) => (

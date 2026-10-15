@@ -229,6 +229,10 @@ class User(Base):
     scopes = relationship("UserScope", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
     custom_permissions = relationship("UserPermission", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
 
+    @property
+    def is_super_admin(self) -> bool:
+        return bool(self.role and getattr(self.role, "key", None) == "super_admin")
+
     def __repr__(self):
         return f"<User {self.email}>"
 

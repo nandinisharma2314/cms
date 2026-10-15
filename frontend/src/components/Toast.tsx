@@ -119,9 +119,7 @@ export function ToastContainer() {
           >
             <X className="w-3.5 h-3.5" />
           </button>
-          <div
-            className={`absolute bottom-0 left-0 right-0 h-0.5 ${PROGRESS_COLORS[t.type]} animate-pulse`}
-          />
+          <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${PROGRESS_COLORS[t.type]} animate-pulse`} />
         </div>
       ))}
     </div>

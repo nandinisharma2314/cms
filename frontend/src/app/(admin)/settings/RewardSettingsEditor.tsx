@@ -2,25 +2,9 @@
 
 import React, { useState } from "react";
 import { Award, Plus, Shield, Sparkles, Target, Trash2, Trophy } from "lucide-react";
-import {
-  api,
-  BadgeTier,
-  ChampionshipConfig,
-  QuestConfig,
-  QuestMetric,
-  RewardSettings,
-  RoleDetail,
-} from "@/lib/api";
+import { api, BadgeTier, ChampionshipConfig, QuestConfig, QuestMetric, RewardSettings, RoleDetail } from "@/lib/api";
 import { useAction, useApiData } from "@/lib/hooks";
-import {
-  Card,
-  ErrorBanner,
-  Field,
-  inputClass,
-  Notice,
-  primaryButtonClass,
-  Spinner,
-} from "@/components/ui";
+import { Card, ErrorBanner, Field, inputClass, Notice, primaryButtonClass, Spinner } from "@/components/ui";
 
 const DEFAULT_PRIORITIES = [
   { key: "critical", label: "Critical" },
@@ -216,9 +200,7 @@ function RewardSettingsForm({
             checked={form.is_enabled}
             onChange={(e) => setForm({ ...form, is_enabled: e.target.checked })}
           />
-          <span className="text-xs font-bold text-slate-700">
-            {form.is_enabled ? "Rewards Active" : "Rewards Disabled"}
-          </span>
+          <span className="text-xs font-bold text-slate-700">{form.is_enabled ? "Rewards Active" : "Rewards Disabled"}</span>
         </label>
       </div>
 
@@ -612,9 +594,7 @@ function RewardSettingsForm({
                 <Trophy className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Inter-Department Championship Cup
-                </h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Inter-Department Championship Cup</h3>
                 <p className="text-[11px] text-slate-500">
                   Configure cup title, seasonal label, trophies, and tournament active status.
                 </p>
@@ -684,7 +664,9 @@ function RewardSettingsForm({
                       type="text"
                       maxLength={4}
                       className={`${inputClass} text-center text-lg font-bold p-1`}
-                      value={currentChampionship.trophies?.[idx] || (idx === 0 ? "🏆" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "🏅")}
+                      value={
+                        currentChampionship.trophies?.[idx] || (idx === 0 ? "🏆" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "🏅")
+                      }
                       onChange={(e) => updateChampTrophy(idx, e.target.value)}
                     />
                   </div>

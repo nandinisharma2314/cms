@@ -1,8 +1,6 @@
 """Tests for the Rewards & Recognition system."""
-from conftest import ADMIN, ELEC_AGENT, ELEC_MANAGER, ELEC_SUPERVISOR, SUPER_ADMIN
-from database import SessionLocal
-from models import Complaint, Priority, RewardSettings, RewardTransaction, User
-from test_workflow import act, file_complaint, items
+from conftest import ELEC_AGENT, SUPER_ADMIN
+from test_workflow import act, file_complaint
 
 
 def test_reward_settings_crud(client, login):

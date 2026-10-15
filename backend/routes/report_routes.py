@@ -64,9 +64,11 @@ def _table(name: str, rows: list[dict], format: str | None, extra_columns: list[
 
 
 @router.get("/agents")
-def agents(format: str | None = None, scope=Depends(report_filters)):
+def agents(format: str | None = None, all_users: bool = False, scope=Depends(report_filters)):
     ctx, filters = scope
-    rows = analytics_service.by_agent(ctx.db, analytics_service.load_rows(ctx, filters))
+    rows = analytics_service.by_agent(
+        ctx.db, analytics_service.load_rows(ctx, filters), all_users=all_users, ctx=ctx, filters=filters
+    )
     return _table("staff", rows, format, [("role", "Role")])
 
 

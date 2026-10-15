@@ -65,7 +65,7 @@ export interface StaffUser {
   pan_card?: string | null;
   avatar_url?: string | null;
   role: RoleRef;
-  reports_to: { id: number; name: string } | null;
+  reports_to: { id: number; name: string; designation?: string } | null;
   primary_department?: { id: number; name: string } | null;
   primary_location?: LocationRef | null;
   custom_permissions?: UserCustomPermission[];
@@ -594,13 +594,7 @@ export interface PerformanceRow {
 }
 
 export type QuestMetric =
-  | "speed_bonus"
-  | "five_star"
-  | "four_star"
-  | "on_time"
-  | "zero_reopen"
-  | "total_resolved"
-  | "total_points";
+  "speed_bonus" | "five_star" | "four_star" | "on_time" | "zero_reopen" | "total_resolved" | "total_points";
 
 export interface QuestConfig {
   id: string;
@@ -678,6 +672,7 @@ export type ReportQuery = {
   department_id?: number;
   location_id?: number;
   priority_id?: number;
+  all_users?: boolean;
 };
 
 export type AuditQuery = {
@@ -1772,10 +1767,7 @@ export const api = {
         { method: "PUT", body: data },
       ),
     backfill: () =>
-      request<{ complaints_scanned: number; transactions_created: number }>(
-        "/rewards/admin/backfill",
-        { method: "POST" },
-      ),
+      request<{ complaints_scanned: number; transactions_created: number }>("/rewards/admin/backfill", { method: "POST" }),
     listQuests: () => request<RewardQuest[]>("/rewards/quests"),
     getQuestsConfig: () => request<QuestConfig[]>("/rewards/quests/config"),
     createQuest: (data: Omit<QuestConfig, "id"> & { id?: string }) =>

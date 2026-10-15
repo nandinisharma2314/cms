@@ -2,12 +2,12 @@ import csv
 import io
 import json
 from datetime import datetime, timedelta
-from typing import Any, Iterable
+from typing import Any
 
 from fastapi import HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from models import (
     Complaint, Department, Location, Priority, Role, User, UserScope, ComplaintEvent,
@@ -787,7 +787,7 @@ def _apply_reward_filters(
         loc = db.get(Location, location_id)
         if loc:
             descendant_ids = [
-                l.id for l in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
+                loc_record.id for loc_record in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
             ]
             scoped_user_ids = [
                 r[0]
@@ -1047,7 +1047,7 @@ def get_leaderboard(
         loc = db.get(Location, location_id)
         if loc:
             descendant_ids = [
-                l.id for l in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
+                loc_record.id for loc_record in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
             ]
 
     query = (
@@ -1248,7 +1248,7 @@ def list_perks(db: Session, include_inactive: bool = False) -> list[dict[str, An
     seed_default_perks_if_empty(db)
     query = db.query(RewardPerk)
     if not include_inactive:
-        query = query.filter(RewardPerk.is_active == True)
+        query = query.filter(RewardPerk.is_active)
     perks = query.order_by(RewardPerk.points_cost.asc()).all()
     return [
         {
@@ -1372,7 +1372,7 @@ def redeem_perk(
 
     now = utcnow()
     desc = f"Redeemed perk: {perk.title}"
-    tx = _apply_reward_transaction(
+    _apply_reward_transaction(
         db,
         user,
         REWARD_RULE_PERK_REDEMPTION,
@@ -1719,7 +1719,7 @@ def get_department_leaderboard(
         loc = db.get(Location, location_id)
         if loc:
             descendant_ids = [
-                l.id for l in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
+                loc_record.id for loc_record in db.query(Location.id).filter(Location.path.startswith(loc.path)).all()
             ]
 
     departments = db.query(Department).all()

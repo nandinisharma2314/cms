@@ -51,9 +51,7 @@ export function SystemHealthPill() {
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <h4 className="text-xs font-extrabold text-slate-900">Infrastructure Health</h4>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-              100% Uptime
-            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">100% Uptime</span>
           </div>
 
           <div className="space-y-2.5 text-xs">

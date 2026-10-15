@@ -1,4 +1,4 @@
-from conftest import CLIENT_HEADERS, ELEC_AGENT, SUPER_ADMIN, new_client
+from conftest import CLIENT_HEADERS, ELEC_AGENT, new_client
 from test_portal_and_imports import JPEG, request_otp
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64

@@ -88,9 +88,7 @@ function PotentialDuplicatesPanel({ complaintId }: { complaintId: string | numbe
     <Card className="p-4 rounded-2xl border-amber-200 bg-amber-50/50 space-y-2.5 shadow-2xs">
       <div className="flex items-center gap-2 text-amber-900">
         <span className="text-base">⚠️</span>
-        <h3 className="text-xs font-bold uppercase tracking-wider">
-          Potential Duplicate Tickets Detected ({duplicates.length})
-        </h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider">Potential Duplicate Tickets Detected ({duplicates.length})</h3>
       </div>
       <p className="text-[11px] text-slate-600 leading-relaxed">
         Similar open complaints exist in this department. Review before dispatching duplicate staff:
@@ -147,12 +145,14 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
         value={pending?.key ?? ""}
         onChange={(e) => {
           setError(null);
-          setPending(e.target.value ? detail.actions.find(a => a.key === e.target.value)! : null);
+          setPending(e.target.value ? detail.actions.find((a) => a.key === e.target.value)! : null);
         }}
       >
         <option value="">Select a workflow action...</option>
         {detail.actions.map((action) => (
-          <option key={action.key} value={action.key}>{action.label}</option>
+          <option key={action.key} value={action.key}>
+            {action.label}
+          </option>
         ))}
       </select>
       {pending && (
@@ -240,8 +240,12 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
 
   if (!open) {
     return (
-      <button className={`${secondaryButtonClass} w-full flex items-center justify-center whitespace-normal text-center h-auto`} onClick={() => setOpen(true)}>
-        <PencilLine className="w-3.5 h-3.5 shrink-0" /> <span className="flex-1">Change department, category, location or priority</span>
+      <button
+        className={`${secondaryButtonClass} w-full flex items-center justify-center whitespace-normal text-center h-auto`}
+        onClick={() => setOpen(true)}
+      >
+        <PencilLine className="w-3.5 h-3.5 shrink-0" />{" "}
+        <span className="flex-1">Change department, category, location or priority</span>
       </button>
     );
   }
@@ -712,22 +716,13 @@ function ComplaintView() {
       {error && <ErrorBanner message={error} />}
 
       <div className="flex gap-2 mt-5 mb-5 overflow-x-auto pb-1">
-        <button
-          className={tabClass(activeTab === "details")}
-          onClick={() => setActiveTab("details")}
-        >
+        <button className={tabClass(activeTab === "details")} onClick={() => setActiveTab("details")}>
           Details
         </button>
-        <button
-          className={tabClass(activeTab === "actions")}
-          onClick={() => setActiveTab("actions")}
-        >
+        <button className={tabClass(activeTab === "actions")} onClick={() => setActiveTab("actions")}>
           Actions & Timeline
         </button>
-        <button
-          className={tabClass(activeTab === "conversation")}
-          onClick={() => setActiveTab("conversation")}
-        >
+        <button className={tabClass(activeTab === "conversation")} onClick={() => setActiveTab("conversation")}>
           Conversation
         </button>
       </div>
@@ -737,7 +732,9 @@ function ComplaintView() {
           <div className="lg:col-span-8 space-y-5">
             <Card className="p-5 space-y-2">
               <p className="text-lg font-bold text-slate-700 leading-relaxed whitespace-pre-wrap wrap-break-word">
-                {(me.is_super_admin || me.role.key === "admin") ? detail.description : detail.description.replace(/^Reported by .*?:\s*/i, "")}
+                {me.is_super_admin || me.role.key === "admin"
+                  ? detail.description
+                  : detail.description.replace(/^Reported by .*?:\s*/i, "")}
               </p>
               {detail.additional_details && <p className="text-xs text-slate-500">{detail.additional_details}</p>}
               <AttachmentLinks attachments={detail.attachments.filter((a) => a.comment_id === null)} />
@@ -749,9 +746,7 @@ function ComplaintView() {
               )}
             </Card>
 
-            {detail.status !== "CLOSED" && detail.status !== "RESOLVED" && (
-              <PotentialDuplicatesPanel complaintId={detail.id} />
-            )}
+            {detail.status !== "CLOSED" && detail.status !== "RESOLVED" && <PotentialDuplicatesPanel complaintId={detail.id} />}
           </div>
 
           <div className="lg:col-span-4 space-y-5">
@@ -764,9 +759,7 @@ function ComplaintView() {
                     <div className="text-[12px] leading-relaxed text-slate-600">
                       {detail.location_detail.label.split(" > ").map((part, index, array) => (
                         <React.Fragment key={index}>
-                          <span className={index === array.length - 1 ? "font-bold text-slate-800" : ""}>
-                            {part}
-                          </span>
+                          <span className={index === array.length - 1 ? "font-bold text-slate-800" : ""}>{part}</span>
                           {index < array.length - 1 && <span className="mx-1.5 text-slate-300">›</span>}
                         </React.Fragment>
                       ))}
@@ -825,9 +818,9 @@ function ComplaintView() {
         <div className="space-y-5 max-w-full">
           <Card className="p-5 space-y-4 max-w-full">
             <h2 className="text-sm font-bold text-slate-800">Actions</h2>
-            
+
             <ActionsPanel detail={detail} onUpdate={setData} />
-            
+
             {detail.can_reclassify && (
               <ReclassifyPanel
                 key={`${detail.department_id}-${detail.category_id}-${detail.location_detail.id}-${detail.priority.id}`}
@@ -835,10 +828,10 @@ function ComplaintView() {
                 onUpdate={setData}
               />
             )}
-            
+
             <RejectionPanel detail={detail} onUpdate={setData} />
           </Card>
-          
+
           <Card className="p-5">
             <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
               <History className="w-4 h-4 text-slate-400" aria-hidden="true" /> Timeline

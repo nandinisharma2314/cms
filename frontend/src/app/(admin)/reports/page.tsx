@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Download, LineChart, Table2, X } from "lucide-react";
+import { Download, LineChart, Table2, Users, X } from "lucide-react";
 import { api, ReportMetrics, ReportQuery } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatDay, formatHours, isoDay } from "@/lib/format";
@@ -162,6 +162,7 @@ function Reports() {
   const [showTable, setShowTable] = useState(false);
   const [printStaffId, setPrintStaffId] = useState<number | null>(null);
   const [printAllStaff] = useState(false);
+  const [allUsers, setAllUsers] = useState(false);
   const [locationId, setLocationId] = useState<number | null>(null);
   const [selectedStaffIds, setSelectedStaffIds] = useState<number[]>([]);
   const [bulkZipIds, setBulkZipIds] = useState<number[] | null>(null);
@@ -205,10 +206,14 @@ function Reports() {
   // Group by the level immediately below the selected location (or level 1, usually State, by default).
   const targetDepth = Math.max(1, currentDepth);
   const activeLevel = levels.find((l) => l.depth === targetDepth)?.key ?? levels[levels.length - 1]?.key ?? null;
-  const tableQuery = tab === "locations" && activeLevel ? { ...query, level: activeLevel } : query;
+  const tableQuery = {
+    ...query,
+    ...(tab === "locations" && activeLevel ? { level: activeLevel } : {}),
+    ...(tab === "agents" && allUsers ? { all_users: true } : {}),
+  };
   const table = useApiData(
     () => (tab === "locations" && !activeLevel ? Promise.resolve([]) : api.reports.table(tab, tableQuery)),
-    [...deps, tab, activeLevel],
+    [...deps, tab, activeLevel, allUsers],
   );
   const canListDepartments = can("department.view");
   const { data: departments = [] } = useApiData(
@@ -422,6 +427,28 @@ function Reports() {
           ))}
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* All Users Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (tab !== "agents") setTab("agents");
+                setAllUsers((prev) => !prev);
+              }}
+              className={`${secondaryButtonClass} !px-2.5 sm:!px-3 transition-colors ${
+                allUsers && tab === "agents"
+                  ? "!bg-blue-600 !text-white !border-blue-600 font-semibold shadow-xs hover:!bg-blue-700"
+                  : ""
+              }`}
+              title={
+                allUsers && tab === "agents"
+                  ? "Showing whole members (all staff). Click to switch to active complaint handlers only."
+                  : "Show whole members / all staff in reports"
+              }
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>{allUsers && tab === "agents" ? "All Users (Active)" : "All Users"}</span>
+            </button>
+
             {/* Bulk PDF Button for all tabs */}
             <button
               onClick={handleBulkPdfZip}
@@ -502,6 +529,7 @@ function Reports() {
             onPrintStaffId={handlePrintStaff}
             selectedRowIds={selectedStaffIds}
             onSelectionChange={setSelectedStaffIds}
+            onShowAllUsers={tab === "agents" && !allUsers ? () => setAllUsers(true) : undefined}
           />
         ) : (
           !table.error && <Spinner />

@@ -9,6 +9,9 @@ ignore = [
     "B008",   # FastAPI dependencies are declared as default arguments
     "SIM108", # if/else blocks are sometimes clearer than a ternary
     "UP017",  # timezone.utc reads fine and matches the rest of the code
+    "E501",   # Ignore line length
+    "E402",   # Module level import not at top of file
+    "B904",   # Within an except clause, raise exceptions with from err
 ]
 
 [tool.pytest.ini_options]

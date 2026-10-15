@@ -2,12 +2,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
-from database import get_db
 from services import reward_service
 from services.access_service import AccessContext
-from utils.auth_middleware import get_access_context, require_permission
+from utils.auth_middleware import require_permission
 
 router = APIRouter(prefix="/rewards", tags=["rewards"])
 
@@ -267,7 +265,7 @@ def list_redemptions(
     ctx: AccessContext = Depends(require_permission("rewards.view")),
 ):
     filter_user_id = user_id
-    if not ctx.has("rewards.manage") and not ctx.user.is_super_admin:
+    if not ctx.has("rewards.manage") and not ctx.is_super_admin:
         filter_user_id = ctx.user.id
 
     return reward_service.list_redemptions(

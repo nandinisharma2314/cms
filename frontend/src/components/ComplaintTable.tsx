@@ -228,10 +228,7 @@ export function ComplaintTable({
           complaints.map((item) => {
             const isSelected = selectedIds.includes(item.id);
             return (
-              <li
-                key={item.id}
-                className={`transition-colors ${isSelected ? "bg-blue-50/60" : "hover:bg-slate-50"}`}
-              >
+              <li key={item.id} className={`transition-colors ${isSelected ? "bg-blue-50/60" : "hover:bg-slate-50"}`}>
                 <div className="px-4 py-3 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -329,10 +326,7 @@ export function ComplaintTable({
                     onClick={() => router.push(href)}
                   >
                     {allowBulk && (
-                      <td
-                        className="py-3 pl-5 pr-2 w-10 align-top"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <td className="py-3 pl-5 pr-2 w-10 align-top" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -343,9 +337,7 @@ export function ComplaintTable({
                       </td>
                     )}
                     <td
-                      className={`py-3 ${
-                        !allowBulk ? "pl-5" : ""
-                      } px-2 font-mono text-[11px] text-slate-600 whitespace-nowrap`}
+                      className={`py-3 ${!allowBulk ? "pl-5" : ""} px-2 font-mono text-[11px] text-slate-600 whitespace-nowrap`}
                     >
                       <Link href={href} onClick={(e) => e.stopPropagation()} className="hover:text-blue-600 font-semibold">
                         {item.id}
@@ -389,9 +381,7 @@ export function ComplaintTable({
                       )}
                     </td>
                     {!compact && (
-                      <td className="py-3 pr-5 text-right text-slate-500 whitespace-nowrap">
-                        {formatDateTime(item.created_at)}
-                      </td>
+                      <td className="py-3 pr-5 text-right text-slate-500 whitespace-nowrap">{formatDateTime(item.created_at)}</td>
                     )}
                   </tr>
                 );

@@ -68,7 +68,7 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col items-center overflow-y-auto bg-white p-0 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
+    <div className="flex flex-col items-center md:flex-1 md:min-h-0 md:overflow-y-auto bg-white p-0 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
       <div className="flex w-full max-w-5xl flex-col overflow-hidden bg-white md:rounded-b-3xl md:border-x md:border-b md:border-slate-100 md:shadow-sm mb-2 md:mb-20">
         <div className="overflow-hidden bg-white">
           <div className="flex items-center justify-between border-b border-slate-100 px-4">
