@@ -26,6 +26,7 @@ import { useEndUser } from "@/lib/portalSession";
 import { validatePhone } from "@/lib/validate";
 import { SupportContacts } from "@/components/portal/Brand/SupportContacts";
 import { Dialog } from "@/components/portal/ui/Dialog";
+import { useI18n } from "@/lib/i18n";
 
 type Tab = "personal" | "contact" | "notifications" | "help";
 
@@ -253,7 +254,8 @@ function ContactChangeDialog({
 }
 
 export default function ProfilePage() {
-  useDocumentTitle("My profile");
+  const { t } = useI18n();
+  useDocumentTitle(t("My profile"));
   const { profile, setProfile, can, logout } = useEndUser();
   const { limits, notifications, otp } = useConfig();
   const canEdit = can("portal.profile.update");
@@ -413,30 +415,30 @@ export default function ProfilePage() {
                 onClick={logout}
                 className="hidden shrink-0 items-center gap-2 rounded-xl bg-red-50 px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-100 md:flex"
               >
-                <LogOut size={14} /> Sign out
+                <LogOut size={14} /> {t("Sign out")}
               </button>
             </div>
           </div>
           <div className="border-t border-slate-100 bg-slate-50/50 px-0 sm:px-8">
             <div className="flex items-center gap-1 relative overflow-x-auto px-2 md:gap-2 md:px-0" role="tablist">
-              {tabs.map((t) => (
+              {tabs.map((tabItem) => (
                 <button
-                  key={t.id}
+                  key={tabItem.id}
                   type="button"
                   role="tab"
-                  aria-selected={tab === t.id}
+                  aria-selected={tab === tabItem.id}
                   onClick={() => {
-                    setTab(t.id);
+                    setTab(tabItem.id);
                     setMessage(null);
                   }}
                   className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-bold transition-all md:px-4 md:py-3.5 md:text-sm ${
-                    tab === t.id
+                    tab === tabItem.id
                       ? "border-blue-600 bg-white text-blue-700"
                       : "border-transparent text-slate-500 hover:bg-slate-100/50 hover:text-slate-800"
                   }`}
                 >
-                  <span className={tab === t.id ? "text-blue-600" : "text-slate-400"}>{t.icon}</span>
-                  {t.label}
+                  <span className={tab === tabItem.id ? "text-blue-600" : "text-slate-400"}>{tabItem.icon}</span>
+                  {t(tabItem.label)}
                 </button>
               ))}
             </div>

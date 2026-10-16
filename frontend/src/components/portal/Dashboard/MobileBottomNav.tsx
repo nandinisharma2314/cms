@@ -7,6 +7,7 @@ import { Bell, FileText, Home, Plus, Users } from "lucide-react";
 import { api, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/portalApi";
 import { useConfig } from "@/lib/portalConfig";
 import { useEndUser } from "@/lib/portalSession";
+import { useI18n } from "@/lib/i18n";
 
 type NavIcon = React.ComponentType<{ className?: string; strokeWidth?: number }>;
 
@@ -40,6 +41,7 @@ const RIGHT_ITEMS: NavItem[] = [
 /** Bottom tab bar on phones; the tabs follow the URL. */
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
   const canCreate = useEndUser().can("portal.complaint.create");
   const { ui } = useConfig();
   const [hasUnread, setHasUnread] = useState(false);
@@ -76,7 +78,7 @@ export default function MobileBottomNav() {
           )}
         </span>
         <span className={`whitespace-nowrap text-[11.5px] leading-none ${isActive ? "font-semibold" : "font-medium"}`}>
-          {item.name}
+          {t(item.name)}
         </span>
         <span className={`absolute bottom-2 h-[3px] w-11 rounded-full bg-blue-600 ${isActive ? "" : "invisible"}`} />
       </Link>
@@ -93,7 +95,7 @@ export default function MobileBottomNav() {
         {canCreate && (
           <Link
             href="/dashboard/register"
-            aria-label="Register a complaint"
+            aria-label={t("Register complaint")}
             className="absolute left-1/2 -top-7 flex h-[60px] w-[60px] -translate-x-1/2 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-[6px] ring-slate-50 transition-transform active:scale-95"
           >
             <Plus className="h-7 w-7" strokeWidth={2.6} />

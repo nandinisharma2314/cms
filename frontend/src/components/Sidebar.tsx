@@ -12,6 +12,7 @@ import {
   Building2,
   ChevronLeft,
   FileText,
+  Globe,
   Headphones,
   History,
   Home,
@@ -28,6 +29,7 @@ import {
 } from "lucide-react";
 import { useConfig } from "@/lib/config";
 import { useSession } from "@/lib/session";
+import { useI18n } from "@/lib/i18n";
 import { BrandMark } from "./BrandMark";
 
 interface NavItem {
@@ -50,7 +52,7 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["complaint.create"],
     hideSuperAdmin: true,
   },
-  { href: "/escalated", label: "Escalated to me", icon: ArrowUpCircle, anyOf: ["complaint.assign"] },
+  { href: "/escalated", label: "Delayed Complaints", icon: ArrowUpCircle, anyOf: ["complaint.assign"] },
   {
     href: "/rejection-requests",
     label: "Rejection requests",
@@ -170,6 +172,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const { me, canAny } = useSession();
+  const { currentLanguage, openLanguageModal } = useI18n();
   const search = React.useSyncExternalStore(
     (callback) => {
       window.addEventListener("popstate", callback);
@@ -240,6 +243,26 @@ export function Sidebar({
             return <SidebarItem key={item.href} item={item} active={active} narrow={narrow} />;
           })}
         </nav>
+
+        <div className="px-3.5 py-1">
+          <button
+            onClick={openLanguageModal}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1b284e] transition-colors cursor-pointer ${
+              narrow ? "justify-center" : "justify-between"
+            }`}
+            title="Switch Language / भाषा बदलें"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Globe className="w-4 h-4 text-sky-400 shrink-0" />
+              {!narrow && <span className="truncate">Language</span>}
+            </span>
+            {!narrow && (
+              <span className="text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-400/30 px-2 py-0.5 rounded-md truncate max-w-24 shrink-0">
+                {currentLanguage.nativeName}
+              </span>
+            )}
+          </button>
+        </div>
 
         <SupportCard collapsed={narrow} />
       </aside>

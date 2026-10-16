@@ -6,6 +6,7 @@ import { Bell, CheckCheck, CheckCircle2, Clock, FileText, MessageSquare, UserCog
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/portalApi";
 import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
 import { formatWhen } from "@/lib/portalFormat";
+import { useI18n } from "@/lib/i18n";
 
 /** Icon per notification kind (the kinds the API sends to end users). */
 const KIND_STYLE: Record<string, { icon: React.ElementType; className: string }> = {
@@ -16,7 +17,8 @@ const KIND_STYLE: Record<string, { icon: React.ElementType; className: string }>
 const OTHER_STYLE = { icon: FileText, className: "bg-indigo-50 text-indigo-600" };
 
 export default function NotificationsPage() {
-  useDocumentTitle("Notifications");
+  const { t } = useI18n();
+  useDocumentTitle(t("Notifications"));
   const router = useRouter();
   const { ui } = useConfig();
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -89,7 +91,7 @@ export default function NotificationsPage() {
                       : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
-                  {value ? `Unread (${unread})` : "All"}
+                  {value ? `${t("Unread")} (${unread})` : t("All")}
                 </button>
               ))}
             </div>
@@ -101,7 +103,7 @@ export default function NotificationsPage() {
                 className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] sm:text-[12px] font-bold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-xs transition-colors shrink-0"
               >
                 <CheckCheck size={14} className="text-blue-600" />
-                <span>Mark all read</span>
+                <span>{t("Mark all read")}</span>
               </button>
             )}
           </div>
@@ -128,8 +130,8 @@ export default function NotificationsPage() {
                 <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-none bg-blue-50 text-blue-500">
                   <Bell size={26} />
                 </span>
-                <p className="text-[14px] font-bold text-slate-800">You&apos;re all caught up</p>
-                <p className="mt-1 max-w-sm text-[13px] text-slate-400">New updates about your complaints will appear here.</p>
+                <p className="text-[14px] font-bold text-slate-800">{t("You're all caught up")}</p>
+                <p className="mt-1 max-w-sm text-[13px] text-slate-400">{t("New updates about your complaints will appear here.")}</p>
               </li>
             ) : (
               items.map((item) => {

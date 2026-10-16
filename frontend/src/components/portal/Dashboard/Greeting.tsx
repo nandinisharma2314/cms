@@ -6,6 +6,7 @@ import { User, Plus } from "lucide-react";
 import { currentHour } from "@/lib/portalFormat";
 import { resolveAvatarUrl } from "@/lib/portalApi";
 import { useEndUser } from "@/lib/portalSession";
+import { useI18n } from "@/lib/i18n";
 
 function greetingFor(hour: number) {
   if (hour < 12) return "Good morning";
@@ -16,6 +17,7 @@ function greetingFor(hour: number) {
 /** Top of the home screen: a time-of-day greeting and, on phones, a profile shortcut. */
 export default function Greeting() {
   const { profile } = useEndUser();
+  const { t } = useI18n();
 
   let assignedRole = "Representative";
   let assignedName = profile.agent_name;
@@ -28,13 +30,13 @@ export default function Greeting() {
   return (
     <div className="flex items-start justify-between gap-4 px-2">
       <div className="min-w-0">
-        <p className="text-[15px] text-slate-600">{greetingFor(currentHour())},</p>
+        <p className="text-[15px] text-slate-600">{t(greetingFor(currentHour()))},</p>
         <h1 className="mt-0.5 text-[24px] font-bold leading-tight tracking-tight text-gray-800">
           {profile.name} <span aria-hidden="true">👋</span>
         </h1>
         {profile.agent_name && (
           <p className="mt-1 text-[13px] font-medium text-amber-500">
-            {assignedRole}: <span className="text-amber-500">{assignedName}</span>
+            {t(assignedRole)}: <span className="text-amber-500">{assignedName}</span>
           </p>
         )}
       </div>
@@ -44,7 +46,7 @@ export default function Greeting() {
           className="hidden items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 active:scale-95 md:flex"
         >
           <Plus className="h-5 w-5" strokeWidth={2.5} />
-          Register complaint
+          {t("Register complaint")}
         </Link>
       </div>
     </div>

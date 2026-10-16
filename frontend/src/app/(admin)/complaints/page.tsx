@@ -7,6 +7,7 @@ import { api, StatusGroup } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { useApiData, useDebounced } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
+import { useI18n } from "@/lib/i18n";
 import { GROUP_LABELS } from "@/lib/status";
 import { ComplaintTable } from "@/components/ComplaintTable";
 import { ComplaintFilterDrawer, ComplaintFilters, countActiveFilters } from "@/components/ComplaintFilterDrawer";
@@ -24,6 +25,7 @@ function pick<T extends string>(value: string | null, allowed: readonly T[]): T 
 
 function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
   const { me, can } = useSession();
+  const { t } = useI18n();
   const { ui } = useConfig();
   const [filters, setFilters] = useState<ComplaintFilters>(initial);
   useDocumentTitle(
@@ -121,23 +123,23 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
         <PageHeader
           title={
             filters.created_by === "me"
-              ? "Complaints (Raised by me)"
+              ? t("Complaints (Raised by me)")
               : filters.escalated === "me"
-                ? "Complaints (Escalated to me)"
+                ? t("Complaints (Escalated to me)")
                 : filters.escalated === "any"
-                  ? "Escalated complaints"
-                  : "Complaints"
+                  ? t("Escalated complaints")
+                  : t("Complaints")
           }
           description={
             filters.created_by === "me"
-              ? "Complaints you have personally registered across all departments and locations."
+              ? t("Complaints you have personally registered across all departments and locations.")
               : filters.escalated === "me"
-                ? "Complaints where an SLA target was missed and escalated to you for supervision."
+                ? t("Complaints where an SLA target was missed and escalated to you for supervision.")
                 : filters.escalated === "any"
-                  ? "Complaints across the system currently in an escalated state."
+                  ? t("Complaints across the system currently in an escalated state.")
                   : me.is_super_admin
-                    ? "All complaints in the system."
-                    : "Complaints inside your department and location scope."
+                    ? t("All complaints in the system.")
+                    : t("Complaints inside your department and location scope.")
           }
         />
       </div>
@@ -145,40 +147,40 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
       <div className="flex flex-col gap-3 shrink-0 mt-2 sm:mt-4">
         {/* Scope Switcher Bar (All in scope / Assigned to me / Raised by me) */}
         {!me.is_super_admin && (
-          <div className="flex items-center gap-1 p-1 bg-slate-200/60 rounded-xl w-fit">
+          <div className="flex items-center justify-end gap-1 p-1 bg-slate-200/60 rounded-xl w-fit max-w-full overflow-x-auto">
             <button
               type="button"
               onClick={() => set({ created_by: "", assigned: "" })}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[13px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 !filters.created_by && filters.assigned !== "me"
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              All complaints
+              {t("All complaints")}
             </button>
             <button
               type="button"
               onClick={() => set({ created_by: "", assigned: "me" })}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[13px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 filters.assigned === "me" && !filters.created_by
                   ? "bg-white text-blue-600 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Assigned to me
+              {t("Assigned to me")}
             </button>
             {can("complaint.create") && (
               <button
                 type="button"
                 onClick={() => set({ created_by: "me", assigned: "" })}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[13px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                   filters.created_by === "me"
                     ? "bg-blue-600 text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                <span>Raised by me</span>
+                <span>{t("Raised by me")}</span>
               </button>
             )}
           </div>
@@ -190,8 +192,8 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
               <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
                 type="search"
-                className="w-full h-10 pl-8 sm:pl-10 pr-2 sm:pr-4 text-xs font-medium bg-white border border-slate-200 text-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
-                placeholder="Search by ID, title or area"
+                className="w-full h-10 pl-8 sm:pl-10 pr-2 sm:pr-4 text-[11px] sm:text-xs font-medium bg-white border border-slate-200 text-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
+                placeholder={t("Search by ID, title or area")}
                 aria-label="Search complaints"
                 value={filters.search}
                 onChange={(e) => set({ search: e.target.value })}
@@ -202,14 +204,14 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             <button
               onClick={() => setDrawerOpen(true)}
               aria-expanded={drawerOpen}
-              className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 h-10 font-semibold text-xs rounded-xl border cursor-pointer transition-all ${
+              className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 h-10 font-semibold text-[11px] sm:text-xs rounded-xl border cursor-pointer transition-all ${
                 drawerOpen || activeCount > 0
                   ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20"
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
-              <span>Filters</span>
+              <span>{t("Filters")}</span>
               {activeCount > 0 && (
                 <span
                   className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
@@ -231,7 +233,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
               >
                 {GROUP_TABS.map((tab) => (
                   <option key={tab.value || "all"} value={tab.value}>
-                    {tab.label}
+                    {t(tab.label)}
                   </option>
                 ))}
               </select>
@@ -248,7 +250,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
                 onClick={() => set({ group: tab.value })}
                 className={tabClass(filters.group === tab.value)}
               >
-                {tab.label}
+                {t(tab.label)}
               </button>
             ))}
           </div>
@@ -257,7 +259,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
         {/* Active Filter Chips Bar (Shown when any filters are active) */}
         {activeCount > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">Active:</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">{t("Active")}:</span>
 
             {/* Date filter chip */}
             {(filters.date_from || filters.date_to) && (
@@ -267,8 +269,8 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
                   {filters.date_from && filters.date_to
                     ? `${filters.date_from} → ${filters.date_to}`
                     : filters.date_from
-                      ? `From ${filters.date_from}`
-                      : `Until ${filters.date_to}`}
+                      ? `${t("From")} ${filters.date_from}`
+                      : `${t("To")} ${filters.date_to}`}
                 </span>
                 <button
                   type="button"
@@ -316,7 +318,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             {/* Priority filter chip */}
             {selectedPriority && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-[11px] font-semibold">
-                <span>Priority: {selectedPriority.name}</span>
+                <span>{t("Priority")}: {selectedPriority.name}</span>
                 <button
                   type="button"
                   onClick={() => set({ priority_id: "" })}
@@ -331,7 +333,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             {/* Assignment filter chip */}
             {filters.assigned && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold">
-                <span>{filters.assigned === "me" ? "Assigned to me" : "Unassigned"}</span>
+                <span>{filters.assigned === "me" ? t("Assigned to me") : t("Unassigned")}</span>
                 <button
                   type="button"
                   onClick={() => set({ assigned: "" })}
@@ -346,7 +348,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             {/* SLA filter chip */}
             {filters.sla && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-semibold">
-                <span>{filters.sla === "breached" ? "Target missed (breached)" : "Due soon (at risk)"}</span>
+                <span>{filters.sla === "breached" ? t("Target missed (breached)") : t("Due soon (at risk)")}</span>
                 <button
                   type="button"
                   onClick={() => set({ sla: "" })}
@@ -361,7 +363,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             {/* Escalation filter chip */}
             {filters.escalated && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-[11px] font-semibold">
-                <span>{filters.escalated === "me" ? "Escalated to me" : "All escalated"}</span>
+                <span>{filters.escalated === "me" ? t("Complaints (Escalated to me)") : t("Escalated complaints")}</span>
                 <button
                   type="button"
                   onClick={() => set({ escalated: "" })}
@@ -376,7 +378,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
             {/* Created by filter chip */}
             {filters.created_by && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-semibold">
-                <span>Raised by me</span>
+                <span>{t("Raised by me")}</span>
                 <button
                   type="button"
                   onClick={() => set({ created_by: "" })}
@@ -394,7 +396,7 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
               onClick={resetAll}
               className="text-[11px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-0.5 cursor-pointer ml-1"
             >
-              Reset all
+              {t("Reset all")}
             </button>
           </div>
         )}
@@ -414,10 +416,10 @@ function ComplaintsList({ initial }: { initial: ComplaintFilters }) {
               loading={loading}
               emptyText={
                 filters.created_by === "me"
-                  ? "You haven't registered any complaints yet."
+                  ? t("You haven't registered any complaints yet.")
                   : filters.escalated === "any"
-                    ? "No escalated complaints found."
-                    : "No complaints match your filters."
+                    ? t("No escalated complaints found.")
+                    : t("No complaints match your filters.")
               }
               onActionCompleted={reload}
             />

@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { ChevronRight, Clock, FileText } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 const SHORTCUTS = [
   {
@@ -23,6 +24,8 @@ const SHORTCUTS = [
 
 /** The two shortcut cards under the greeting. */
 export default function ShortcutCards() {
+  const { t } = useI18n();
+
   return (
     <div className="grid grid-cols-2 gap-2.5 md:gap-5">
       {SHORTCUTS.map(({ title, subtitle, href, icon: Icon, tone }) => (
@@ -37,8 +40,8 @@ export default function ShortcutCards() {
             <Icon className="h-5 w-5 md:h-6 md:w-6" strokeWidth={2.1} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-bold leading-tight text-[#0b1a3f] md:text-[15px]">{title}</span>
-            <span className="mt-1 block text-[12px] leading-snug text-slate-500 md:text-[13px]">{subtitle}</span>
+            <span className="block text-[13px] font-bold leading-tight text-[#0b1a3f] md:text-[15px]">{t(title)}</span>
+            <span className="mt-1 block text-[12px] leading-snug text-slate-500 md:text-[13px]">{t(subtitle)}</span>
           </span>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 md:h-4 md:w-4" strokeWidth={2.6} />
         </Link>

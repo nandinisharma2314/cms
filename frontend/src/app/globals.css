@@ -26,3 +26,12 @@ body {
 *::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
+
+/* Suppress any 3rd party translate banners */
+.goog-te-banner-frame,
+.skiptranslate,
+#goog-gt-tt {
+  display: none !important;
+  visibility: hidden !important;
+}
+

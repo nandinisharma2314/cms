@@ -4,16 +4,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, FileText, LogOut, Search, User } from "lucide-react";
+import { ChevronDown, FileText, Globe, LogOut, Search, User } from "lucide-react";
 import { initials } from "@/lib/portalFormat";
 import { resolveAvatarUrl } from "@/lib/portalApi";
 import { useEndUser } from "@/lib/portalSession";
+import { useI18n } from "@/lib/i18n";
+import { LanguagePill } from "@/components/LanguageSwitcherModal";
 import { BrandMark } from "@/components/portal/Brand/BrandMark";
 
 /** Top bar on larger screens (and on phone pages other than home). */
 export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) {
   const router = useRouter();
   const { profile, logout } = useEndUser();
+  const { currentLanguage, openLanguageModal, t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -40,7 +43,8 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
         <BrandMark />
       </Link>
 
-      <div className="flex shrink-0 items-center gap-3 md:gap-5">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-5">
+        <LanguagePill />
         <form
           role="search"
           className="relative hidden md:flex"
@@ -54,8 +58,8 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search my complaints"
-            aria-label="Search my complaints"
+            placeholder={t("Search my complaints")}
+            aria-label={t("Search my complaints")}
             className="h-10 w-64 rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 lg:w-80"
           />
         </form>
@@ -77,7 +81,7 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
             </span>
             <span className="hidden flex-col items-start text-left md:flex">
               <span className="max-w-40 truncate text-sm font-bold leading-tight text-slate-800">{profile.name}</span>
-              <span className="mt-0.5 text-[11px] font-medium leading-tight text-slate-500">{profile.role.name}</span>
+              <span className="mt-0.5 text-[11px] font-medium leading-tight text-slate-500">{t(profile.role.name)}</span>
             </span>
             <ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 md:block" />
           </button>
@@ -94,17 +98,32 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600"
                 >
-                  <User className="h-4 w-4" /> My profile
+                  <User className="h-4 w-4" /> {t("My profile")}
                 </Link>
                 <Link
                   href="/dashboard/complaints"
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600"
                 >
-                  <FileText className="h-4 w-4" /> My complaints
+                  <FileText className="h-4 w-4" /> {t("My complaints")}
                 </Link>
               </div>
-              <div className="border-t border-slate-100 p-2">
+              <div className="border-t border-slate-100 p-2 space-y-1">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    openLanguageModal();
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-blue-600" /> Language / भाषा
+                  </span>
+                  <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                    {currentLanguage.nativeName}
+                  </span>
+                </button>
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
@@ -113,7 +132,7 @@ export function TopHeader({ hideOnMobile = false }: { hideOnMobile?: boolean }) 
                     logout();
                   }}
                 >
-                  <LogOut className="h-4 w-4" /> Sign out
+                  <LogOut className="h-4 w-4" /> {t("Sign out")}
                 </button>
               </div>
             </div>

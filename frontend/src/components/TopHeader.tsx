@@ -4,12 +4,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Award, Bell, Camera, ChevronDown, FileText, KeyRound, LogOut, MapPin, Menu, Search, Shield, User } from "lucide-react";
+import { Award, Bell, Camera, ChevronDown, FileText, Globe, KeyRound, LogOut, MapPin, Menu, Search, Shield, User } from "lucide-react";
 import { api, NotificationItem, NOTIFICATIONS_CHANGED_EVENT, resolveAvatarUrl } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatDateTime, initials } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
+import { useI18n } from "@/lib/i18n";
+import { LanguagePill } from "./LanguageSwitcherModal";
 import { scopeLabel } from "./ScopeEditor";
 import { QuickActionsBar } from "./QuickActionsBar";
 import { ChangePasswordModal } from "./ChangePasswordForm";
@@ -156,6 +158,7 @@ function Notifications() {
 
 function UserMenu() {
   const { me, can, logout, setMe } = useSession();
+  const { currentLanguage, openLanguageModal } = useI18n();
   const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
   const [error, setError] = useState<string | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -220,6 +223,21 @@ function UserMenu() {
             </label>
           )}
           {error && <p className="px-3.5 py-1 text-[11px] text-rose-600">{error}</p>}
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              openLanguageModal();
+            }}
+            className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer text-left border-b border-slate-100"
+          >
+            <span className="flex items-center gap-2">
+              <Globe className="w-3.5 h-3.5 text-blue-600" />
+              Language / भाषा
+            </span>
+            <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+              {currentLanguage.nativeName}
+            </span>
+          </button>
           {can("rewards.view") && (
             <Link
               href="/rewards"
@@ -313,7 +331,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
       <div className="flex items-center gap-1.5 sm:gap-3 ml-auto">
         <div
           className="hidden xl:flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl"
-          title={me.scopes.map(scopeLabel).join("\n") || scopeSummary}
+          title={me.scopes.map((s) => scopeLabel(s)).join("\n") || scopeSummary}
         >
           <Shield className="w-4 h-4 text-blue-600" />
           <span>{me.role.name}</span>
@@ -335,6 +353,7 @@ export function TopHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
           </Link>
         )}
         <SystemHealthPill />
+        <LanguagePill />
         <Notifications />
         <QuickActionsBar />
         <UserMenu />

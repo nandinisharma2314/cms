@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import { useDocumentTitle } from "@/lib/portalConfig";
 import { api, resolveAvatarUrl } from "@/lib/portalApi";
+import { useI18n } from "@/lib/i18n";
 
 type HierarchyNode = {
   id: string;
@@ -36,6 +37,8 @@ function assignColors(node: HierarchyNode, depth: number = 0) {
 }
 
 function OrgNode({ node }: { node: HierarchyNode }) {
+  const { t } = useI18n();
+
   return (
     <li>
       <div className="inline-flex flex-col items-center">
@@ -51,7 +54,7 @@ function OrgNode({ node }: { node: HierarchyNode }) {
           )}
           {node.isMe && (
             <span className="absolute -right-1 -top-1 z-20 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[8px] font-bold text-white shadow-sm md:px-2 md:py-1 md:text-[10px]">
-              You
+              {t("You")}
             </span>
           )}
         </div>
@@ -60,7 +63,7 @@ function OrgNode({ node }: { node: HierarchyNode }) {
             {node.name}
           </h3>
           <p className="mt-[1px] whitespace-nowrap text-[9px] font-semibold uppercase tracking-wide text-slate-500 sm:text-[10px] md:text-[12px]">
-            {node.role}
+            {t(node.role)}
           </p>
         </div>
       </div>
@@ -76,7 +79,8 @@ function OrgNode({ node }: { node: HierarchyNode }) {
 }
 
 export default function TeamsPage() {
-  useDocumentTitle("My Teams");
+  const { t } = useI18n();
+  useDocumentTitle(t("Teams"));
 
   const [hierarchy, setHierarchy] = useState<HierarchyNode | null>(null);
   const [loading, setLoading] = useState(true);

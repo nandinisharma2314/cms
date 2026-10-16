@@ -12,6 +12,7 @@ import { ComplaintTable } from "@/components/ComplaintTable";
 import { ComplaintFilterDrawer, ComplaintFilters, countActiveFilters } from "@/components/ComplaintFilterDrawer";
 import { RequirePermission } from "@/components/RequirePermission";
 import { Card, ErrorBanner, PageHeader, Pagination, tabClass } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
 
 const GROUP_TABS: { value: StatusGroup | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -25,11 +26,12 @@ function pick<T extends string>(value: string | null, allowed: readonly T[]): T 
 function EscalatedList({ initial }: { initial: ComplaintFilters }) {
   const { can } = useSession();
   const { ui } = useConfig();
+  const { t } = useI18n();
   const [filters, setFilters] = useState<ComplaintFilters>(initial);
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  useDocumentTitle(filters.escalated === "any" ? "All Escalated" : "Escalated to me");
+  useDocumentTitle(filters.escalated === "any" ? t("complaints.all_delayed_title") : t("complaints.delayed_title"));
 
   const search = useDebounced(filters.search.trim());
   const set = (patch: Partial<ComplaintFilters>) => {
@@ -38,7 +40,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
   };
 
   const resetAll = () => {
-    setFilters({
+    setFilters((prev) => ({
       search: "",
       group: "",
       assigned: "",
@@ -48,9 +50,9 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
       date_from: "",
       date_to: "",
       sla: "",
-      escalated: "me",
+      escalated: prev.escalated || "me",
       created_by: "",
-    });
+    }));
     setPage(1);
   };
 
@@ -87,7 +89,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
     ],
   );
 
-  const activeCount = countActiveFilters(filters);
+  const activeCount = countActiveFilters({ ...filters, escalated: "" });
 
   // Active filter chip labels
   const { data: _locPath } = useApiData(
@@ -110,26 +112,52 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
     <div className="flex flex-col h-[calc(100vh-130px)] -mt-5 sm:-mt-2">
       <div className="shrink-0">
         <PageHeader
-          title={filters.escalated === "any" ? "All Escalated Complaints" : "Escalated to me"}
+          title={filters.escalated === "any" ? t("complaints.all_delayed_title") : t("complaints.delayed_title")}
           description={
             filters.escalated === "any"
-              ? "All complaints across the organization currently in an escalated state."
-              : "Complaints escalated to you requiring immediate supervisor attention and resolution."
+              ? t("complaints.all_delayed_subtitle")
+              : t("complaints.delayed_subtitle")
           }
         />
       </div>
 
-      <div className="flex flex-col gap-3 shrink-0 mt-2 sm:mt-4">
+      <div className="flex flex-col gap-2.5 sm:gap-3 shrink-0 mt-2 sm:mt-4">
+        {/* Scope switcher: My Team vs All Department */}
+        <div className="flex items-center gap-1 p-1 bg-slate-200/60 rounded-xl w-fit max-w-full">
+          <button
+            type="button"
+            onClick={() => set({ escalated: "me" })}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              filters.escalated !== "any"
+                ? "bg-white text-blue-700 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            {t("complaints.my_team")}
+          </button>
+          <button
+            type="button"
+            onClick={() => set({ escalated: "any" })}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              filters.escalated === "any"
+                ? "bg-white text-blue-700 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            {t("complaints.all_department")}
+          </button>
+        </div>
+
         {/* Controls row */}
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 sm:gap-3">
           <div className="flex items-center gap-1.5 sm:gap-2 w-full lg:w-auto">
             <div className="relative flex-1 lg:w-72">
-              <Search className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
                 type="search"
-                className="w-full h-10 pl-8 sm:pl-10 pr-2 sm:pr-4 text-xs font-medium bg-white border border-slate-200 text-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
-                placeholder="Search by ID, title or area"
-                aria-label="Search escalated complaints"
+                className="w-full h-10 pl-9 pr-3 text-xs font-medium bg-white border border-slate-200 text-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
+                placeholder={t("complaints.search_placeholder")}
+                aria-label={t("complaints.delayed_title")}
                 value={filters.search}
                 onChange={(e) => set({ search: e.target.value })}
               />
@@ -139,14 +167,14 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
             <button
               onClick={() => setDrawerOpen(true)}
               aria-expanded={drawerOpen}
-              className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 h-10 font-semibold text-xs rounded-xl border cursor-pointer transition-all ${
+              className={`shrink-0 flex items-center gap-1.5 px-3 sm:px-4 h-10 font-semibold text-xs rounded-xl border cursor-pointer transition-all ${
                 drawerOpen || activeCount > 0
                   ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20"
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
               }`}
             >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span>Filters</span>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>{t("complaints.filters")}</span>
               {activeCount > 0 && (
                 <span
                   className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
@@ -159,16 +187,16 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
             </button>
 
             {/* Mobile status dropdown */}
-            <div className="block lg:hidden shrink-0 w-24 sm:w-32">
+            <div className="block lg:hidden shrink-0 w-22 sm:w-28">
               <select
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-1.5 sm:px-3 text-[10px] sm:text-sm font-semibold text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 value={filters.group}
                 onChange={(e) => set({ group: e.target.value as StatusGroup | "" })}
-                aria-label="Status"
+                aria-label={t("Status")}
               >
                 {GROUP_TABS.map((tab) => (
                   <option key={tab.value || "all"} value={tab.value}>
-                    {tab.label}
+                    {t(tab.label)}
                   </option>
                 ))}
               </select>
@@ -176,7 +204,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
           </div>
 
           {/* Desktop Status Group Tabs */}
-          <div className="hidden lg:flex flex-row gap-2 lg:ml-auto" role="tablist" aria-label="Status">
+          <div className="hidden lg:flex flex-row gap-2 lg:ml-auto" role="tablist" aria-label={t("Status")}>
             {GROUP_TABS.map((tab) => (
               <button
                 key={tab.value || "all"}
@@ -185,7 +213,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
                 onClick={() => set({ group: tab.value })}
                 className={tabClass(filters.group === tab.value)}
               >
-                {tab.label}
+                {t(tab.label)}
               </button>
             ))}
           </div>
@@ -194,7 +222,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
         {/* Active Filter Chips Bar (Shown when any filters are active) */}
         {activeCount > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">Active:</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">{t("Active")}:</span>
 
             {/* Date filter chip */}
             {(filters.date_from || filters.date_to) && (
@@ -204,8 +232,8 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
                   {filters.date_from && filters.date_to
                     ? `${filters.date_from} → ${filters.date_to}`
                     : filters.date_from
-                      ? `From ${filters.date_from}`
-                      : `Until ${filters.date_to}`}
+                      ? `${t("From")} ${filters.date_from}`
+                      : `${t("To")} ${filters.date_to}`}
                 </span>
                 <button
                   type="button"
@@ -253,7 +281,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
             {/* Priority filter chip */}
             {selectedPriority && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-[11px] font-semibold">
-                <span>Priority: {selectedPriority.name}</span>
+                <span>{t("Priority")}: {selectedPriority.name}</span>
                 <button
                   type="button"
                   onClick={() => set({ priority_id: "" })}
@@ -268,7 +296,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
             {/* Assignment filter chip */}
             {filters.assigned && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold">
-                <span>{filters.assigned === "me" ? "Assigned to me" : "Unassigned"}</span>
+                <span>{filters.assigned === "me" ? t("complaints.assigned_to_you") : t("Unassigned")}</span>
                 <button
                   type="button"
                   onClick={() => set({ assigned: "" })}
@@ -283,27 +311,12 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
             {/* SLA filter chip */}
             {filters.sla && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-semibold">
-                <span>{filters.sla === "breached" ? "Target missed (breached)" : "Due soon (at risk)"}</span>
+                <span>{filters.sla === "breached" ? t("Target missed (breached)") : t("Due soon (at risk)")}</span>
                 <button
                   type="button"
                   onClick={() => set({ sla: "" })}
                   className="hover:text-amber-950 cursor-pointer"
                   title="Remove SLA filter"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-
-            {/* Escalation filter chip */}
-            {filters.escalated !== "me" && filters.escalated && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-[11px] font-semibold">
-                <span>All escalated</span>
-                <button
-                  type="button"
-                  onClick={() => set({ escalated: "me" })}
-                  className="hover:text-rose-950 cursor-pointer"
-                  title="Reset to escalated to me"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -316,7 +329,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
               onClick={resetAll}
               className="text-[11px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-0.5 cursor-pointer ml-1"
             >
-              Reset all
+              {t("Reset all")}
             </button>
           </div>
         )}
@@ -335,14 +348,16 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
               complaints={data?.items ?? []}
               loading={loading}
               emptyText={
-                filters.escalated === "any" ? "No escalated complaints found." : "No complaints are currently escalated to you."
+                filters.escalated === "any"
+                  ? t("No delayed complaints found in your department.")
+                  : t("No delayed complaints in your team's queue.")
               }
               onActionCompleted={reload}
             />
           </Card>
         )}
         {data && (
-          <Pagination page={page} pageSize={data.page_size} total={data.total} noun="escalated complaints" onPage={setPage} />
+          <Pagination page={page} pageSize={data.page_size} total={data.total} noun="delayed complaints" onPage={setPage} />
         )}
       </div>
 

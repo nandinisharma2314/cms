@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { ArrowUpCircle, Clock } from "lucide-react";
 import { ComplaintData } from "@/lib/api";
 import { currentSla, SLA_BADGE } from "@/lib/status";
+import { useI18n } from "@/lib/i18n";
 
 function formatDuration(ms: number): string {
   const absMs = Math.abs(ms);
@@ -23,6 +24,7 @@ function formatDuration(ms: number): string {
 }
 
 export function LiveSlaTicker({ complaint, showEscalation = true }: { complaint: ComplaintData; showEscalation?: boolean }) {
+  const { t } = useI18n();
   const [, setTick] = useState(0);
 
   // Ticking timer: re-render every 30 seconds to update live countdown
@@ -41,20 +43,20 @@ export function LiveSlaTicker({ complaint, showEscalation = true }: { complaint:
     if (resSla === "met") {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span>✓</span> SLA Met
+          <span>✓</span> {t("SLA Met")}
         </span>
       );
     }
     if (resSla === "met_late") {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-          <span>⚠️</span> Met Late
+          <span>⚠️</span> {t("Met Late")}
         </span>
       );
     }
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
-        Closed
+        {t("Closed")}
       </span>
     );
   }
@@ -63,7 +65,7 @@ export function LiveSlaTicker({ complaint, showEscalation = true }: { complaint:
   if (complaint.sla_paused) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-        <span>⏸</span> Paused
+        <span>⏸</span> {t("Paused")}
       </span>
     );
   }
@@ -97,7 +99,7 @@ export function LiveSlaTicker({ complaint, showEscalation = true }: { complaint:
           title={`Target was ${targetDateStr}`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
-          <span>Breached {overStr} ago</span>
+          <span>{overStr} {t("ago")} ({t("Breached")})</span>
         </span>
         {showEscalation && complaint.escalation && (
           <span

@@ -128,7 +128,9 @@ def get_admin_dashboard_stats(
         "assigned_to_me": scoped.filter(
             Complaint.assigned_to_id == ctx.user.id, Complaint.status.in_(ACTIVE_STATUSES)
         ).count(),
-        "escalated_to_me": scoped.filter(Complaint.escalated_to_id == ctx.user.id).count(),
+        "escalated_to_me": scoped.filter(
+            Complaint.escalated_to_id.in_([ctx.user.id] + [u.id for u in ctx.db.query(User).filter(User.is_active.is_(True)).all() if ctx.can_manage_user(u)])
+        ).count(),
         "rejection_requests": pending_rejections_for(ctx),
         "total_users": total_users,
     }
@@ -244,7 +246,8 @@ def list_complaints(
     elif sla:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "sla must be 'breached' or 'at_risk'")
     if escalated == "me":
-        query = query.filter(Complaint.escalated_to_id == ctx.user.id)
+        subordinate_ids = [u.id for u in ctx.db.query(User).filter(User.is_active.is_(True)).all() if ctx.can_manage_user(u)]
+        query = query.filter(Complaint.escalated_to_id.in_([ctx.user.id] + subordinate_ids))
     elif escalated == "any":
         query = query.filter(Complaint.escalated_to_id.isnot(None))
     elif escalated:
@@ -354,7 +357,6 @@ def create_complaint_endpoint(
             "No location specified or assigned. Please choose a location.",
         )
     department, category, location = resolve_classification(db, department_id, category_id, resolved_location_id)
-    ctx.require_covers(department.id, location.path)
     priority, p_reason = category.default_priority, None
     if priority_id is not None and priority_id != priority.id:
         ctx.require("complaint.reclassify")

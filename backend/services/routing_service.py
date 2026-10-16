@@ -93,11 +93,62 @@ def _candidates(db: Session, users: list[User], complaint: Complaint) -> list[Ca
     return [Candidate(u, score, loads.get(u.id, 0), last.get(u.id)) for u, score in matched]
 
 
+def _candidates_descendant(db: Session, users: list[User], complaint: Complaint) -> list[Candidate]:
+    from services.access_service import check_user_tenure, scopes_of
+    matched = []
+    loc_path = complaint.location.path if complaint.location else None
+    for user in users:
+        allowed, _, _ = check_user_tenure(user)
+        if not allowed:
+            continue
+        user_scopes = scopes_of(user)
+        best_score = None
+        for s in user_scopes:
+            if s.department_id is not None and s.department_id != complaint.department_id:
+                continue
+            is_dept = 1 if s.department_id is not None else 0
+            if loc_path is None or s.location_path is None:
+                depth = 0
+                score = (is_dept, depth)
+                best_score = score if best_score is None or score > best_score else best_score
+            elif s.location_path.startswith(loc_path):
+                depth = s.location_path.strip("/").count("/") + 1
+                score = (is_dept, depth)
+                best_score = score if best_score is None or score > best_score else best_score
+        if best_score is not None:
+            matched.append((user, best_score))
+    ids = [u.id for u, _ in matched]
+    loads = workloads(db, ids)
+    last = _last_assigned(db, ids)
+    return [Candidate(u, score, loads.get(u.id, 0), last.get(u.id)) for u, score in matched]
+
+
 def routing_candidates(db: Session, complaint: Complaint) -> list[Candidate]:
     receivers = _holders(db, RECEIVE_PERMISSION).filter(User.is_available.is_(True)).all()
     # Receiving without being able to respond would leave the complaint stuck with them.
     able = [u for u in receivers if any(p.key == RESPOND_PERMISSION for p in u.role.permissions)]
-    return _candidates(db, able, complaint)
+    cands = _candidates(db, able, complaint)
+    if cands:
+        return cands
+
+    # Pass 2: If complaint is at a broader parent location (e.g. India or state),
+    # check candidates operating within that location tree.
+    cands = _candidates_descendant(db, able, complaint)
+    if cands:
+        return cands
+
+    # Pass 3: If no field agent exists in that department/area, check department superiors (Supervisor, Manager)
+    from services.access_service import scopes_of
+    superiors = [
+        u for u in _holders(db, RESPOND_PERMISSION).filter(User.is_available.is_(True)).all()
+        if any(s.department_id == complaint.department_id for s in scopes_of(u))
+    ]
+    if superiors:
+        sup_cands = _candidates(db, superiors, complaint) or _candidates_descendant(db, superiors, complaint)
+        if sup_cands:
+            return sup_cands
+
+    return []
 
 
 def _rank(candidate: Candidate):
@@ -280,7 +331,26 @@ def manual_candidates(ctx: AccessContext, complaint: Complaint) -> list[Candidat
         u for u in _holders(ctx.db, RESPOND_PERMISSION).all()
         if u.id == ctx.user.id or ctx.can_manage_user(u)
     ]
-    return sorted(_candidates(ctx.db, users, complaint), key=_rank)
+    cands = _candidates(ctx.db, users, complaint)
+    if not cands:
+        cands = _candidates_descendant(ctx.db, users, complaint)
+
+    # Ensure the acting user (manager, supervisor, etc.) can always take ownership and self-assign
+    from services.access_service import check_user_tenure, scopes_of
+    allowed, _, _ = check_user_tenure(ctx.user)
+    if ctx.user.is_active and allowed and any(p.key == RESPOND_PERMISSION for p in ctx.user.role.permissions):
+        if not any(c.user.id == ctx.user.id for c in cands):
+            user_scopes = scopes_of(ctx.user)
+            is_dept = 1 if any(s.department_id == complaint.department_id for s in user_scopes) else 0
+            self_cand = Candidate(
+                ctx.user,
+                (is_dept, 0),
+                workloads(ctx.db, [ctx.user.id]).get(ctx.user.id, 0),
+                _last_assigned(ctx.db, [ctx.user.id]).get(ctx.user.id),
+            )
+            cands.append(self_cand)
+
+    return sorted(cands, key=_rank)
 
 
 def manual_assign(ctx: AccessContext, complaint: Complaint, assignee_id: int, reason: str | None) -> User:

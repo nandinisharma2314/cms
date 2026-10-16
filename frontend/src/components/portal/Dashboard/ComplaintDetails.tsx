@@ -24,6 +24,7 @@ import { api, Attachment, attachmentUrl, ComplaintDetail } from "@/lib/portalApi
 import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
 import { formatBytes, formatDateTime, shortPlace } from "@/lib/portalFormat";
 import { GROUP_PILLS, TONE_PILLS } from "@/lib/portalStatus";
+import { useI18n } from "@/lib/i18n";
 import ComplaintActivity from "./ComplaintActivity";
 
 type FileKind = "image" | "pdf" | "csv" | "video" | "other";
@@ -232,6 +233,7 @@ function Preview({ file, onClose }: { file: Attachment; onClose: () => void }) {
 
 /** Everything about one of the end user's complaints, on its own page. */
 export default function ComplaintDetails({ complaintId }: { complaintId: string }) {
+  const { t } = useI18n();
   useDocumentTitle(complaintId);
   const router = useRouter();
   const { ui } = useConfig();
@@ -275,15 +277,15 @@ export default function ComplaintDetails({ complaintId }: { complaintId: string 
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <h1 className="text-[17px] font-bold text-[#0b1a3f]">Complaint details</h1>
+          <h1 className="text-[17px] font-bold text-[#0b1a3f]">{t("Complaint details")}</h1>
         </div>
 
         {error && !detail ? (
           <div className={`${CARD} p-6 text-center`}>
-            <p className="text-[15px] font-semibold text-[#0b1a3f]">We couldn&apos;t open this complaint</p>
+            <p className="text-[15px] font-semibold text-[#0b1a3f]">{t("We couldn't open this complaint")}</p>
             <p className="mt-1 text-[13px] text-slate-500">{error}</p>
             <Link href="/dashboard/complaints" className="mt-4 inline-block text-[14px] font-semibold text-blue-600">
-              Back to my complaints
+              {t("Back to my complaints")}
             </Link>
           </div>
         ) : !detail ? (
@@ -307,10 +309,10 @@ export default function ComplaintDetails({ complaintId }: { complaintId: string 
                 <span
                   className={`rounded-full px-3 py-1 text-[12px] font-semibold ${GROUP_PILLS[detail.status_group].className}`}
                 >
-                  {detail.status_label}
+                  {t(detail.status_label)}
                 </span>
                 <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${TONE_PILLS[detail.priority.tone]}`}>
-                  {detail.priority.name} priority
+                  {t(detail.priority.name)}
                 </span>
               </div>
               <h2 className="mt-3 text-[22px] font-extrabold leading-tight text-[#0b1a3f] wrap-break-word md:text-[26px]">
@@ -332,7 +334,7 @@ export default function ComplaintDetails({ complaintId }: { complaintId: string 
             </section>
 
             <section className={`${CARD} p-5 md:p-6`}>
-              <h3 className="text-[12px] font-bold uppercase tracking-wider text-slate-400">Description</h3>
+              <h3 className="text-[12px] font-bold uppercase tracking-wider text-slate-400">{t("Description")}</h3>
               <p className="mt-2 whitespace-pre-wrap text-[14.5px] leading-relaxed text-slate-700 wrap-break-word">
                 {detail.description}
               </p>
@@ -346,7 +348,7 @@ export default function ComplaintDetails({ complaintId }: { complaintId: string 
 
             <section className={`${CARD} p-5 md:p-6`}>
               <h3 className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-slate-400">
-                <Paperclip className="h-4 w-4 text-blue-600" aria-hidden="true" /> Photos &amp; documents ({attachments.length})
+                <Paperclip className="h-4 w-4 text-blue-600" aria-hidden="true" /> {t("Photos & documents")} ({attachments.length})
               </h3>
               {attachments.length ? (
                 <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">

@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Building,
+  Building2,
   Check,
   ChevronDown,
   Clock,
@@ -20,21 +21,24 @@ import {
   LayoutGrid,
   MapPin,
   Paperclip,
+  Search,
   Send,
   ShieldAlert,
   ShieldCheck,
+  Tag,
   UploadCloud,
   Users,
   X,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, ClassificationOptions } from "@/lib/api";
 import { useConfig, useDocumentTitle } from "@/lib/config";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { useApiData } from "@/lib/hooks";
-import { coversDepartment } from "@/lib/scope";
 import { attachmentProblem } from "@/lib/attachments";
 import { LocationPicker } from "@/components/LocationPicker";
+import { PriorityBadge } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
 
 type Step = 1 | 2 | 3;
 
@@ -67,20 +71,21 @@ function Counter({ value, max }: { value: string; max: number }) {
 
 /** The decorative column next to the form on large screens. */
 function Aside() {
+  const { t } = useI18n();
   return (
     <div className="sticky top-6 hidden h-[calc(100vh-120px)] flex-col justify-center self-start lg:flex">
       <div className="mx-auto flex w-full max-w-120 flex-col">
         <div className="mb-4 inline-flex w-fit items-center gap-2 rounded-full bg-indigo-50/80 px-4 py-1.5 text-xs font-semibold text-indigo-700">
-          <Home size={14} aria-hidden="true" /> Home <span className="text-indigo-300">/</span> New complaint
+          <Home size={14} aria-hidden="true" /> {t("Home")} <span className="text-indigo-300">/</span> {t("New Complaint")}
         </div>
         <h1 className="mb-2 text-4xl font-extrabold leading-tight tracking-tight text-slate-900">
-          Register a <span className="text-indigo-600">complaint</span>
+          {t("Register complaint")}
         </h1>
         <p className="mb-6 text-sm font-medium text-slate-500">
-          Tell us what&apos;s wrong. It will automatically be routed to the right team for the selected workplace.
+          {t("Tell us what's wrong. It will automatically be routed to the right team for the selected workplace.")}
         </p>
         <ul className="mb-6 flex flex-wrap gap-x-5 gap-y-3">
-          {["Goes straight to the right team", "Updates as they happen", "Staff tracking enabled"].map((text) => (
+          {[t("Goes straight to the right team"), t("Updates as they happen"), t("Staff tracking enabled")].map((text) => (
             <li key={text} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
                 <Check size={12} strokeWidth={3} aria-hidden="true" />
@@ -116,8 +121,338 @@ function Aside() {
   );
 }
 
+function DepartmentDropdown({
+  departments,
+  selectedId,
+  onSelect,
+  disabled,
+}: {
+  departments: ClassificationOptions["departments"];
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const { t } = useI18n();
+  const selectedDepartment = departments.find((d) => d.id === selectedId);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return departments;
+    const q = query.toLowerCase();
+    return departments.filter((d) => d.name.toLowerCase().includes(q));
+  }, [departments, query]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        disabled={disabled || !departments.length}
+        onClick={() => {
+          setOpen(!open);
+          setQuery("");
+        }}
+        className={`w-full rounded-xl border bg-white py-2.5 pl-12 pr-10 text-[13px] font-medium text-left transition-all flex items-center justify-between cursor-pointer disabled:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed ${
+          open
+            ? "border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm"
+            : "border-slate-200 hover:border-slate-300"
+        }`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <FieldIcon>
+          <Landmark size={14} aria-hidden="true" />
+        </FieldIcon>
+        <span className={`truncate ${selectedDepartment ? "font-semibold text-slate-800" : "text-slate-400"}`}>
+          {selectedDepartment ? selectedDepartment.name : (departments.length ? t("Choose a department") : t("Loading departments…"))}
+        </span>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={`transition-transform duration-200 ${open ? "rotate-180 text-indigo-600" : ""}`}
+          />
+        </div>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/10 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+          {/* Search Header */}
+          <div className="p-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center gap-2">
+            <Search size={14} className="text-slate-400 ml-1.5 shrink-0" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("Search department…")}
+              className="w-full bg-transparent text-xs text-slate-800 placeholder:text-slate-400 outline-none py-1"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="text-slate-400 hover:text-slate-600 p-1"
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+            <span className="text-[10px] font-bold text-slate-500 px-2 py-0.5 bg-white rounded-md border border-slate-200 shrink-0">
+              {filtered.length} {filtered.length === 1 ? t("dept") : t("depts")}
+            </span>
+          </div>
+
+          {/* Department List */}
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5" role="listbox">
+            {filtered.length === 0 ? (
+              <div className="py-7 text-center text-xs text-slate-400">
+                {t("No department matching")} &ldquo;{query}&rdquo;
+              </div>
+            ) : (
+              filtered.map((d) => {
+                const isSelected = d.id === selectedId;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(d.id);
+                      setOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-xl text-left flex items-center justify-between transition-all cursor-pointer group ${
+                      isSelected
+                        ? "bg-indigo-50 text-indigo-950 font-semibold border border-indigo-100"
+                        : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600"
+                        }`}
+                      >
+                        <Building2 size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs truncate">{d.name}</div>
+                        <div className="text-[11px] text-slate-400 font-normal">
+                          {d.categories.length} {d.categories.length === 1 ? "category" : "categories"}
+                        </div>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white shrink-0 ml-2">
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryDropdown({
+  department,
+  selectedId,
+  onSelect,
+  disabled,
+}: {
+  department: ClassificationOptions["departments"][number] | null;
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const { t } = useI18n();
+  const categories = department?.categories ?? [];
+  const selectedCategory = categories.find((c) => c.id === selectedId);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return categories;
+    const q = query.toLowerCase();
+    return categories.filter((c) => c.name.toLowerCase().includes(q));
+  }, [categories, query]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        disabled={disabled || !department}
+        onClick={() => {
+          setOpen(!open);
+          setQuery("");
+        }}
+        className={`w-full rounded-xl border bg-white py-2.5 pl-12 pr-10 text-[13px] font-medium text-left transition-all flex items-center justify-between cursor-pointer disabled:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed ${
+          open
+            ? "border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm"
+            : "border-slate-200 hover:border-slate-300"
+        }`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <FieldIcon>
+          <LayoutGrid size={14} aria-hidden="true" />
+        </FieldIcon>
+        <span className={`truncate ${selectedCategory ? "font-semibold text-slate-800" : "text-slate-400"}`}>
+          {selectedCategory ? selectedCategory.name : (department ? t("Choose a category") : t("Select a department first"))}
+        </span>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={`transition-transform duration-200 ${open ? "rotate-180 text-indigo-600" : ""}`}
+          />
+        </div>
+      </button>
+
+      {open && department && (
+        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/10 overflow-hidden">
+          {categories.length > 4 && (
+            <div className="p-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center gap-2">
+              <Search size={14} className="text-slate-400 ml-1.5 shrink-0" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search category…")}
+                className="w-full bg-transparent text-xs text-slate-800 placeholder:text-slate-400 outline-none py-1"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                  aria-label="Clear search"
+                >
+                  <X size={13} />
+                </button>
+              )}
+              <span className="text-[10px] font-bold text-slate-500 px-2 py-0.5 bg-white rounded-md border border-slate-200 shrink-0">
+                {filtered.length}
+              </span>
+            </div>
+          )}
+
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5" role="listbox">
+            {filtered.length === 0 ? (
+              <div className="py-7 text-center text-xs text-slate-400">
+                {t("No category matching")} &ldquo;{query}&rdquo;
+              </div>
+            ) : (
+              filtered.map((c) => {
+                const isSelected = c.id === selectedId;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(c.id);
+                      setOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-xl text-left flex items-center justify-between transition-all cursor-pointer group ${
+                      isSelected
+                        ? "bg-indigo-50 text-indigo-950 font-semibold border border-indigo-100"
+                        : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600"
+                        }`}
+                      >
+                        <Tag size={14} />
+                      </div>
+                      <span className="text-xs truncate">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <PriorityBadge priority={c.default_priority} />
+                      {isSelected && (
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white shrink-0">
+                          <Check size={12} strokeWidth={3} />
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminRegisterComplaintPage() {
-  useDocumentTitle("New complaint");
+  const { t } = useI18n();
+  useDocumentTitle(t("New Complaint"));
   const router = useRouter();
   const { me, can } = useSession();
   const { limits, attachments } = useConfig();
@@ -144,16 +479,23 @@ export default function AdminRegisterComplaintPage() {
   const [created, setCreated] = useState<{ id: string; assignee: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Set default location to user's primary location when available
+  // Set default location to user's primary location or first scoped location when available
   useEffect(() => {
-    if (locationId === null && me?.primary_location?.id) {
-      setLocationId(me.primary_location.id);
+    if (locationId === null) {
+      if (me?.primary_location?.id) {
+        setLocationId(me.primary_location.id);
+      } else if (me?.scopes && me.scopes.length > 0) {
+        const scopeLoc = me.scopes.find((s) => s.location?.id)?.location;
+        if (scopeLoc?.id) {
+          setLocationId(scopeLoc.id);
+        }
+      }
     }
   }, [me, locationId]);
 
   const departments = useMemo(
-    () => (options?.departments ?? []).filter((d) => coversDepartment(me, d.id)),
-    [options, me],
+    () => options?.departments ?? [],
+    [options],
   );
   const department = departments.find((d) => d.id === departmentId) ?? null;
   const category = department?.categories.find((c) => c.id === categoryId) ?? null;
@@ -265,15 +607,15 @@ export default function AdminRegisterComplaintPage() {
 
         <div className="relative flex h-fit flex-col bg-white p-4 shadow-sm md:rounded-3xl md:px-6 md:py-5">
           {/* Mobile Header */}
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 lg:hidden">
+          <div className="mb-4 pt-4 flex items-center justify-between border-b border-slate-100 pb-3 lg:hidden">
             <Link
               href="/complaints"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
             >
               <ArrowLeft size={16} />
-              <span>Back</span>
+              <span>{t("Back")}</span>
             </Link>
-            <h1 className="text-base font-bold text-slate-900">New Complaint</h1>
+            <h1 className="text-base font-bold text-slate-900">{t("New Complaint")}</h1>
             <div className="w-12" aria-hidden="true" />
           </div>
 
@@ -317,7 +659,7 @@ export default function AdminRegisterComplaintPage() {
                     <span
                       className={`text-[11px] ${current ? "font-bold text-slate-900" : done ? "font-semibold text-slate-700" : "font-semibold text-slate-400"}`}
                     >
-                      {s.label}
+                      {t(s.label)}
                     </span>
                   </button>
                 </li>
@@ -329,70 +671,34 @@ export default function AdminRegisterComplaintPage() {
             <div className="flex flex-col gap-3">
               {/* Department */}
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="department" className="text-xs font-bold text-slate-900">
-                  Department <span className="text-red-500">*</span>
+                <label className="text-xs font-bold text-slate-900">
+                  {t("Department")} <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <FieldIcon>
-                    <Landmark size={14} aria-hidden="true" />
-                  </FieldIcon>
-                  <select
-                    id="department"
-                    value={departmentId ?? ""}
-                    disabled={!departments.length}
-                    onChange={(e) => {
-                      setDepartmentId(e.target.value ? Number(e.target.value) : null);
-                      setCategoryId(null);
-                    }}
-                    className={`${fieldBox} appearance-none pr-10`}
-                  >
-                    <option value="" disabled>
-                      {departments.length ? "Choose a department" : "Loading departments…"}
-                    </option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
-                    <ChevronDown size={16} aria-hidden="true" />
-                  </div>
-                </div>
+                <DepartmentDropdown
+                  departments={departments}
+                  selectedId={departmentId}
+                  onSelect={(id) => {
+                    setDepartmentId(id);
+                    setCategoryId(null);
+                  }}
+                  disabled={!departments.length}
+                />
               </div>
 
               {/* Category */}
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="category" className="text-xs font-bold text-slate-900">
-                  Category <span className="text-red-500">*</span>
+                <label className="text-xs font-bold text-slate-900">
+                  {t("Category")} <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <FieldIcon>
-                    <LayoutGrid size={14} aria-hidden="true" />
-                  </FieldIcon>
-                  <select
-                    id="category"
-                    value={categoryId ?? ""}
-                    disabled={!department}
-                    onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
-                    className={`${fieldBox} appearance-none pr-10`}
-                  >
-                    <option value="" disabled>
-                      Choose a category
-                    </option>
-                    {department?.categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
-                    <ChevronDown size={16} aria-hidden="true" />
-                  </div>
-                </div>
+                <CategoryDropdown
+                  department={department}
+                  selectedId={categoryId}
+                  onSelect={(id) => setCategoryId(id)}
+                  disabled={!department}
+                />
                 {category && (
                   <p className="text-[12px] text-slate-500">
-                    Complaints like this are handled with {category.default_priority.name.toLowerCase()} priority.
+                    {t("Priority:")} <span className="font-semibold text-slate-700">{t(category.default_priority.name)}</span>
                   </p>
                 )}
               </div>
@@ -400,7 +706,7 @@ export default function AdminRegisterComplaintPage() {
               {/* Title */}
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="title" className="text-xs font-bold text-slate-900">
-                  Title <span className="text-red-500">*</span>
+                  {t("Title")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <FieldIcon>
@@ -411,7 +717,7 @@ export default function AdminRegisterComplaintPage() {
                     maxLength={limits.title}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="A short summary of the problem"
+                    placeholder={t("A short summary of the problem")}
                     className={fieldBox}
                   />
                 </div>
@@ -421,7 +727,7 @@ export default function AdminRegisterComplaintPage() {
               {/* Description */}
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="description" className="text-xs font-bold text-slate-900">
-                  Description <span className="text-red-500">*</span>
+                  {t("Description")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <FieldIcon top>
@@ -433,7 +739,7 @@ export default function AdminRegisterComplaintPage() {
                     maxLength={limits.description}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What happened, since when, and anything else that helps"
+                    placeholder={t("What happened, since when, and anything else that helps")}
                     className={`${fieldBox} min-h-24 resize-y`}
                   />
                 </div>
@@ -444,14 +750,14 @@ export default function AdminRegisterComplaintPage() {
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-900">
-                    Workplace / Location <span className="text-red-500">*</span>
+                    {t("Workplace / Location")} <span className="text-red-500">*</span>
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowLocationPicker(!showLocationPicker)}
                     className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
                   >
-                    {showLocationPicker ? "Done selecting" : locationDisplayName ? "Change location" : "Choose location"}
+                    {showLocationPicker ? t("Done selecting") : locationDisplayName ? t("Change location") : t("Choose location")}
                   </button>
                 </div>
 
@@ -462,20 +768,28 @@ export default function AdminRegisterComplaintPage() {
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-800">{locationDisplayName}</span>
                         <span className="text-[11px] text-slate-500">
-                          Complaint routing will use this workplace location.
+                          {t("Complaint routing will use this workplace location.")}
                         </span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 space-y-2">
                     <LocationPicker
                       value={effectiveLocationId}
                       onChange={(id) => {
                         setLocationId(id);
-                        if (id) setShowLocationPicker(false);
                       }}
                     />
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowLocationPicker(false)}
+                        className="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        {t("Confirm Location")}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -483,7 +797,7 @@ export default function AdminRegisterComplaintPage() {
               {/* Optional Room / Desk / Landmark */}
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="details" className="text-xs font-bold text-slate-900">
-                  Room / Desk / Landmark <span className="font-normal text-slate-400">(optional)</span>
+                  {t("Room / Desk / Landmark")} <span className="font-normal text-slate-400">{t("(optional)")}</span>
                 </label>
                 <div className="relative">
                   <FieldIcon top>
@@ -495,7 +809,7 @@ export default function AdminRegisterComplaintPage() {
                     maxLength={limits.additional_details}
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
-                    placeholder="e.g. Room 204, 2nd floor desk near printer, or any specific spot"
+                    placeholder={t("e.g. Room 204, 2nd floor desk near printer, or any specific spot")}
                     className={`${fieldBox} resize-none`}
                   />
                 </div>
@@ -507,7 +821,7 @@ export default function AdminRegisterComplaintPage() {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                      <UploadCloud size={14} className="text-indigo-600" aria-hidden="true" /> Photos and documents (optional)
+                      <UploadCloud size={14} className="text-indigo-600" aria-hidden="true" /> {t("Photos and documents (optional)")}
                     </span>
                     <span className="text-[11px] font-semibold text-slate-400">
                       Up to {maxFiles}
@@ -533,7 +847,7 @@ export default function AdminRegisterComplaintPage() {
                     }`}
                   >
                     <UploadCloud size={18} className="mb-1 text-indigo-600" aria-hidden="true" />
-                    <span className="text-xs font-bold text-slate-800">Tap to choose files, or drop them here</span>
+                    <span className="text-xs font-bold text-slate-800">{t("Tap to choose files, or drop them here")}</span>
                     <span className="text-[11px] font-semibold uppercase text-slate-400">
                       {attachments.allowed_types.join(", ")}
                     </span>
@@ -596,33 +910,33 @@ export default function AdminRegisterComplaintPage() {
             <div className="flex flex-col gap-3 text-sm text-slate-700">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div>
-                  <h2 className="text-[15px] font-bold text-slate-900">Check your complaint</h2>
-                  <p className="text-[12px] text-slate-500">Edit anything that isn&apos;t right, then submit it.</p>
+                  <h2 className="text-[15px] font-bold text-slate-900">{t("Check your complaint")}</h2>
+                  <p className="text-[12px] text-slate-500">{t("Edit anything that isn't right, then submit it.")}</p>
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
-                  <Clock size={11} aria-hidden="true" /> Step 2 of 2
+                  <Clock size={11} aria-hidden="true" /> {t("Step 2 of 2")}
                 </span>
               </div>
               {[
                 {
-                  title: "Details",
+                  title: t("Details"),
                   icon: FileText,
                   goTo: 1 as Step,
                   rows: [
-                    ["Department", department.name],
-                    ["Category", category.name],
-                    ["Starting Priority", category.default_priority.name],
-                    ["Title", title],
-                    ["Description", description],
+                    [t("Department"), department.name],
+                    [t("Category"), category.name],
+                    [t("Starting Priority"), t(category.default_priority.name)],
+                    [t("Title"), title],
+                    [t("Description"), description],
                   ],
                 },
                 {
-                  title: "Location",
+                  title: t("Location"),
                   icon: MapPin,
                   goTo: 1 as Step,
                   rows: [
-                    ["Workplace / Location", locationDisplayName || "Selected location"],
-                    ...(details.trim() ? [["Room / Desk / Landmark", details]] : []),
+                    [t("Workplace / Location"), locationDisplayName || t("Selected location")],
+                    ...(details.trim() ? [[t("Room / Desk / Landmark"), details]] : []),
                   ],
                 },
               ].map((card) => (
@@ -636,7 +950,7 @@ export default function AdminRegisterComplaintPage() {
                       onClick={() => setStep(card.goTo)}
                       className="flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2 py-0.5 text-[11px] font-bold text-blue-600 shadow-sm hover:bg-blue-50 cursor-pointer"
                     >
-                      <Edit3 size={10} aria-hidden="true" /> Edit
+                      <Edit3 size={10} aria-hidden="true" /> {t("Edit")}
                     </button>
                   </div>
                   <dl className="grid gap-1.5">
@@ -652,10 +966,10 @@ export default function AdminRegisterComplaintPage() {
               {canAttach && (
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/90 p-3 shadow-sm">
                   <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                    <Paperclip size={13} className="text-blue-600" aria-hidden="true" /> Files ({files.length})
+                    <Paperclip size={13} className="text-blue-600" aria-hidden="true" /> {t("Files")} ({files.length})
                   </h3>
                   <p className="text-[12px] text-slate-500">
-                    {files.length ? files.map((f) => f.name).join(", ") : "No files attached."}
+                    {files.length ? files.map((f) => f.name).join(", ") : t("No files attached.")}
                   </p>
                 </div>
               )}
@@ -666,16 +980,16 @@ export default function AdminRegisterComplaintPage() {
           {step === 3 && created && (
             <div className="flex flex-col items-center gap-5 py-4 text-center">
               <div>
-                <h2 className="text-2xl font-black text-slate-900 md:text-3xl">Complaint registered</h2>
+                <h2 className="text-2xl font-black text-slate-900 md:text-3xl">{t("Complaint registered")}</h2>
                 <p className="mt-2 text-sm text-slate-500 font-medium">
                   {created.assignee
-                    ? `Registered and routed to ${created.assignee}.`
-                    : "Registered; it has been routed to the department queue."}
+                    ? `${t("Registered and routed to")} ${created.assignee}.`
+                    : t("Registered; it has been routed to the department queue.")}
                 </p>
               </div>
               <div className="flex w-full max-w-md items-center justify-between rounded-2xl border border-slate-100 bg-[#f0f4f8] p-5">
                 <div className="text-left">
-                  <p className="mb-1 text-xs font-medium text-slate-500">Complaint ID</p>
+                  <p className="mb-1 text-xs font-medium text-slate-500">{t("Complaint ID")}</p>
                   <p className="font-mono text-xl font-black tracking-tight text-slate-900">{created.id}</p>
                 </div>
                 <button
@@ -689,17 +1003,17 @@ export default function AdminRegisterComplaintPage() {
                   className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-100 cursor-pointer"
                 >
                   {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}{" "}
-                  {copied ? "Copied" : "Copy"}
+                  {copied ? t("Copied") : t("Copy")}
                 </button>
               </div>
-              <p className="text-[12px] text-slate-400">Registered {formatDateTime(new Date().toISOString())}</p>
+              <p className="text-[12px] text-slate-400">{t("Registered")} {formatDateTime(new Date().toISOString())}</p>
               <div className="flex w-full max-w-md flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => router.push(`/complaints/${encodeURIComponent(created.id)}`)}
                   className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700 cursor-pointer transition-colors"
                 >
-                  View complaint
+                  {t("View complaint")}
                 </button>
                 <button
                   type="button"
@@ -714,7 +1028,7 @@ export default function AdminRegisterComplaintPage() {
                   }}
                   className="flex-1 rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
                 >
-                  Register another
+                  {t("Register another")}
                 </button>
               </div>
             </div>
@@ -740,7 +1054,7 @@ export default function AdminRegisterComplaintPage() {
                   }}
                   className="flex flex-[0.8] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-bold text-blue-600 hover:bg-slate-100 cursor-pointer transition-colors"
                 >
-                  <ArrowLeft size={16} className="mr-2" aria-hidden="true" /> Back
+                  <ArrowLeft size={16} className="mr-2" aria-hidden="true" /> {t("Back")}
                 </button>
               )}
               {step === 1 ? (
@@ -749,7 +1063,7 @@ export default function AdminRegisterComplaintPage() {
                   onClick={next}
                   className="flex flex-[1.2] items-center justify-center rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 cursor-pointer transition-colors"
                 >
-                  Next <ArrowRight size={16} className="ml-2" aria-hidden="true" />
+                  {t("Next")} <ArrowRight size={16} className="ml-2" aria-hidden="true" />
                 </button>
               ) : (
                 <button
@@ -759,10 +1073,10 @@ export default function AdminRegisterComplaintPage() {
                   className="flex flex-[1.2] items-center justify-center rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-700 disabled:opacity-50 cursor-pointer transition-colors"
                 >
                   {submitting ? (
-                    "Sending…"
+                    t("Sending…")
                   ) : (
                     <>
-                      <Send size={16} className="mr-2" aria-hidden="true" /> Send complaint
+                      <Send size={16} className="mr-2" aria-hidden="true" /> {t("Send complaint")}
                     </>
                   )}
                 </button>

@@ -5,12 +5,14 @@ import Link from "next/link";
 import { api, DashboardStats, StatusGroup } from "@/lib/api";
 import { GROUP_COLORS, GROUP_LABELS } from "@/lib/status";
 import { useApiData } from "@/lib/hooks";
+import { useI18n } from "@/lib/i18n";
 import { CardDateFilter, DateRange } from "./CardDateFilter";
 
 const GROUPS: StatusGroup[] = ["open", "in_progress", "resolved", "rejected"];
 
 /** Donut of every status group (they always add up to the total). */
 export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardStats | undefined; loading: boolean }) {
+  const { t } = useI18n();
   const [hovered, setHovered] = useState<StatusGroup | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>(null);
 
@@ -39,7 +41,7 @@ export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardSt
   return (
     <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-200/60  shadow-[0_2px_12px_rgba(0,0,0,0.04)] h-full transition-shadow hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <h2 className="text-base font-bold text-slate-800">Complaints by status</h2>
+        <h2 className="text-base font-bold text-slate-800">{t("Complaints by status")}</h2>
         <CardDateFilter onChange={setDateRange} />
       </div>
       {isLoading ? (
@@ -49,7 +51,7 @@ export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardSt
       ) : (
         <div className="flex flex-col items-center justify-center flex-1 gap-5">
           <div className="relative w-40 h-40 shrink-0">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 180 180" role="img" aria-label="Complaints by status">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 180 180" role="img" aria-label={t("Complaints by status")}>
               <circle cx="90" cy="90" r={radius} stroke="#f1f5f9" strokeWidth={strokeWidth} fill="transparent" />
               {slices
                 .filter((s) => s.fraction > 0)
@@ -72,7 +74,7 @@ export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardSt
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-2xl font-extrabold text-slate-800 leading-tight">{total.toLocaleString()}</span>
-              <span className="text-xs font-semibold text-slate-400">Total</span>
+              <span className="text-xs font-semibold text-slate-400">{t("Total")}</span>
             </div>
           </div>
           <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 w-full">
@@ -90,7 +92,7 @@ export function ComplaintsByStatusChart({ stats, loading }: { stats: DashboardSt
                     aria-hidden="true"
                   />
                   <span className="min-w-0">
-                    <span className="block font-semibold text-slate-700 truncate">{GROUP_LABELS[s.group]}</span>
+                    <span className="block font-semibold text-slate-700 truncate">{t(GROUP_LABELS[s.group])}</span>
                     <span className="block text-slate-600">
                       {s.count.toLocaleString()}{" "}
                       <span className="text-slate-400">({stats?.status_breakdown[s.group].percentage ?? 0}%)</span>

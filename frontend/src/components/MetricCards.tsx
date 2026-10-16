@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { Change } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 export interface MetricCardData {
   id: string;
@@ -21,9 +22,10 @@ const SENTIMENT_COLOR: Record<Change["sentiment"], string> = {
 };
 
 function ChangeLine({ change, days }: { change: Change | null; days: number }) {
-  if (change === null) return <span className="text-xs text-slate-400">No data for the previous {days} days</span>;
+  const { t } = useI18n();
+  if (change === null) return <span className="text-xs text-slate-400">{t("No data for the previous {days} days", { days })}</span>;
   const Icon = change.direction === "up" ? ArrowUpRight : change.direction === "down" ? ArrowDownRight : Minus;
-  const verdict = change.sentiment === "neutral" ? "" : change.sentiment === "good" ? " (better)" : " (worse)";
+  const verdict = change.sentiment === "neutral" ? "" : change.sentiment === "good" ? ` (${t("better")})` : ` (${t("worse")})`;
   return (
     <span className="flex flex-wrap items-center gap-x-1.5 text-xs">
       <span className={`font-semibold flex items-center ${SENTIMENT_COLOR[change.sentiment]}`}>
@@ -31,7 +33,7 @@ function ChangeLine({ change, days }: { change: Change | null; days: number }) {
         {change.percent > 0 ? "+" : ""}
         {change.percent}%<span className="sr-only">{verdict}</span>
       </span>
-      <span className="text-slate-400">vs previous {days} days</span>
+      <span className="text-slate-400">{t("vs previous {days} days", { days })}</span>
     </span>
   );
 }

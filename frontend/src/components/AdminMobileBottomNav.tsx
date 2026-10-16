@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { ArrowUpCircle, BarChart3, Bell, FileText, Home, Plus, Settings, User, Users } from "lucide-react";
 import { useSession } from "@/lib/session";
+import { useI18n } from "@/lib/i18n";
 
 type NavIcon = React.ComponentType<{ className?: string; strokeWidth?: number }>;
 
@@ -27,6 +28,7 @@ function HomeSolid({ className }: { className?: string; strokeWidth?: number }) 
 export function AdminMobileBottomNav() {
   const pathname = usePathname();
   const { me, can } = useSession();
+  const { t } = useI18n();
   const isNewComplaint = pathname === "/complaints/new";
   const canCreate = !me?.is_super_admin && can("complaint.create") && !isNewComplaint;
 
@@ -36,7 +38,7 @@ export function AdminMobileBottomNav() {
   ];
 
   const middleItem: NavItem = can("complaint.assign")
-    ? { name: "Escalated", icon: ArrowUpCircle, href: "/escalated" }
+    ? { name: "Delayed", icon: ArrowUpCircle, href: "/escalated" }
     : can("reports.view")
       ? { name: "Reports", icon: BarChart3, href: "/reports" }
       : { name: "Notifications", icon: Bell, href: "/notifications" };
@@ -57,7 +59,7 @@ export function AdminMobileBottomNav() {
           <Icon className="h-6 w-6" strokeWidth={1.9} />
         </span>
         <span className={`whitespace-nowrap text-[11.5px] leading-none ${isActive ? "font-semibold" : "font-medium"}`}>
-          {item.name}
+          {t(item.name)}
         </span>
         <span className={`absolute bottom-2 h-[3px] w-11 rounded-full bg-blue-600 ${isActive ? "" : "invisible"}`} />
       </Link>

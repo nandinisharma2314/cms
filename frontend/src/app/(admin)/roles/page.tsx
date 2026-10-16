@@ -27,6 +27,68 @@ function groupPermissions(permissions: PermissionDef[]): [string, PermissionDef[
   return Array.from(groups.entries());
 }
 
+const PERMISSION_TITLES: Record<string, string> = {
+  "complaint.view": "View Complaints",
+  "complaint.create": "Register Complaints",
+  "complaint.respond": "Reply to Complaints",
+  "complaint.resolve": "Solve Complaints",
+  "complaint.close": "Close & Reopen Complaints",
+  "complaint.receive": "Auto-Receive Complaints",
+  "complaint.assign": "Assign Complaints to Staff",
+  "complaint.reassign": "Move Complaints to Staff",
+  "complaint.reject.request": "Ask to Reject Complaint",
+  "complaint.reject.approve": "Approve Rejections",
+  "complaint.reclassify": "Change Department / Area",
+
+  "user.view": "View Staff Members",
+  "user.create": "Add New Staff",
+  "user.update": "Edit Staff Details",
+  "user.deactivate": "Turn Staff On / Off",
+  "user.reset_password": "Reset Staff Password",
+
+  "end_user.view": "View Citizen Accounts",
+  "end_user.create": "Add Citizen Accounts",
+  "end_user.update": "Edit Citizen Details",
+  "end_user.import": "Upload Citizens (CSV)",
+
+  "department.view": "View Departments",
+  "department.create": "Create Departments",
+  "department.update": "Edit Departments",
+
+  "location.view": "View Cities & Areas",
+  "location.create": "Create Cities & Areas",
+  "location.update": "Edit Cities & Areas",
+  "location.import": "Upload Areas (CSV)",
+
+  "role.view": "View User Roles",
+  "role.manage": "Manage Roles & Access",
+
+  "sla.manage": "Time Limits & Delay Rules",
+  "settings.manage": "App Settings",
+
+  "reports.view": "View Reports",
+  "audit.view": "Activity History Log",
+
+  "grievance.file": "File Staff Complaint",
+  "grievance.view_own": "Track Own Complaints",
+  "grievance.manage": "Solve Staff Complaints",
+  "grievance.view_all": "View All Staff Complaints",
+
+  "team.view": "View Team Members",
+  "team.manage": "Manage Team Workload",
+
+  "rewards.view": "View Rewards & Points",
+  "rewards.manage": "Manage Reward Rules",
+
+  "portal.complaint.create": "Submit Complaints",
+  "portal.complaint.attach": "Attach Photos & Files",
+  "portal.complaint.comment": "Reply on Complaints",
+  "portal.complaint.confirm": "Confirm & Close Complaint",
+  "portal.complaint.reopen": "Reopen Complaint",
+  "portal.complaint.feedback": "Rate & Review",
+  "portal.profile.update": "Edit Own Profile",
+};
+
 function NewRoleDialog({
   roles,
   onClose,
@@ -297,10 +359,10 @@ function RoleDetailPanel({
                 // portal permissions, so anyone who manages roles may grant those.
                 const grantable = role.editable && (endUserRole || can(p.key));
                 return (
-                  <label key={p.key} className={`flex items-start gap-2 text-xs ${grantable ? "cursor-pointer" : "opacity-60"}`}>
+                  <label key={p.key} className={`flex items-start gap-2.5 p-1.5 rounded-lg hover:bg-slate-100/70 transition-colors text-xs ${grantable ? "cursor-pointer" : "opacity-60"}`}>
                     <input
                       type="checkbox"
-                      className="mt-0.5"
+                      className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       disabled={!grantable}
                       checked={draft.has(p.key)}
                       onChange={(e) => {
@@ -310,9 +372,16 @@ function RoleDetailPanel({
                         setDraft(next);
                       }}
                     />
-                    <span>
-                      <span className="font-mono text-[11px] text-slate-800">{p.key}</span>
-                      <span className="block text-[11px] text-slate-500">{p.description}</span>
+                    <span className="min-w-0">
+                      <span className="font-bold text-xs text-slate-800 block">
+                        {PERMISSION_TITLES[p.key] || p.key}
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400 block">
+                        {p.key}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 mt-0.5 leading-snug">
+                        {p.description}
+                      </span>
                     </span>
                   </label>
                 );
@@ -361,8 +430,9 @@ function PermissionMatrix({ roles, permissions }: { roles: RoleDetail[]; permiss
               </tr>
               {list.map((p) => (
                 <tr key={p.key} className="border-b border-slate-50">
-                  <td className="sticky left-0 bg-white px-4 py-1.5" title={p.description}>
-                    <span className="font-mono text-[11px] text-slate-800">{p.key}</span>
+                  <td className="sticky left-0 bg-white px-4 py-2" title={p.description}>
+                    <div className="font-semibold text-xs text-slate-800">{PERMISSION_TITLES[p.key] || p.key}</div>
+                    <div className="font-mono text-[10px] text-slate-400">{p.key}</div>
                   </td>
                   {roles.map((r) => (
                     <td key={r.id} className="px-3 py-1.5 text-center">

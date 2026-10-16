@@ -8,9 +8,11 @@ import { useConfig } from "@/lib/portalConfig";
 import { formatDateTime, shortPlace } from "@/lib/portalFormat";
 import { useEndUser } from "@/lib/portalSession";
 import { departmentDot, GROUP_PILLS } from "@/lib/portalStatus";
+import { useI18n } from "@/lib/i18n";
 
 /** The end user's most recent complaints; a row opens its page. */
 export default function RecentComplaints() {
+  const { t } = useI18n();
   const { ui } = useConfig();
   const [complaints, setComplaints] = useState<Complaint[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,12 +28,12 @@ export default function RecentComplaints() {
   return (
     <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-1 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)] md:px-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[16px] font-bold text-[#0b1a3f] md:text-[17px]">Recent complaints</h2>
+        <h2 className="text-[16px] font-bold text-[#0b1a3f] md:text-[17px]">{t("Recent complaints")}</h2>
         <Link
           href="/dashboard/complaints"
           className="flex items-center text-[14px] font-semibold text-blue-600 hover:text-blue-700"
         >
-          View all <ChevronRight className="ml-0.5 h-4 w-4" strokeWidth={2.4} />
+          {t("View all")} <ChevronRight className="ml-0.5 h-4 w-4" strokeWidth={2.4} />
         </Link>
       </div>
 
@@ -53,10 +55,10 @@ export default function RecentComplaints() {
         </ul>
       ) : complaints.length === 0 ? (
         <p className="py-8 text-center text-[14px] text-slate-500">
-          You haven&apos;t registered any complaints yet.{" "}
+          {t("You haven't registered any complaints yet.")}{" "}
           {canCreate && (
             <Link href="/dashboard/register" className="font-semibold text-blue-600">
-              Register one
+              {t("Register one")}
             </Link>
           )}
         </p>
@@ -86,7 +88,7 @@ export default function RecentComplaints() {
                     <span
                       className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[11.5px] font-medium ${pill.className}`}
                     >
-                      {c.status_label}
+                      {t(c.status_label)}
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
                   </span>

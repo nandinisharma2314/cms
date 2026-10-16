@@ -6,9 +6,9 @@ import { Department, LocationNode, ScopeInput, UserScope } from "@/lib/api";
 import { LocationPicker } from "./LocationPicker";
 import { inputClass } from "./ui";
 
-export function scopeLabel(scope: UserScope): string {
-  const department = scope.department?.name ?? "All departments";
-  const location = scope.location?.label ?? "All locations";
+export function scopeLabel(scope: UserScope, t?: (k: string) => string): string {
+  const department = scope.department?.name ?? (t ? t("All departments") : "All departments");
+  const location = scope.location?.label ?? (t ? t("All locations") : "All locations");
   return `${department} · ${location}`;
 }
 

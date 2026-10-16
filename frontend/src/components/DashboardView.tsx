@@ -15,6 +15,7 @@ import { PendingActionsList } from "./PendingActionsList";
 import { scopeLabel } from "./ScopeEditor";
 import { TopDepartments } from "./TopDepartments";
 import { Card, ErrorBanner } from "./ui";
+import { useI18n } from "@/lib/i18n";
 
 const AREA_LINKS: Record<ConfigurationProblem["area"], string> = {
   settings: "/settings",
@@ -26,14 +27,15 @@ const AREA_LINKS: Record<ConfigurationProblem["area"], string> = {
 /** What the Super Admin still has to set up; hidden once everything is configured. */
 function SetupChecklist() {
   const { data } = useApiData(() => api.settings.status(), []);
+  const { t } = useI18n();
   if (!data || data.problems.length === 0) return null;
   return (
     <Card className="p-5 border-amber-200 bg-amber-50/60">
       <div className="flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
         <div className="space-y-2">
-          <h2 className="text-sm font-bold text-amber-900">Finish setting up</h2>
-          <p className="text-xs text-amber-800">Parts of the system don&apos;t work until these are configured:</p>
+          <h2 className="text-sm font-bold text-amber-900">{t("Finish setting up")}</h2>
+          <p className="text-xs text-amber-800">{t("Parts of the system don't work until these are configured:")}</p>
           <ul className="text-xs text-amber-900 space-y-1">
             {data.problems.map((p) => (
               <li key={p.field}>
@@ -50,7 +52,8 @@ function SetupChecklist() {
 }
 
 export function DashboardView() {
-  useDocumentTitle("Dashboard");
+  const { t } = useI18n();
+  useDocumentTitle(t("Dashboard"));
   const { me, can } = useSession();
   const { ui } = useConfig();
   const canViewComplaints = can("complaint.view");
@@ -72,7 +75,7 @@ export function DashboardView() {
     ? [
         {
           id: "total",
-          title: "Total complaints",
+          title: t("Total complaints"),
           value: m.total,
           change: m.total_change,
           icon: FileText,
@@ -81,7 +84,7 @@ export function DashboardView() {
         },
         {
           id: "open",
-          title: "Awaiting action",
+          title: t("Awaiting action"),
           value: m.open,
           change: m.open_change,
           icon: Clock,
@@ -90,7 +93,7 @@ export function DashboardView() {
         },
         {
           id: "in_progress",
-          title: "In progress",
+          title: t("In progress"),
           value: m.in_progress,
           change: m.in_progress_change,
           icon: Hourglass,
@@ -99,7 +102,7 @@ export function DashboardView() {
         },
         {
           id: "resolved",
-          title: "Resolved",
+          title: t("Resolved"),
           value: m.resolved,
           change: m.resolved_change,
           icon: CheckCircle2,
@@ -108,14 +111,14 @@ export function DashboardView() {
         },
       ]
     : [];
-  const scopeText = me.is_super_admin ? "Entire system" : me.scopes.map(scopeLabel).join("; ") || "No scope assigned";
+  const scopeText = me.is_super_admin ? t("Entire system") : me.scopes.map((s) => scopeLabel(s, t)).join("; ") || t("No scope assigned");
 
   return (
     <>
       <div className="-mt-5 sm:-mt-2">
-        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Welcome, {me.name}</h1>
+        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">{t("Welcome, {name}", { name: me.name })}</h1>
         <p className="text-xs text-slate-500 font-medium mt-1">
-          <span className="font-semibold text-slate-700">{me.role.name}</span> · {scopeText}
+          <span className="font-semibold text-slate-700">{t(me.role.name)}</span> · {scopeText}
         </p>
       </div>
 
@@ -158,7 +161,7 @@ export function DashboardView() {
                               : "text-slate-500 hover:text-slate-800"
                           }`}
                         >
-                          Latest in scope
+                          {t("Latest in scope")}
                           {recent.data && (
                             <span className="ml-1.5 text-[11px] text-slate-400 font-semibold">
                               ({recent.data.total})
@@ -174,7 +177,7 @@ export function DashboardView() {
                               : "text-slate-500 hover:text-slate-800"
                           }`}
                         >
-                          Raised by you
+                          {t("Raised by you")}
                           {myRaised.data && (
                             <span className="ml-1.5 text-[11px] font-semibold text-blue-500">
                               ({myRaised.data.total})
@@ -184,10 +187,10 @@ export function DashboardView() {
                       </div>
                     ) : (
                       <h2 className="text-base font-bold text-slate-800">
-                        Latest complaints
+                        {t("Latest complaints")}
                         {recent.data && (
                           <span className="ml-2 text-xs text-slate-400 font-medium">
-                            ({recent.data.total.toLocaleString()} in your scope)
+                            ({recent.data.total.toLocaleString()} {t("in your scope")})
                           </span>
                         )}
                       </h2>
@@ -197,14 +200,14 @@ export function DashboardView() {
                     href={complaintTab === "mine" ? "/complaints?created_by=me" : "/complaints"}
                     className="text-xs font-semibold text-blue-600 hover:text-blue-700"
                   >
-                    View all
+                    {t("View all")}
                   </Link>
                 </div>
                 <ComplaintTable
                   compact
                   complaints={(complaintTab === "mine" ? myRaised.data?.items : recent.data?.items) ?? []}
                   loading={complaintTab === "mine" ? myRaised.loading : recent.loading}
-                  emptyText={complaintTab === "mine" ? "You haven't raised any complaints yet." : "No complaints in your scope yet."}
+                  emptyText={complaintTab === "mine" ? t("You haven't raised any complaints yet.") : t("No complaints in your scope yet.")}
                 />
               </Card>
             )}
@@ -217,7 +220,7 @@ export function DashboardView() {
         </>
       ) : (
         <Card className="p-8 text-center text-xs text-slate-500">
-          Your role doesn&apos;t include complaints. Use the menu for the areas you manage.
+          {t("Your role doesn't include complaints. Use the menu for the areas you manage.")}
         </Card>
       )}
     </>

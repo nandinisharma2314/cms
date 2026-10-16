@@ -9,6 +9,7 @@ import { useSession } from "@/lib/session";
 import { scopeLabel } from "./ScopeEditor";
 import { StatusBadge } from "./ui";
 import { ChangeAvatarModal } from "./ChangeAvatarModal";
+import { useI18n } from "@/lib/i18n";
 
 function greetingFor(hour: number) {
   if (hour < 12) return "Good morning";
@@ -18,6 +19,7 @@ function greetingFor(hour: number) {
 
 export function StaffMobileDashboard() {
   const { me, can, setMe } = useSession();
+  const { t } = useI18n();
   const canViewComplaints = can("complaint.view");
   const canCreate = !me.is_super_admin && can("complaint.create");
   const isAgent = me.role.key === "agent" || me.role.key === "field_worker";
@@ -139,7 +141,7 @@ export function StaffMobileDashboard() {
         },
       ];
 
-  const scopeText = me.is_super_admin ? "Entire system" : me.scopes.map(scopeLabel).join("; ") || null;
+  const scopeText = me.is_super_admin ? t("Entire system") : me.scopes.map((s) => scopeLabel(s, t)).join("; ") || null;
   const hour = new Date().getHours();
 
   return (
@@ -147,16 +149,16 @@ export function StaffMobileDashboard() {
       {/* 1. Greeting & Profile Section */}
       <div className="flex items-start justify-between gap-3 mt-2 px-1">
         <div className="min-w-0">
-          <p className="text-[14px] text-slate-500">{greetingFor(hour)},</p>
+          <p className="text-[14px] text-slate-500">{t(greetingFor(hour))},</p>
           <h1 className="mt-0.5 text-[22px] font-bold leading-tight tracking-tight text-slate-900 truncate">
             {me.name} <span aria-hidden="true">👋</span>
           </h1>
           <div className="mt-1 flex flex-col items-start gap-0.5 text-[12px]">
-            <span className="font-semibold text-blue-600">{me.role.name}</span>
+            <span className="font-semibold text-blue-600">{t(me.role.name)}</span>
             {scopeText && <span className="text-slate-400 text-[11px] truncate">{scopeText}</span>}
             {me.reports_to && (
               <span className="text-amber-500 font-medium">
-                {me.reports_to.designation || "Reports to"}: {me.reports_to.name}
+                {t(me.reports_to.designation || "Reports to")}: {me.reports_to.name}
               </span>
             )}
           </div>
@@ -174,7 +176,7 @@ export function StaffMobileDashboard() {
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${me.is_available ? "bg-emerald-500" : "bg-slate-400"}`} />
-            {me.is_available ? "Available" : "Off duty"}
+            {me.is_available ? t("Available") : t("Off duty")}
           </button>
         </div>
       </div>
@@ -182,21 +184,21 @@ export function StaffMobileDashboard() {
       {/* 2. Stat Tiles Card (Matches End User StatCard perfectly) */}
       <section className="rounded-2xl bg-white p-3.5 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
         <div className="mb-3 flex items-center justify-between px-1">
-          <h2 className="text-[15px] font-bold text-[#0b1a3f]">Work queue</h2>
+          <h2 className="text-[15px] font-bold text-[#0b1a3f]">{t("Work queue")}</h2>
           <Link href="/complaints" className="flex items-center text-[13px] font-semibold text-blue-600 hover:text-blue-700">
-            View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
+            {t("View all")} <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
           </Link>
         </div>
 
         <div className="grid grid-cols-4 gap-2">
-          {tiles.map((t) => (
+          {tiles.map((tile) => (
             <Link
-              key={t.label}
-              href={t.href}
-              className={`rounded-xl px-1 py-3 text-center transition-transform active:scale-[0.98] ${t.tile}`}
+              key={tile.label}
+              href={tile.href}
+              className={`rounded-xl px-1 py-3 text-center transition-transform active:scale-[0.98] ${tile.tile}`}
             >
-              <div className={`text-[20px] font-bold leading-none ${t.value}`}>{loading ? "–" : t.count}</div>
-              <div className={`mt-2 truncate text-[11px] font-medium leading-none ${t.caption}`}>{t.label}</div>
+              <div className={`text-[20px] font-bold leading-none ${tile.value}`}>{loading ? "–" : tile.count}</div>
+              <div className={`mt-2 truncate text-[11px] font-medium leading-none ${tile.caption}`}>{t(tile.label)}</div>
             </Link>
           ))}
         </div>
@@ -214,9 +216,9 @@ export function StaffMobileDashboard() {
             </span>
             <div className="min-w-0">
               <div className="text-[13.5px] font-bold text-violet-950 truncate">
-                {pending?.escalated_to_me} escalated {pending?.escalated_to_me === 1 ? "complaint" : "complaints"}
+                {pending?.escalated_to_me} {t("delayed")} {pending?.escalated_to_me === 1 ? t("complaint") : t("complaints")}
               </div>
-              <p className="text-[11.5px] text-violet-700">Requires review or reassignment</p>
+              <p className="text-[11.5px] text-violet-700">{t("Needs your quick check or assignment")}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-violet-400" />
@@ -232,9 +234,9 @@ export function StaffMobileDashboard() {
             </span>
             <div className="min-w-0">
               <div className="text-[13.5px] font-bold text-violet-950 truncate">
-                {m?.escalated} escalated {m?.escalated === 1 ? "complaint" : "complaints"}
+                {m?.escalated} {t("delayed")} {m?.escalated === 1 ? t("complaint") : t("complaints")}
               </div>
-              <p className="text-[11.5px] text-violet-700">Delayed SLA targets requiring attention</p>
+              <p className="text-[11.5px] text-violet-700">{t("Running late, please check")}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-violet-400" />
@@ -250,9 +252,9 @@ export function StaffMobileDashboard() {
             </span>
             <div className="min-w-0">
               <div className="text-[13.5px] font-bold text-amber-950 truncate">
-                {m?.sla_breached} delayed {m?.sla_breached === 1 ? "complaint" : "complaints"}
+                {m?.sla_breached} {t("delayed")} {m?.sla_breached === 1 ? t("complaint") : t("complaints")}
               </div>
-              <p className="text-[11.5px] text-red-700">SLA breached — immediate action required</p>
+              <p className="text-[11.5px] text-red-700">{t("SLA breached — immediate action required")}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-red-400" />
@@ -262,12 +264,12 @@ export function StaffMobileDashboard() {
       {/* 4. Recent Requests / Tasks Feed (Matches RecentComplaints.tsx styling) */}
       <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-1 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-[15px] font-bold text-[#0b1a3f]">{isAgent ? "Assigned to you" : "Recent requests"}</h2>
+          <h2 className="text-[15px] font-bold text-[#0b1a3f]">{isAgent ? t("Assigned to you") : t("Recent requests")}</h2>
           <Link
             href={isAgent ? "/complaints?assigned=me" : "/complaints"}
             className="flex items-center text-[13px] font-semibold text-blue-600 hover:text-blue-700"
           >
-            View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
+            {t("View all")} <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
           </Link>
         </div>
 
@@ -284,7 +286,7 @@ export function StaffMobileDashboard() {
             ))}
           </ul>
         ) : !complaints || complaints.length === 0 ? (
-          <p className="py-7 text-center text-[13px] text-slate-500">No active complaints in your queue.</p>
+          <p className="py-7 text-center text-[13px] text-slate-500">{t("No active complaints in your queue.")}</p>
         ) : (
           <ul>
             {complaints.map((c) => (
@@ -332,25 +334,25 @@ export function StaffMobileDashboard() {
       {canCreate && !loading && (
         <section className="min-w-0 flex-1 rounded-2xl bg-white px-4 pb-3 pt-4 shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[15px] font-bold text-[#0b1a3f]">Requests you raised</h2>
+            <h2 className="text-[15px] font-bold text-[#0b1a3f]">{t("Requests you raised")}</h2>
             {createdComplaints && createdComplaints.length > 0 && (
               <Link
                 href="/complaints?created_by=me"
                 className="flex items-center text-[13px] font-semibold text-blue-600 hover:text-blue-700"
               >
-                View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
+                {t("View all")} <ChevronRight className="ml-0.5 h-3.5 w-3.5" strokeWidth={2.4} />
               </Link>
             )}
           </div>
 
           {!createdComplaints || createdComplaints.length === 0 ? (
             <div className="py-4 text-center">
-              <p className="text-[12px] text-slate-500 mb-2">You haven&apos;t raised any complaints yet.</p>
+              <p className="text-[12px] text-slate-500 mb-2">{t("You haven't registered any complaints yet.")}</p>
               <Link
                 href="/complaints/new"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition-colors"
               >
-                + Register complaint
+                + {t("Register complaint")}
               </Link>
             </div>
           ) : (

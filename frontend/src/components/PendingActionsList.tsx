@@ -6,6 +6,7 @@ import { ArrowUpCircle, Ban, ChevronRight, Clock, Inbox, KeyRound, TimerOff, Use
 import { DashboardStats } from "@/lib/api";
 import { plural } from "@/lib/format";
 import { useSession } from "@/lib/session";
+import { useI18n } from "@/lib/i18n";
 import { ResetTicketsDialog } from "./ResetTicketsDialog";
 
 function ActionRow({
@@ -61,13 +62,14 @@ export function PendingActionsList({
   onRefresh: () => void;
 }) {
   const { can } = useSession();
+  const { t } = useI18n();
   const [resetsOpen, setResetsOpen] = useState(false);
   const summary = stats?.pending_summary;
   const metrics = stats?.metrics;
 
   return (
     <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.03)] h-full">
-      <h2 className="text-base font-bold text-slate-800 mb-4">Waiting for you</h2>
+      <h2 className="text-base font-bold text-slate-800 mb-4">{t("Waiting for you")}</h2>
       {loading || !summary || !metrics ? (
         <div className="flex flex-col gap-2.5 animate-pulse">
           {[1, 2, 3, 4].map((i) => (
@@ -83,8 +85,8 @@ export function PendingActionsList({
                 onClick={() => setResetsOpen(true)}
                 icon={KeyRound}
                 tint="bg-blue-600 text-white"
-                title={plural(summary.pending_resets, "password reset request", "password reset requests")}
-                subtitle="Waiting for your approval"
+                title={`${summary.pending_resets} ${t("password reset requests")}`}
+                subtitle={t("Waiting for your approval")}
               />
             ),
             summary.rejection_requests > 0 && (
@@ -93,8 +95,8 @@ export function PendingActionsList({
                 href="/rejection-requests"
                 icon={Ban}
                 tint="bg-fuchsia-600 text-white"
-                title={`${plural(summary.rejection_requests, "rejection request", "rejection requests")} to decide`}
-                subtitle="Approve or deny them"
+                title={`${summary.rejection_requests} ${t("rejection requests to decide")}`}
+                subtitle={t("Approve or deny them")}
               />
             ),
             summary.escalated_to_me > 0 && (
@@ -103,8 +105,8 @@ export function PendingActionsList({
                 href="/escalated"
                 icon={ArrowUpCircle}
                 tint="bg-rose-600 text-white"
-                title={`${plural(summary.escalated_to_me, "complaint", "complaints")} escalated to you`}
-                subtitle="A target was missed below you; you are now accountable"
+                title={`${summary.escalated_to_me} ${t("delayed complaints waiting for you")}`}
+                subtitle={t("These complaints took too long and need your action")}
               />
             ),
             metrics.sla_breached > 0 && (
@@ -113,8 +115,8 @@ export function PendingActionsList({
                 href="/complaints?sla=breached"
                 icon={TimerOff}
                 tint="bg-rose-50 text-rose-600"
-                title={`${plural(metrics.sla_breached, "complaint", "complaints")} past a target`}
-                subtitle="Response or resolution time missed"
+                title={`${metrics.sla_breached} ${t("delayed complaints running late")}`}
+                subtitle={t("Time limit missed, please check")}
               />
             ),
             metrics.sla_at_risk > 0 && (
@@ -123,8 +125,8 @@ export function PendingActionsList({
                 href="/complaints?sla=at_risk"
                 icon={Clock}
                 tint="bg-amber-50 text-amber-600"
-                title={`${plural(metrics.sla_at_risk, "complaint", "complaints")} due soon`}
-                subtitle="Inside the warning window of a target"
+                title={`${metrics.sla_at_risk} ${t("complaints due soon")}`}
+                subtitle={t("Inside the warning window of a target")}
               />
             ),
             (summary.assigned_to_me > 0 || can("complaint.receive")) && (
@@ -133,8 +135,8 @@ export function PendingActionsList({
                 href="/complaints?assigned=me"
                 icon={Inbox}
                 tint="bg-blue-50 text-blue-600"
-                title={`${plural(summary.assigned_to_me, "open complaint", "open complaints")} assigned to you`}
-                subtitle="Waiting for action or in progress"
+                title={`${summary.assigned_to_me} ${t("open complaints assigned to you")}`}
+                subtitle={t("Waiting for action or in progress")}
               />
             ),
             can("complaint.assign") && summary.unassigned > 0 && (
@@ -143,8 +145,8 @@ export function PendingActionsList({
                 href="/complaints?assigned=unassigned"
                 icon={UserCheck}
                 tint="bg-amber-50 text-amber-600"
-                title={`${plural(summary.unassigned, "complaint", "complaints")} waiting for someone`}
-                subtitle="Nobody in scope was available to take them"
+                title={`${summary.unassigned} ${t("complaints waiting for someone")}`}
+                subtitle={t("Nobody in scope was available to take them")}
               />
             ),
             summary.total_users !== null && (
@@ -153,15 +155,15 @@ export function PendingActionsList({
                 href="/users"
                 icon={Users2}
                 tint="bg-slate-100 text-slate-600"
-                title={`${plural(summary.total_users, "staff account", "staff accounts")} under you`}
-                subtitle="People you can manage"
+                title={`${summary.total_users} ${t("staff accounts under you")}`}
+                subtitle={t("People you can manage")}
               />
             ),
           ].filter(Boolean);
           return rows.length ? (
             <div className="flex flex-col gap-2.5 overflow-y-auto">{rows}</div>
           ) : (
-            <p className="flex flex-1 items-center justify-center text-xs text-slate-400">Nothing is waiting for you.</p>
+            <p className="flex flex-1 items-center justify-center text-xs text-slate-400">{t("Nothing is waiting for you.")}</p>
           );
         })()
       )}

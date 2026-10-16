@@ -31,6 +31,7 @@ import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
 import { formatBytes, formatDateTime } from "@/lib/portalFormat";
 import { useEndUser } from "@/lib/portalSession";
 import { attachmentProblem } from "@/lib/attachments";
+import { useI18n } from "@/lib/i18n";
 
 type Step = 1 | 2 | 3;
 
@@ -113,7 +114,8 @@ function Aside() {
 }
 
 export default function RegisterComplaintPage() {
-  useDocumentTitle("New complaint");
+  const { t } = useI18n();
+  useDocumentTitle(t("Register complaint"));
   const router = useRouter();
   const { profile, can } = useEndUser();
   const { limits, attachments } = useConfig();
@@ -262,7 +264,7 @@ export default function RegisterComplaintPage() {
                     <span
                       className={`text-[11px] ${current ? "font-bold text-slate-900" : done ? "font-semibold text-slate-700" : "font-semibold text-slate-400"}`}
                     >
-                      {s.label}
+                      {t(s.label)}
                     </span>
                   </button>
                 </li>
@@ -274,7 +276,7 @@ export default function RegisterComplaintPage() {
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="department" className="text-xs font-bold text-slate-900">
-                  Department <span className="text-red-500">*</span>
+                  {t("Department")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <FieldIcon>
@@ -291,7 +293,7 @@ export default function RegisterComplaintPage() {
                     className={`${fieldBox} appearance-none pr-10`}
                   >
                     <option value="" disabled>
-                      {departments ? "Choose a department" : "Loading…"}
+                      {departments ? t("Choose a department") : t("Loading…")}
                     </option>
                     {departments?.map((d) => (
                       <option key={d.id} value={d.id}>
@@ -307,7 +309,7 @@ export default function RegisterComplaintPage() {
 
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="category" className="text-xs font-bold text-slate-900">
-                  Category <span className="text-red-500">*</span>
+                  {t("Category")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <FieldIcon>
@@ -321,7 +323,7 @@ export default function RegisterComplaintPage() {
                     className={`${fieldBox} appearance-none pr-10`}
                   >
                     <option value="" disabled>
-                      Choose a category
+                      {t("Choose a category")}
                     </option>
                     {department?.categories.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -342,7 +344,7 @@ export default function RegisterComplaintPage() {
 
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="title" className="text-xs font-bold text-slate-900">
-                  Title <span className="text-red-500">*</span>
+                  {t("Title")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <FieldIcon>
@@ -362,7 +364,7 @@ export default function RegisterComplaintPage() {
 
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="description" className="text-xs font-bold text-slate-900">
-                  Description <span className="text-red-500">*</span>
+                  {t("Description")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <FieldIcon top>
@@ -383,7 +385,7 @@ export default function RegisterComplaintPage() {
 
               {/* Assigned Location Badge */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-900">Workplace / Location</label>
+                <label className="text-xs font-bold text-slate-900">{t("Location")}</label>
                 <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs">
                   <MapPin size={16} className="text-blue-600 shrink-0" aria-hidden="true" />
                   <div className="flex flex-col">

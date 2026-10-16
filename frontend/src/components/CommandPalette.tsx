@@ -162,8 +162,8 @@ export function CommandPalette() {
       items.push({
         id: "nav-escalated",
         category: "Navigation",
-        title: "Escalated Complaints",
-        description: "Tickets flagged for manager intervention or SLA breach",
+        title: "Delayed Complaints",
+        description: "Complaints that took too long and need quick action",
         icon: <Zap className="w-4 h-4 text-amber-600" />,
         onSelect: () => router.push("/escalated"),
       });

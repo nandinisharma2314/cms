@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { ComplaintStatus, PriorityRef } from "@/lib/api";
 import { useConfig } from "@/lib/config";
+import { useI18n } from "@/lib/i18n";
 import { STATUS_BADGE, TONE_BADGE } from "@/lib/status";
 
 /** Input styling without a width, for fields sized by the caller. */
@@ -45,10 +46,10 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between ">
+    <div className="flex flex-wrap pt-2 items-end justify-between ">
       <div className="min-w-0">
         <h1 className="text-xl sm:text-2xl mt-5 font-extrabold tracking-tight text-slate-900">{title}</h1>
-        {description && <p className="text-xs text-slate-500 font-medium ">{description}</p>}
+        {description && <p className="text-[11px] sm:text-xs text-slate-500 font-medium ">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -129,13 +130,14 @@ export function Field({
 }
 
 export function StatusPill({ active }: { active: boolean }) {
+  const { t } = useI18n();
   return (
     <span
       className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
         active ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-slate-100 text-slate-500 border-slate-200"
       }`}
     >
-      {active ? "Active" : "Inactive"}
+      {t(active ? "Active" : "Inactive")}
     </span>
   );
 }
@@ -147,19 +149,21 @@ export function PriorityBadge({
   priority: Pick<PriorityRef, "name" | "tone">;
   className?: string;
 }) {
+  const { t } = useI18n();
   return (
     <span
       className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-md whitespace-nowrap ${TONE_BADGE[priority.tone]} ${className}`}
     >
-      {priority.name}
+      {t(priority.name)}
     </span>
   );
 }
 
 export function StatusBadge({ status, label }: { status: ComplaintStatus; label: string }) {
+  const { t } = useI18n();
   return (
     <span className={`inline-block px-2.5 py-1 text-[11px] font-semibold rounded-md whitespace-nowrap ${STATUS_BADGE[status]}`}>
-      {label}
+      {t(label)}
     </span>
   );
 }
@@ -187,18 +191,19 @@ export function Pagination({
   noun: string;
   onPage: (page: number) => void;
 }) {
+  const { t } = useI18n();
   const pages = Math.max(1, Math.ceil(total / pageSize));
   if (total <= pageSize && page === 1) return null;
   return (
     <nav className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500" aria-label="Pagination">
       <span>
-        Page {page} of {pages} ({total.toLocaleString()} {noun})
+        {t("Page")} {page} {t("of")} {pages} ({total.toLocaleString()} {t(noun)})
       </span>
       <button className={secondaryButtonClass} disabled={page <= 1} onClick={() => onPage(page - 1)}>
-        Previous
+        {t("Previous")}
       </button>
       <button className={secondaryButtonClass} disabled={page >= pages} onClick={() => onPage(page + 1)}>
-        Next
+        {t("Next")}
       </button>
     </nav>
   );

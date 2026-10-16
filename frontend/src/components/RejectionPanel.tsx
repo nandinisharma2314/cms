@@ -6,6 +6,7 @@ import { api, ComplaintDetail, RejectionRequestItem } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { useAction } from "@/lib/hooks";
+import { useI18n } from "@/lib/i18n";
 import { ErrorBanner, Field, inputClass, primaryButtonClass, secondaryButtonClass, textareaClass } from "./ui";
 
 const STATUS_STYLE: Record<RejectionRequestItem["status"], string> = {
@@ -24,6 +25,7 @@ export function RejectionDecision({
   onDecided: (detail: ComplaintDetail) => void;
 }) {
   const { limits } = useConfig();
+  const { t } = useI18n();
   const [mode, setMode] = useState<"approve" | "deny" | null>(null);
   const [note, setNote] = useState("");
   const { busy, error, run } = useAction();
@@ -35,13 +37,13 @@ export function RejectionDecision({
           className={mode === "approve" ? primaryButtonClass : secondaryButtonClass}
           onClick={() => setMode(mode === "approve" ? null : "approve")}
         >
-          <Check className="w-3.5 h-3.5" /> Approve rejection
+          <Check className="w-3.5 h-3.5" /> {t("Approve rejection")}
         </button>
         <button
           className={mode === "deny" ? primaryButtonClass : secondaryButtonClass}
           onClick={() => setMode(mode === "deny" ? null : "deny")}
         >
-          <X className="w-3.5 h-3.5" /> Deny
+          <X className="w-3.5 h-3.5" /> {t("Deny")}
         </button>
       </div>
       {mode && (
@@ -61,7 +63,7 @@ export function RejectionDecision({
           }}
         >
           <Field
-            label={mode === "approve" ? "Message to the end user (optional)" : "Why is it denied? (sent to the requester)"}
+            label={mode === "approve" ? t("Message to the end user (optional)") : t("Why is it denied? (sent to the requester)")}
             hint={mode === "approve" ? `If left empty they see only the reason: ${request.category}` : undefined}
           >
             <textarea
@@ -74,7 +76,7 @@ export function RejectionDecision({
             />
           </Field>
           <button type="submit" className={primaryButtonClass} disabled={busy}>
-            {busy ? "Saving…" : mode === "approve" ? "Reject the complaint" : "Deny and send back"}
+            {busy ? t("Saving…") : mode === "approve" ? t("Reject the complaint") : t("Deny and send back")}
           </button>
         </form>
       )}
@@ -85,6 +87,7 @@ export function RejectionDecision({
 
 function RequestForm({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: (d: ComplaintDetail) => void }) {
   const { limits } = useConfig();
+  const { t } = useI18n();
   const reasons = detail.rejection.reasons;
   const [open, setOpen] = useState(false);
   const [reasonId, setReasonId] = useState<number | null>(null);
@@ -94,7 +97,7 @@ function RequestForm({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: 
   if (!open) {
     return (
       <button className={`${secondaryButtonClass} border-rose-200 text-rose-600 hover:bg-rose-50`} onClick={() => setOpen(true)}>
-        <Ban className="w-3.5 h-3.5" /> Request rejection
+        <Ban className="w-3.5 h-3.5" /> {t("Request rejection")}
       </button>
     );
   }
@@ -117,14 +120,14 @@ function RequestForm({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: 
       {reasons.length === 0 ? (
         <ErrorBanner message="No rejection reasons are set up yet. Ask the Super Admin to add them under Settings." />
       ) : (
-        <Field label="Reason">
+        <Field label={t("Reason")}>
           <select
             required
             className={inputClass}
             value={reasonId ?? ""}
             onChange={(e) => setReasonId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">Choose…</option>
+            <option value="">{t("Choose…")}</option>
             {reasons.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -133,7 +136,7 @@ function RequestForm({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: 
           </select>
         </Field>
       )}
-      <Field label={`Explain why (internal, at least ${limits.rejection_reason_min} characters)`}>
+      <Field label={`${t("Explain why")} (internal, at least ${limits.rejection_reason_min} characters)`}>
         <textarea
           rows={3}
           required
@@ -146,10 +149,10 @@ function RequestForm({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: 
       </Field>
       <div className="flex gap-2">
         <button type="button" className={secondaryButtonClass} onClick={() => setOpen(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
         <button type="submit" className={primaryButtonClass} disabled={busy || reasons.length === 0}>
-          {busy ? "Sending…" : "Send for approval"}
+          {busy ? t("Sending…") : t("Send for approval")}
         </button>
       </div>
       <ErrorBanner message={error} />
@@ -158,6 +161,7 @@ function RequestForm({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: 
 }
 
 export function RejectionPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: (d: ComplaintDetail) => void }) {
+  const { t } = useI18n();
   const withdraw = useAction();
   const pending = detail.rejection.requests.find((r) => r.status === "PENDING");
   const history = detail.rejection.requests.filter((r) => r.status !== "PENDING");
@@ -168,7 +172,7 @@ export function RejectionPanel({ detail, onUpdate }: { detail: ComplaintDetail; 
       {pending && (
         <div className="p-3 rounded-xl border border-fuchsia-100 bg-fuchsia-50/60 text-xs space-y-2">
           <div className="font-bold text-fuchsia-800">
-            Rejection requested by {pending.requested_by.name} ({pending.requested_by.role})
+            {t("Rejection requested by")} {pending.requested_by.name} ({pending.requested_by.role})
           </div>
           <div className="text-slate-700">
             <span className="font-semibold">{pending.category}.</span> {pending.reason}
@@ -184,7 +188,7 @@ export function RejectionPanel({ detail, onUpdate }: { detail: ComplaintDetail; 
               disabled={withdraw.busy}
               onClick={() => withdraw.run(async () => onUpdate(await api.rejections.withdraw(pending.id)))}
             >
-              <Undo2 className="w-3.5 h-3.5" /> Withdraw request
+              <Undo2 className="w-3.5 h-3.5" /> {t("Withdraw request")}
             </button>
           )}
           <ErrorBanner message={withdraw.error} />

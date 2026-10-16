@@ -16,6 +16,7 @@ import {
   Send,
   Star,
   Timer,
+  UserCheck,
   UserCircle2,
   Wand2,
 } from "lucide-react";
@@ -27,6 +28,8 @@ import { useAction, useApiData } from "@/lib/hooks";
 import { coversDepartment, treeInScope } from "@/lib/scope";
 import { useSession } from "@/lib/session";
 import { SLA_BADGE } from "@/lib/status";
+import { useI18n } from "@/lib/i18n";
+import { formatTimelineMessage } from "@/lib/timeline";
 import { findPath, LocationPicker } from "@/components/LocationPicker";
 import { RejectionPanel } from "@/components/RejectionPanel";
 import { RequirePermission } from "@/components/RequirePermission";
@@ -77,6 +80,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 function PotentialDuplicatesPanel({ complaintId }: { complaintId: string | number }) {
+  const { t } = useI18n();
   const { data: duplicates } = useApiData<PotentialDuplicate[]>(
     () => api.complaints.potentialDuplicates(complaintId),
     [complaintId],
@@ -88,10 +92,10 @@ function PotentialDuplicatesPanel({ complaintId }: { complaintId: string | numbe
     <Card className="p-4 rounded-2xl border-amber-200 bg-amber-50/50 space-y-2.5 shadow-2xs">
       <div className="flex items-center gap-2 text-amber-900">
         <span className="text-base">⚠️</span>
-        <h3 className="text-xs font-bold uppercase tracking-wider">Potential Duplicate Tickets Detected ({duplicates.length})</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider">{t("Potential Duplicate Tickets Detected")} ({duplicates.length})</h3>
       </div>
       <p className="text-[11px] text-slate-600 leading-relaxed">
-        Similar open complaints exist in this department. Review before dispatching duplicate staff:
+        {t("Similar open complaints exist in this department. Review before dispatching duplicate staff:")}
       </p>
       <div className="space-y-2">
         {duplicates.map((d) => (
@@ -110,12 +114,12 @@ function PotentialDuplicatesPanel({ complaintId }: { complaintId: string | numbe
                 <span className="text-xs font-semibold text-slate-800 truncate max-w-xs">{d.title}</span>
               </div>
               <p className="text-[10px] text-slate-400 mt-0.5">
-                {d.location_name ? `${d.location_name} • ` : ""}Status: {d.status}
+                {d.location_name ? `${d.location_name} • ` : ""}{t("Status")}: {t(d.status)}
               </p>
             </div>
             <div className="text-right shrink-0">
               <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                {d.similarity_score}% Match
+                {d.similarity_score}% {t("Match")}
               </span>
             </div>
           </div>
@@ -128,6 +132,7 @@ function PotentialDuplicatesPanel({ complaintId }: { complaintId: string | numbe
 /** Workflow buttons. Actions that take a note (and rejecting, which takes a reason) open a form first. */
 function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: Update }) {
   const { limits } = useConfig();
+  const { t } = useI18n();
   const [pending, setPending] = useState<WorkflowAction | null>(null);
   const [note, setNote] = useState("");
   const [reasonId, setReasonId] = useState<number | null>(null);
@@ -135,7 +140,7 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
   const reasons = detail.rejection.reasons;
 
   if (detail.actions.length === 0) {
-    return <p className="text-xs text-slate-400">No workflow actions are available to you for this complaint right now.</p>;
+    return <p className="text-xs text-slate-400">{t("No workflow actions are available to you for this complaint right now.")}</p>;
   }
   return (
     <div className="space-y-3 max-w-full">
@@ -148,10 +153,10 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
           setPending(e.target.value ? detail.actions.find((a) => a.key === e.target.value)! : null);
         }}
       >
-        <option value="">Select a workflow action...</option>
+        <option value="">{t("Select a workflow action...")}</option>
         {detail.actions.map((action) => (
           <option key={action.key} value={action.key}>
-            {action.label}
+            {t(action.label)}
           </option>
         ))}
       </select>
@@ -174,14 +179,14 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
             (reasons.length === 0 ? (
               <ErrorBanner message="No rejection reasons are set up yet. Ask the Super Admin to add them under Settings." />
             ) : (
-              <Field label="Reason">
+              <Field label={t("Reason")}>
                 <select
                   required
                   className={inputClass}
                   value={reasonId ?? ""}
                   onChange={(e) => setReasonId(e.target.value ? Number(e.target.value) : null)}
                 >
-                  <option value="">Choose…</option>
+                  <option value="">{t("Choose…")}</option>
                   {reasons.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name}
@@ -190,7 +195,7 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
                 </select>
               </Field>
             ))}
-          <Field label={pending.note_label}>
+          <Field label={t(pending.note_label)}>
             <textarea
               rows={3}
               required={pending.note === "required"}
@@ -202,14 +207,14 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
           </Field>
           <div className="flex justify-end gap-2">
             <button type="button" className={secondaryButtonClass} onClick={() => setPending(null)}>
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               type="submit"
               className={primaryButtonClass}
               disabled={busy || (pending.key === "reject" && reasons.length === 0)}
             >
-              {busy ? "Saving…" : pending.label}
+              {busy ? t("Saving…") : t(pending.label)}
             </button>
           </div>
         </form>
@@ -222,6 +227,7 @@ function ActionsPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
 function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: Update }) {
   const { me } = useSession();
   const { limits } = useConfig();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const { data: options, error: loadError } = useApiData(
     () => (open ? api.complaints.classificationOptions() : Promise.resolve(undefined)),
@@ -245,7 +251,7 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
         onClick={() => setOpen(true)}
       >
         <PencilLine className="w-3.5 h-3.5 shrink-0" />{" "}
-        <span className="flex-1">Change department, category, location or priority</span>
+        <span className="flex-1">{t("Change department, category, location or priority")}</span>
       </button>
     );
   }
@@ -280,7 +286,7 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field label="Department">
+            <Field label={t("Department")}>
               <select
                 className={inputClass}
                 value={departmentId}
@@ -299,7 +305,7 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
                 ))}
               </select>
             </Field>
-            <Field label="Category">
+            <Field label={t("Category")}>
               <select
                 required
                 className={inputClass}
@@ -311,7 +317,7 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
                   if (chosen) setPriorityId(chosen.default_priority.id);
                 }}
               >
-                <option value="">Choose…</option>
+                <option value="">{t("Choose…")}</option>
                 {categoryId !== null &&
                   categoryId === detail.category_id &&
                   !department?.categories.some((c) => c.id === categoryId) && (
@@ -324,21 +330,21 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
                 ))}
               </select>
             </Field>
-            <Field label="Priority">
+            <Field label={t("Priority")}>
               <select className={inputClass} value={priorityId} onChange={(e) => setPriorityId(Number(e.target.value))}>
                 {priorityId === detail.priority.id && !options.priorities.some((p) => p.id === priorityId) && (
-                  <option value={priorityId}>{detail.priority.name} (inactive)</option>
+                  <option value={priorityId}>{t(detail.priority.name)} (inactive)</option>
                 )}
                 {options.priorities.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {t(p.name)}
                   </option>
                 ))}
               </select>
             </Field>
           </div>
           <Field
-            label="Location"
+            label={t("Location")}
             hint={
               locationId === detail.location_detail.id && findPath(tree, locationId).length === 0
                 ? `Currently ${detail.location}, which is no longer offered; choose a location only to change it.`
@@ -347,7 +353,7 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
           >
             <LocationPicker value={locationId} onChange={setLocationId} />
           </Field>
-          <Field label="Reason for the change (kept on the internal timeline)">
+          <Field label={t("Reason for the change (kept on the internal timeline)")}>
             <textarea
               required
               rows={2}
@@ -361,10 +367,10 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
       )}
       <div className="flex justify-end gap-2">
         <button type="button" className={secondaryButtonClass} onClick={() => setOpen(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
         <button type="submit" className={primaryButtonClass} disabled={busy || !options}>
-          {busy ? "Saving…" : "Save changes"}
+          {busy ? t("Saving…") : t("Save")}
         </button>
       </div>
       <ErrorBanner message={error} />
@@ -373,49 +379,50 @@ function ReclassifyPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
 }
 
 function SlaClock({ label, state, due }: { label: string; state: SlaState; due: string | null }) {
+  const { t } = useI18n();
   if (!state) return null;
   const badge = SLA_BADGE[state];
   return (
     <div className="flex items-center justify-between gap-2">
       <div>
-        <div className="text-[11px] text-slate-400 font-medium">{label}</div>
+        <div className="text-[11px] text-slate-400 font-medium">{t(label)}</div>
         <div className="text-xs font-semibold text-slate-800">
-          {state === "met" || state === "met_late" ? "Done" : `Due ${formatDateTime(due)}`}
+          {state === "met" || state === "met_late" ? t("Done") : `${t("Due")} ${formatDateTime(due)}`}
         </div>
       </div>
-      <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${badge.className}`}>{badge.label}</span>
+      <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${badge.className}`}>{t(badge.label)}</span>
     </div>
   );
 }
 
 function SlaPanel({ detail }: { detail: ComplaintDetail }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-3">
       <SlaClock label="First response" state={detail.sla.response} due={detail.sla_due.response_due_at} />
       <SlaClock label="Resolution" state={detail.sla.resolution} due={detail.sla_due.resolution_due_at} />
-      {!detail.sla.response && !detail.sla.resolution && <p className="text-xs text-slate-400">No clock is running.</p>}
+      {!detail.sla.response && !detail.sla.resolution && <p className="text-xs text-slate-400">{t("No clock is running.")}</p>}
       {detail.sla_paused && (
-        <p className="text-[11px] text-violet-700">The resolution clock is paused while waiting for the end user.</p>
+        <p className="text-[11px] text-violet-700">{t("The resolution clock is paused while waiting for the end user.")}</p>
       )}
       {detail.escalation && (
         <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 text-xs">
           <div className="flex items-center gap-1.5 font-bold text-rose-800">
-            <ArrowUpCircle className="w-4 h-4" aria-hidden="true" /> Escalated (level {detail.escalation.level})
+            <ArrowUpCircle className="w-4 h-4" aria-hidden="true" /> {t("Delayed")} (Level {detail.escalation.level})
           </div>
           <div className="text-rose-900 mt-1">
-            {detail.escalation.to.name} ({detail.escalation.to.role}) is accountable for the missed {detail.escalation.type}{" "}
-            target.
+            {detail.escalation.to.name} ({t(detail.escalation.to.role)}) {t("is checking this delayed complaint.")}
           </div>
           <div className="text-[11px] text-rose-700 mt-1">
             {detail.escalation.next_at
-              ? `Escalates further ${formatDateTime(detail.escalation.next_at)} unless handled.`
-              : "The top of the escalation chain has been reached."}
+              ? `Will go to next manager on ${formatDateTime(detail.escalation.next_at)} if not solved.`
+              : "Sent to top management for final review."}
           </div>
         </div>
       )}
       {detail.escalations.length > 0 && (
         <details className="text-[11px] text-slate-500">
-          <summary className="cursor-pointer font-semibold text-slate-600">Escalation history</summary>
+          <summary className="cursor-pointer font-semibold text-slate-600">{t("Escalation history")}</summary>
           <ul className="mt-2 space-y-1.5">
             {detail.escalations.map((e, i) => (
               <li key={i}>
@@ -433,7 +440,8 @@ function SlaPanel({ detail }: { detail: ComplaintDetail }) {
 
 function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: Update }) {
   const { limits } = useConfig();
-  const { can } = useSession();
+  const { can, me } = useSession();
+  const { t } = useI18n();
   const { data: options, error: optionsError } = useApiData(
     () => (detail.can_assign ? api.complaints.assigneeOptions(detail.id) : Promise.resolve([])),
     [detail.id, detail.can_assign, detail.assignee?.id ?? null],
@@ -441,7 +449,16 @@ function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
   const [assigneeId, setAssigneeId] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const { busy, error, run } = useAction();
-  const candidates = (options ?? []).filter((o) => !o.is_current);
+  const isAssignedToMe = Boolean(me && detail.assignee && detail.assignee.id === me.id);
+  const rawCandidates = (options ?? []).filter((o) => !o.is_current);
+
+  // If "me" is in options and not current assignee, place "me" right at the top
+  const candidates = useMemo(() => {
+    if (!me) return rawCandidates;
+    const meCandidate = rawCandidates.find((c) => c.id === me.id);
+    const others = rawCandidates.filter((c) => c.id !== me.id);
+    return meCandidate ? [meCandidate, ...others] : others;
+  }, [rawCandidates, me]);
 
   const act = (call: () => Promise<ComplaintDetail>) =>
     run(async () => {
@@ -456,28 +473,51 @@ function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
         <UserCircle2 className="w-8 h-8 text-slate-300 shrink-0" aria-hidden="true" />
         {detail.assignee ? (
           <div>
-            <div className="text-xs font-bold text-slate-800">{detail.assignee.name}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-800">{detail.assignee.name}</span>
+              {isAssignedToMe && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  {t("Assigned to you")}
+                </span>
+              )}
+            </div>
             <div className="text-[11px] text-slate-400">
-              {detail.assignee.role} · since {formatDateTime(detail.assigned_at)}
+              {t(detail.assignee.role)} · since {formatDateTime(detail.assigned_at)}
             </div>
           </div>
         ) : (
-          <div className="text-xs font-semibold text-rose-600">Unassigned: waiting in the department queue</div>
+          <div className="text-xs font-semibold text-rose-600">{t("Not assigned yet: waiting in department queue")}</div>
         )}
       </div>
 
       {detail.can_assign && (
         <div className="space-y-2">
+          {/* Quick "Assign to me" button if not currently assigned to me */}
+          {!isAssignedToMe && me && (
+            <div className="flex items-center gap-2 pb-1 flex-wrap">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act(() => api.complaints.assign(detail.id, me.id, "Self-assigned"))}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>{t("Assign to me")}</span>
+              </button>
+              <span className="text-[11px] text-slate-400">{t("or assign to someone else below:")}</span>
+            </div>
+          )}
+
           <select
             className={inputClass}
             aria-label="Assign to"
             value={assigneeId ?? ""}
             onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">{detail.assignee ? "Reassign to…" : "Assign to…"}</option>
+            <option value="">{detail.assignee ? t("Choose staff member to reassign…") : t("Choose staff member to assign…")}</option>
             {candidates.map((o) => (
               <option key={o.id} value={o.id}>
-                {o.name} ({o.role}) · {o.workload} open{o.is_available ? "" : " · unavailable"}
+                {o.id === me?.id ? `${t("Assign to me")} (${o.name})` : o.name} ({t(o.role)}) · {o.workload} {t("open")}{o.is_available ? "" : ` · ${t("unavailable")}`}
               </option>
             ))}
           </select>
@@ -485,7 +525,7 @@ function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
             <input
               className={inputClass}
               maxLength={limits.assignment_reason}
-              placeholder="Reason (optional, internal)"
+              placeholder={t("Reason (optional)")}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
@@ -498,7 +538,7 @@ function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
                 assigneeId !== null && act(() => api.complaints.assign(detail.id, assigneeId, reason.trim() || null))
               }
             >
-              {detail.assignee ? "Reassign" : "Assign"}
+              {detail.assignee ? t("Reassign") : t("Assign")}
             </button>
             {!detail.assignee && can("complaint.assign") && (
               <button
@@ -506,12 +546,12 @@ function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
                 disabled={busy}
                 onClick={() => act(() => api.complaints.autoAssign(detail.id))}
               >
-                <Wand2 className="w-3.5 h-3.5" /> Route automatically
+                <Wand2 className="w-3.5 h-3.5" /> {t("Auto-assign staff")}
               </button>
             )}
           </div>
-          {options && candidates.length === 0 && (
-            <p className="text-[11px] text-slate-400">Nobody under you covers this department and location.</p>
+          {options && candidates.length === 0 && !isAssignedToMe && (
+            <p className="text-[11px] text-slate-400">{t("No other team member found for this department and location.")}</p>
           )}
         </div>
       )}
@@ -519,7 +559,7 @@ function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
 
       {detail.assignments.length > 0 && (
         <details className="text-[11px] text-slate-500">
-          <summary className="cursor-pointer font-semibold text-slate-600">Assignment history</summary>
+          <summary className="cursor-pointer font-semibold text-slate-600">{t("Assignment history")}</summary>
           <ul className="mt-2 space-y-1.5">
             {detail.assignments.map((a, i) => (
               <li key={i}>
@@ -539,6 +579,7 @@ function AssignmentPanel({ detail, onUpdate }: { detail: ComplaintDetail; onUpda
 
 function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate: Update }) {
   const { limits, attachments } = useConfig();
+  const { t } = useI18n();
   const fileInput = useRef<HTMLInputElement>(null);
   const [body, setBody] = useState("");
   const [internal, setInternal] = useState(false);
@@ -548,7 +589,7 @@ function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
 
   return (
     <div className="space-y-3">
-      {detail.comments.length === 0 && <p className="text-xs text-slate-400">No messages yet.</p>}
+      {detail.comments.length === 0 && <p className="text-xs text-slate-400">{t("No messages yet.")}</p>}
       {detail.comments.map((c) => (
         <div
           key={c.id}
@@ -563,12 +604,12 @@ function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
           <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
             <span className="font-semibold text-slate-800">
               {c.author_name}
-              {c.author_type === "end_user" && <span className="text-slate-400 font-normal"> · end user</span>}
+              {c.author_type === "end_user" && <span className="text-slate-400 font-normal"> · {t("end user")}</span>}
             </span>
             <span className="flex items-center gap-1 text-[10px] text-slate-400">
               {c.is_internal && (
                 <span className="inline-flex items-center gap-0.5 text-amber-700 font-semibold">
-                  <Lock className="w-3 h-3" aria-hidden="true" /> internal
+                  <Lock className="w-3 h-3" aria-hidden="true" /> {t("internal")}
                 </span>
               )}
               {formatDateTime(c.created_at)}
@@ -598,15 +639,15 @@ function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
             maxLength={limits.comment}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            aria-label={internal ? "Internal note" : "Reply to the end user"}
-            placeholder={internal ? "Internal note, for staff only…" : "Reply to the end user…"}
+            aria-label={internal ? t("Internal note") : t("Reply to the end user")}
+            placeholder={internal ? t("Internal note, for staff only…") : t("Reply to the end user…")}
             className={`${textareaClass} ${internal ? "border-amber-200 bg-amber-50/40" : ""}`}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
                 <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-                Internal note
+                {t("Internal note")}
               </label>
               {attachments.allowed_types.length > 0 && room !== null && room > 0 && (
                 <>
@@ -630,16 +671,16 @@ function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
                     onClick={() => fileInput.current?.click()}
                   >
                     <Paperclip className="w-3.5 h-3.5" />
-                    {files.length ? `${files.length} file${files.length > 1 ? "s" : ""}` : "Attach"}
+                    {files.length ? `${files.length} ${files.length > 1 ? t("files") : t("file")}` : t("Attach")}
                   </button>
                   <span className="text-[10px] text-slate-400">
-                    {room} more allowed{attachments.max_mb ? `, up to ${attachments.max_mb} MB each` : ""}
+                    {room} {t("more allowed")}{attachments.max_mb ? `, up to ${attachments.max_mb} MB each` : ""}
                   </span>
                 </>
               )}
             </div>
             <button type="submit" className={primaryButtonClass} disabled={busy}>
-              <Send className="w-3.5 h-3.5" /> {busy ? "Sending…" : internal ? "Add note" : "Send reply"}
+              <Send className="w-3.5 h-3.5" /> {busy ? t("Sending…") : internal ? t("Add note") : t("Send reply")}
             </button>
           </div>
           <ErrorBanner message={error} />
@@ -650,6 +691,7 @@ function Conversation({ detail, onUpdate }: { detail: ComplaintDetail; onUpdate:
 }
 
 function Timeline({ detail }: { detail: ComplaintDetail }) {
+  const { t } = useI18n();
   return (
     <ol className="relative border-l border-slate-200 ml-2 space-y-4">
       {[...detail.timeline].reverse().map((e) => (
@@ -658,15 +700,15 @@ function Timeline({ detail }: { detail: ComplaintDetail }) {
             className={`absolute -left-5.5 top-0.5 w-3 h-3 rounded-full border-2 border-white ${e.public ? "bg-blue-500" : "bg-slate-300"}`}
             aria-hidden="true"
           />
-          <div className="text-xs text-slate-800">{e.message}</div>
+          <div className="text-xs text-slate-800">{formatTimelineMessage(e.message, t)}</div>
           {e.note && (
             <div className="mt-1 text-[11px] text-red-600 bg-slate-50 rounded-md px-2 py-1 whitespace-pre-wrap">
               &ldquo;{e.note}&rdquo;
             </div>
           )}
           <div className="text-[10px] text-slate-400 mt-0.5">
-            {e.actor_name ?? "System"} · {formatDateTime(e.created_at)}
-            {!e.public && " · staff only"}
+            {e.actor_name ?? t("System")} · {formatDateTime(e.created_at)}
+            {!e.public && ` · ${t("staff only")}`}
           </div>
         </li>
       ))}
@@ -681,6 +723,7 @@ function ComplaintView() {
   useDocumentTitle(complaintId);
   const { ui } = useConfig();
   const { me } = useSession();
+  const { t } = useI18n();
   const { data: detail, error, setData, reload } = useApiData(() => api.complaints.get(complaintId), [complaintId]);
   const [activeTab, setActiveTab] = useState<"details" | "actions" | "conversation">("details");
 
@@ -691,7 +734,7 @@ function ComplaintView() {
   }, [reload, ui.complaint_refresh_seconds]);
 
   if (error && !detail) return <ErrorBanner message={error} />;
-  if (!detail) return <Spinner label="Loading complaint…" />;
+  if (!detail) return <Spinner label={t("Loading complaint…")} />;
 
   return (
     <>
@@ -699,7 +742,7 @@ function ComplaintView() {
         onClick={() => router.back()}
         className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-blue-600 mb-4"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> Back
+        <ArrowLeft className="w-3.5 h-3.5" /> {t("Back")}
       </button>
 
       <div>
@@ -708,7 +751,7 @@ function ComplaintView() {
           <StatusBadge status={detail.status} label={detail.status_label} />
           <PriorityBadge priority={detail.priority} className="text-[11px]" />
           {detail.reopen_count > 0 && (
-            <span className="text-[11px] text-orange-700 font-semibold">Reopened {detail.reopen_count}×</span>
+            <span className="text-[11px] text-orange-700 font-semibold">{t("Reopened")} {detail.reopen_count}×</span>
           )}
         </div>
         <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 mt-2 wrap-break-word">{detail.title}</h1>
@@ -717,13 +760,13 @@ function ComplaintView() {
 
       <div className="flex gap-2 mt-5 mb-5 overflow-x-auto pb-1">
         <button className={tabClass(activeTab === "details")} onClick={() => setActiveTab("details")}>
-          Details
+          {t("Details")}
         </button>
         <button className={tabClass(activeTab === "actions")} onClick={() => setActiveTab("actions")}>
-          Actions & Timeline
+          {t("Actions & Timeline")}
         </button>
         <button className={tabClass(activeTab === "conversation")} onClick={() => setActiveTab("conversation")}>
-          Conversation
+          {t("Conversation")}
         </button>
       </div>
 
@@ -740,7 +783,7 @@ function ComplaintView() {
               <AttachmentLinks attachments={detail.attachments.filter((a) => a.comment_id === null)} />
               {detail.resolution_note && (
                 <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-xs">
-                  <div className="font-semibold text-emerald-800">Resolution</div>
+                  <div className="font-semibold text-emerald-800">{t("Resolution")}</div>
                   <p className="text-emerald-900 mt-0.5 whitespace-pre-wrap">{detail.resolution_note}</p>
                 </div>
               )}
@@ -751,10 +794,10 @@ function ComplaintView() {
 
           <div className="lg:col-span-4 space-y-5">
             <Card className="p-5 grid grid-cols-2 gap-4">
-              <DetailRow label="Department">{detail.department}</DetailRow>
-              <DetailRow label="Category">{detail.category ?? "Not set"}</DetailRow>
+              <DetailRow label={t("Department")}>{detail.department}</DetailRow>
+              <DetailRow label={t("Category")}>{detail.category ?? t("Not set")}</DetailRow>
               <div className="col-span-2">
-                <DetailRow label="Location">
+                <DetailRow label={t("Location")}>
                   <div className="flex items-start gap-1.5 mt-1 rounded-lg">
                     <div className="text-[12px] leading-relaxed text-slate-600">
                       {detail.location_detail.label.split(" > ").map((part, index, array) => (
@@ -769,19 +812,19 @@ function ComplaintView() {
               </div>
               {(me.is_super_admin || me.role.key === "admin") && (
                 <>
-                  <DetailRow label="Reported by">{detail.end_user?.name ?? detail.end_user_name ?? "—"}</DetailRow>
-                  <DetailRow label="Contact">
+                  <DetailRow label={t("Reported by")}>{detail.end_user?.name ?? detail.end_user_name ?? "—"}</DetailRow>
+                  <DetailRow label={t("Contact")}>
                     {detail.end_user ? `${detail.end_user.mobile} · ${detail.end_user.email}` : (detail.end_user_phone ?? "—")}
                   </DetailRow>
                 </>
               )}
-              <DetailRow label="Registered">{formatDateTime(detail.created_at)}</DetailRow>
-              <DetailRow label="First response">{formatDateTime(detail.acknowledged_at)}</DetailRow>
-              <DetailRow label="Resolved">{formatDateTime(detail.resolved_at)}</DetailRow>
-              <DetailRow label="Closed">{formatDateTime(detail.closed_at)}</DetailRow>
+              <DetailRow label={t("Registered")}>{formatDateTime(detail.created_at)}</DetailRow>
+              <DetailRow label={t("First response")}>{formatDateTime(detail.acknowledged_at)}</DetailRow>
+              <DetailRow label={t("Resolved")}>{formatDateTime(detail.resolved_at)}</DetailRow>
+              <DetailRow label={t("Closed")}>{formatDateTime(detail.closed_at)}</DetailRow>
               {detail.feedback_rating !== null && (
                 <div className="col-span-2">
-                  <DetailRow label="End user rating">
+                  <DetailRow label={t("End user rating")}>
                     <span className="flex items-center gap-0.5" aria-label={`${detail.feedback_rating} out of 5`}>
                       {[1, 2, 3, 4, 5].map((n) => (
                         <Star
@@ -801,13 +844,13 @@ function ComplaintView() {
 
             <Card className="p-5">
               <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-                <Timer className="w-4 h-4 text-slate-400" aria-hidden="true" /> SLA
+                <Timer className="w-4 h-4 text-slate-400" aria-hidden="true" /> {t("SLA")}
               </h2>
               <SlaPanel detail={detail} />
             </Card>
 
             <Card className="p-5">
-              <h2 className="text-sm font-bold text-slate-800 mb-3">Assignment</h2>
+              <h2 className="text-sm font-bold text-slate-800 mb-3">{t("Assignment")}</h2>
               <AssignmentPanel detail={detail} onUpdate={setData} />
             </Card>
           </div>
@@ -817,7 +860,7 @@ function ComplaintView() {
       {activeTab === "actions" && (
         <div className="space-y-5 max-w-full">
           <Card className="p-5 space-y-4 max-w-full">
-            <h2 className="text-sm font-bold text-slate-800">Actions</h2>
+            <h2 className="text-sm font-bold text-slate-800">{t("Actions")}</h2>
 
             <ActionsPanel detail={detail} onUpdate={setData} />
 
@@ -834,7 +877,7 @@ function ComplaintView() {
 
           <Card className="p-5">
             <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-              <History className="w-4 h-4 text-slate-400" aria-hidden="true" /> Timeline
+              <History className="w-4 h-4 text-slate-400" aria-hidden="true" /> {t("Timeline")}
             </h2>
             <Timeline detail={detail} />
           </Card>
@@ -845,7 +888,7 @@ function ComplaintView() {
         <div className="max-w-4xl">
           <Card className="p-5">
             <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-              <MessageSquare className="w-4 h-4 text-slate-400" aria-hidden="true" /> Conversation
+              <MessageSquare className="w-4 h-4 text-slate-400" aria-hidden="true" /> {t("Conversation")}
             </h2>
             <Conversation detail={detail} onUpdate={setData} />
           </Card>

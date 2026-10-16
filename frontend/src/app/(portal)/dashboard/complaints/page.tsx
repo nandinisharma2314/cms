@@ -9,6 +9,7 @@ import { useConfig, useDocumentTitle } from "@/lib/portalConfig";
 import { formatDateTime, shortPlace } from "@/lib/portalFormat";
 import { useEndUser } from "@/lib/portalSession";
 import { departmentDot, GROUP_PILLS, TONE_PILLS } from "@/lib/portalStatus";
+import { useI18n } from "@/lib/i18n";
 
 const CARD = " bg-white shadow-[0_2px_14px_-6px_rgba(15,23,42,0.12)]";
 const GROUPS: (StatusGroup | "")[] = ["", "open", "in_progress", "resolved", "rejected"];
@@ -18,7 +19,8 @@ function isGroup(value: string | null): value is StatusGroup {
 }
 
 function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusGroup | ""; initialSearch: string }) {
-  useDocumentTitle("My complaints");
+  const { t } = useI18n();
+  useDocumentTitle(t("My complaints"));
   const { ui } = useConfig();
   const canCreate = useEndUser().can("portal.complaint.create");
   const [group, setGroup] = useState<StatusGroup | "">(initialGroup);
@@ -77,17 +79,17 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
       <div className="flex-col gap-3 p-2 pb-2 md:px-4">
         <div className={`${CARD} space-y-3 p-3 md:p-4`}>
           <label className="relative block">
-            <span className="sr-only">Search my complaints</span>
+            <span className="sr-only">{t("Search my complaints")}</span>
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title or complaint ID"
+              placeholder={t("Search by title or complaint ID")}
               className="h-11 w-full  border border-slate-200 bg-slate-50 pl-10 pr-4 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </label>
-          <div className="flex gap-2 relative overflow-x-auto pb-0.5" role="tablist" aria-label="Status">
+          <div className="flex gap-2 relative overflow-x-auto pb-0.5" role="tablist" aria-label={t("Status")}>
             {GROUPS.map((value) => (
               <button
                 key={value || "all"}
@@ -99,7 +101,7 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
                   group === value ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                {value ? GROUP_PILLS[value].label : "All"}
+                {value ? t(GROUP_PILLS[value].label) : t("All")}
               </button>
             ))}
           </div>
@@ -125,17 +127,17 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
             ) : items.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-[15px] font-semibold text-[#0b1a3f]">
-                  {term || group ? "Nothing matches" : "No complaints yet"}
+                  {term || group ? t("Nothing matches") : t("No complaints yet")}
                 </p>
                 <p className="mt-1 text-[13px] text-slate-500">
-                  {term || group ? "Try another search or status." : "When you register a complaint, you can follow it here."}
+                  {term || group ? t("Try another search or status.") : t("When you register a complaint, you can follow it here.")}
                 </p>
                 {canCreate && !term && !group && (
                   <Link
                     href="/dashboard/register"
                     className="mt-4 inline-block  bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white"
                   >
-                    Register a complaint
+                    {t("Register a complaint")}
                   </Link>
                 )}
               </div>
@@ -158,12 +160,12 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
                           <span
                             className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${GROUP_PILLS[c.status_group].className}`}
                           >
-                            {c.status_label}
+                            {t(c.status_label)}
                           </span>
                           <span
                             className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${TONE_PILLS[c.priority.tone]}`}
                           >
-                            {c.priority.name}
+                            {t(c.priority.name)}
                           </span>
                           <span className="text-[12px] text-slate-400">{formatDateTime(c.created_at)}</span>
                         </span>
@@ -180,7 +182,7 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
         {items && items.length > 0 && (
           <div className="flex flex-col items-center gap-2 pb-2 text-[13px] text-slate-500">
             <span>
-              Showing {items.length} of {total}
+              {t("Showing")} {items.length} {t("of")} {total}
             </span>
             {items.length < total && (
               <button
@@ -189,7 +191,7 @@ function ComplaintsList({ initialGroup, initialSearch }: { initialGroup: StatusG
                 disabled={loadingMore}
                 className=" border border-slate-200 bg-white px-5 py-2 font-semibold text-blue-600 hover:bg-slate-50 disabled:opacity-60"
               >
-                {loadingMore ? "Loading…" : "Show more"}
+                {loadingMore ? t("Loading…") : t("Show more")}
               </button>
             )}
           </div>

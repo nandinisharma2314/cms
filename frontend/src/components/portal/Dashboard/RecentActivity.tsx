@@ -19,6 +19,7 @@ import { Activity, api } from "@/lib/portalApi";
 import { useConfig } from "@/lib/portalConfig";
 import { formatWhen } from "@/lib/portalFormat";
 import { Dialog } from "@/components/portal/ui/Dialog";
+import { useI18n } from "@/lib/i18n";
 
 /** Icon and colour per kind of update (event types from the complaint timeline). */
 const KIND_STYLE: Record<string, { icon: React.ElementType; bg: string; color: string }> = {
@@ -58,6 +59,7 @@ function ActivityRow({ item, onOpen, compact }: { item: Activity; onOpen: (item:
 /** Recent public updates across the end user's complaints (the side panel on larger screens). */
 export default function RecentActivity() {
   const router = useRouter();
+  const { t } = useI18n();
   const { ui } = useConfig();
   const [items, setItems] = useState<Activity[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,12 +109,12 @@ export default function RecentActivity() {
     <>
       <div className="flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/40 p-3 px-4">
-          <h2 className="text-base font-bold text-slate-800">Recent activity</h2>
+          <h2 className="text-base font-bold text-slate-800">{t("Recent activity")}</h2>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={refresh}
-              aria-label="Refresh activity"
+              aria-label={t("Refresh activity")}
               className="rounded-md p-1 text-slate-400 transition-colors hover:bg-white hover:text-blue-600"
             >
               <RefreshCw size={13} className={refreshing ? "animate-spin text-blue-600" : ""} />
@@ -122,7 +124,7 @@ export default function RecentActivity() {
               onClick={openAll}
               className="ml-1 flex items-center text-xs font-bold text-blue-600 hover:text-blue-700"
             >
-              View all <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+              {t("View all")} <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -149,8 +151,8 @@ export default function RecentActivity() {
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
                 <ActivityIcon size={18} />
               </div>
-              <p className="text-xs font-bold text-slate-700">Nothing yet</p>
-              <p className="mt-0.5 text-[11px] text-slate-400">Updates on your complaints will show up here.</p>
+              <p className="text-xs font-bold text-slate-700">{t("Nothing yet")}</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">{t("Updates on your complaints will show up here.")}</p>
             </div>
           ) : (
             <ul className="flex flex-col gap-4">
@@ -166,15 +168,15 @@ export default function RecentActivity() {
 
       {allOpen && (
         <Dialog
-          title="All activity"
+          title={t("All activity")}
           icon={<ActivityIcon className="h-4 w-4 text-blue-600" />}
           onClose={() => setAllOpen(false)}
           wide
         >
           {!all ? (
-            <p className="py-8 text-center text-sm text-slate-400">Loading…</p>
+            <p className="py-8 text-center text-sm text-slate-400">{t("Loading…")}</p>
           ) : all.items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">Nothing yet.</p>
+            <p className="py-8 text-center text-sm text-slate-400">{t("Nothing yet.")}</p>
           ) : (
             <>
               <ul className="divide-y divide-slate-100">

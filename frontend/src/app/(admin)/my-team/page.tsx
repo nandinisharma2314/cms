@@ -19,6 +19,7 @@ import { api, ComplaintData, TeamDashboardResponse, TeamMemberPerformance, Staff
 import { useDocumentTitle } from "@/lib/config";
 import { formatDateTime } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
+import { useI18n } from "@/lib/i18n";
 
 import {
   Card,
@@ -97,6 +98,8 @@ function MemberComplaintsModal({
   const [reassignReason, setReassignReason] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const { t } = useI18n();
+
   React.useEffect(() => {
     let active = true;
     api.team.memberComplaints(member.id as number).then(
@@ -138,8 +141,8 @@ function MemberComplaintsModal({
 
   return (
     <Modal
-      title={`Active Complaints for ${member.name}`}
-      description={`${member.role} • ${member.current_active_complaints} active complaint(s)`}
+      title={`${t("Active Complaints for")} ${member.name}`}
+      description={`${member.role ? t(member.role) : ""} • ${member.current_active_complaints} ${t("active complaint(s)")}`}
       onClose={onClose}
       wide
     >
@@ -149,36 +152,36 @@ function MemberComplaintsModal({
           <form onSubmit={handleReassign} className="p-4 rounded-xl border border-sky-200 bg-sky-50/60 space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-slate-800">
-                Reassign Complaint: <span className="font-mono text-sky-700">{reassigning.id}</span>
+                {t("Reassign Complaint:")} <span className="font-mono text-sky-700">{reassigning.id}</span>
               </h4>
               <button type="button" className="text-xs text-slate-500 hover:text-slate-800" onClick={() => setReassigning(null)}>
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
             <p className="text-xs text-slate-600 line-clamp-1">{reassigning.title}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Reassign To (Team Member)">
+              <Field label={t("Reassign To (Team Member)")}>
                 <select
                   required
                   className={inputClass}
                   value={newAssigneeId}
                   onChange={(e) => setNewAssigneeId(e.target.value ? Number(e.target.value) : "")}
                 >
-                  <option value="">Select team member…</option>
+                  <option value="">{t("Select team member…")}</option>
                   {teamMembers
                     .filter((m) => m.id !== member.id && m.is_active)
                     .map((m) => (
                       <option key={m.id} value={m.id as number}>
-                        {m.name} ({m.role}) — {m.current_active_complaints} active
+                        {m.name} {m.role ? `(${t(m.role)})` : ""} — {m.current_active_complaints} {t("active")}
                       </option>
                     ))}
                 </select>
               </Field>
-              <Field label="Reason for Reassignment (optional)">
+              <Field label={t("Reason for Reassignment (optional)")}>
                 <input
                   maxLength={255}
                   className={inputClass}
-                  placeholder="e.g. Workload rebalancing"
+                  placeholder={t("e.g. Workload rebalancing")}
                   value={reassignReason}
                   onChange={(e) => setReassignReason(e.target.value)}
                 />
@@ -186,19 +189,19 @@ function MemberComplaintsModal({
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" className={secondaryButtonClass} onClick={() => setReassigning(null)}>
-                Cancel
+                {t("Cancel")}
               </button>
               <button type="submit" className={primaryButtonClass} disabled={saving || !newAssigneeId}>
-                {saving ? "Reassigning…" : "Confirm Reassignment"}
+                {saving ? t("Reassigning…") : t("Confirm Reassignment")}
               </button>
             </div>
           </form>
         ) : null}
 
         {loading ? (
-          <div className="py-8 text-center text-xs text-slate-400">Loading complaints…</div>
+          <div className="py-8 text-center text-xs text-slate-400">{t("Loading complaints…")}</div>
         ) : !complaints || complaints.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-400">No complaints currently assigned to this member.</div>
+          <div className="py-8 text-center text-xs text-slate-400">{t("No complaints currently assigned to this member.")}</div>
         ) : (
           <div className="divide-y divide-slate-100 border rounded-xl overflow-hidden">
             {complaints.map((c) => (
@@ -207,17 +210,17 @@ function MemberComplaintsModal({
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-mono text-xs font-bold text-slate-800">{c.id}</span>
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                      {c.status}
+                      {t(c.status)}
                     </span>
                     <span
                       className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${c.priority.tone === "danger" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}
                     >
-                      {c.priority.name}
+                      {t(c.priority.name)}
                     </span>
                   </div>
                   <div className="text-xs font-medium text-slate-800 truncate">{c.title}</div>
                   <div className="text-[11px] text-slate-400 mt-0.5">
-                    {c.department} • {c.location} • Filed {formatDateTime(c.created_at)}
+                    {c.department} • {c.location} • {formatDateTime(c.created_at)}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -230,7 +233,7 @@ function MemberComplaintsModal({
                       setReassignReason("");
                     }}
                   >
-                    <ArrowRightLeft className="w-3.5 h-3.5" /> Reassign
+                    <ArrowRightLeft className="w-3.5 h-3.5" /> {t("Reassign")}
                   </button>
                   <Link
                     href={`/complaints/${c.id}`}
@@ -259,10 +262,11 @@ function getInitials(name: string) {
 }
 
 function AgentEndUsers() {
+  const { t } = useI18n();
   const { data, loading, error } = useApiData(() => api.endUsers.list({ page_size: 50 }), []);
 
   if (loading) {
-    return <div className="py-12 text-center text-sm text-slate-500">Loading end users...</div>;
+    return <div className="py-12 text-center text-sm text-slate-500">{t("Loading end users...")}</div>;
   }
 
   if (error) {
@@ -274,7 +278,7 @@ function AgentEndUsers() {
   if (endUsers.length === 0) {
     return (
       <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
-        No end users found in your location.
+        {t("No end users found in your location.")}
       </div>
     );
   }
@@ -285,9 +289,9 @@ function AgentEndUsers() {
         <table className="w-full text-left text-[11px] text-slate-600">
           <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
             <tr>
-              <th className="px-2 py-2">End User Name</th>
-              <th className="px-2 py-2">Mobile</th>
-              <th className="px-2 py-2 hidden sm:table-cell">Email</th>
+              <th className="px-2 py-2">{t("End User Name")}</th>
+              <th className="px-2 py-2">{t("Mobile")}</th>
+              <th className="px-2 py-2 hidden sm:table-cell">{t("Email")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -319,7 +323,8 @@ function AgentEndUsers() {
 }
 
 export default function TeamsPage() {
-  useDocumentTitle("Teams");
+  const { t } = useI18n();
+  useDocumentTitle(t("Teams"));
   const [directOnly, setDirectOnly] = useState(false);
 
   const [periodPreset, setPeriodPreset] = useState<"7" | "30" | "90" | "custom">("30");
@@ -410,8 +415,8 @@ export default function TeamsPage() {
   return (
     <div className="space-y-4 -mt-5 sm:-mt-2">
       <PageHeader
-        title="Team"
-        description="Live supervision portal: monitor team performance, workload distribution, and SLA adherence."
+        title={t("Team")}
+        description={t("Live supervision portal: monitor team performance, workload distribution, and SLA adherence.")}
         actions={
           <div className="flex flex-wrap items-center gap-2 pb-1 sm:pb-0 justify-end w-full sm:w-auto">
             {/* Custom Date Filters */}
@@ -422,7 +427,7 @@ export default function TeamsPage() {
                   value={customDateFrom}
                   onChange={(e) => setCustomDateFrom(e.target.value)}
                   className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
-                  placeholder="From"
+                  placeholder={t("From")}
                 />
                 <span className="text-slate-300">-</span>
                 <input
@@ -430,7 +435,7 @@ export default function TeamsPage() {
                   value={customDateTo}
                   onChange={(e) => setCustomDateTo(e.target.value)}
                   className="text-xs border-none bg-slate-50 focus:ring-sky-500 rounded-lg p-1.5 w-28 text-slate-600"
-                  placeholder="To"
+                  placeholder={t("To")}
                 />
               </div>
             )}
@@ -443,7 +448,7 @@ export default function TeamsPage() {
 
       {viewMode === "overview" ? (
         <div className="space-y-4">
-          <h2 className="text-lg font-bold text-slate-800">Teams Overview</h2>
+          <h2 className="text-lg font-bold text-slate-800">{t("Teams Overview")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredManagers?.map((manager) => (
               <Card
@@ -460,16 +465,16 @@ export default function TeamsPage() {
                         href={`/users/staff/${manager.id}`}
                         className="font-bold text-slate-900 hover:text-sky-700 hover:underline line-clamp-1"
                       >
-                        {manager.primary_department?.name || manager.name}&apos;s Team
+                        {manager.primary_department?.name || manager.name} {t("Team")}
                       </Link>
-                      <p className="text-xs font-medium text-slate-500 line-clamp-1">{manager.role.name}</p>
+                      <p className="text-xs font-medium text-slate-500 line-clamp-1">{t(manager.role.name)}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-lg border border-slate-100 p-3 text-xs text-slate-600 flex flex-col gap-2.5 mt-1">
                   <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-400 font-medium">Team Lead:</span>
+                    <span className="text-slate-400 font-medium">{t("Team Lead:")}</span>
                     <Link
                       href={`/users/staff/${manager.id}`}
                       className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
@@ -479,7 +484,7 @@ export default function TeamsPage() {
                   </div>
                   {manager.reports_to && (
                     <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                      <span className="text-slate-400 font-medium">Manager:</span>
+                      <span className="text-slate-400 font-medium">{t("Manager:")}</span>
                       <Link
                         href={`/users/staff/${manager.reports_to.id}`}
                         className="font-semibold text-slate-800 hover:text-sky-700 hover:underline"
@@ -490,7 +495,7 @@ export default function TeamsPage() {
                   )}
                   <div className="flex items-center gap-2 pt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="truncate font-medium">{manager.primary_location?.name || "Global / Multiple"}</span>
+                    <span className="truncate font-medium">{manager.primary_location?.name || t("Global / Multiple")}</span>
                   </div>
                 </div>
 
@@ -503,20 +508,20 @@ export default function TeamsPage() {
                     }}
                     className={primaryButtonClass + " !py-2 flex justify-center text-xs"}
                   >
-                    View Members
+                    {t("View Members")}
                   </button>
                   <Link
                     href={`/users/staff/${manager.id}`}
                     className={secondaryButtonClass + " !py-2 flex justify-center text-xs bg-white hover:bg-slate-50"}
                   >
-                    Lead Profile
+                    {t("Lead Profile")}
                   </Link>
                 </div>
               </Card>
             ))}
             {filteredManagers?.length === 0 && (
               <div className="col-span-full py-12 text-center text-slate-500 bg-white border border-dashed rounded-xl">
-                No teams found matching your filters.
+                {t("No teams found matching your filters.")}
               </div>
             )}
           </div>
@@ -533,7 +538,7 @@ export default function TeamsPage() {
                 }}
                 className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" /> Back to Teams Overview
+                <ArrowLeft className="w-4 h-4" /> {t("Back to Teams Overview")}
               </button>
             </div>
           )}
@@ -541,25 +546,25 @@ export default function TeamsPage() {
           {/* Aggregated KPI Cards */}
           {agg ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-              <KpiTile label="Team Size" value={data.team_size} subtext="Supervised staff" icon={Users} tone="info" />
+              <KpiTile label={t("Team Size")} value={data.team_size} subtext={t("Supervised staff")} icon={Users} tone="info" />
               <KpiTile
-                label="Active Pending"
+                label={t("Active Pending")}
                 value={agg.pending}
-                subtext={`${agg.total_assigned} total`}
+                subtext={`${agg.total_assigned} ${t("total")}`}
                 icon={Clock}
                 tone={agg.pending > 15 ? "warning" : "neutral"}
               />
               <KpiTile
-                label="Resolved"
+                label={t("Resolved")}
                 value={agg.resolved}
-                subtext={`${agg.avg_resolution_hours ?? "—"}h avg res.`}
+                subtext={`${agg.avg_resolution_hours ?? "—"}${t("h avg res.")}`}
                 icon={CheckCircle2}
                 tone="success"
               />
               <KpiTile
-                label="Response SLA"
+                label={t("Response SLA")}
                 value={agg.response_sla_pct !== null ? `${agg.response_sla_pct}%` : "—"}
-                subtext={`${agg.avg_response_hours ?? "—"}h avg`}
+                subtext={`${agg.avg_response_hours ?? "—"}${t("h avg")}`}
                 icon={Timer}
                 tone={
                   agg.response_sla_pct === null
@@ -572,9 +577,9 @@ export default function TeamsPage() {
                 }
               />
               <KpiTile
-                label="Resolution SLA"
+                label={t("Resolution SLA")}
                 value={agg.resolution_sla_pct !== null ? `${agg.resolution_sla_pct}%` : "—"}
-                subtext={`${agg.sla_breaches} breaches`}
+                subtext={`${agg.sla_breaches} ${t("breaches")}`}
                 icon={ShieldCheck}
                 tone={
                   agg.resolution_sla_pct === null
@@ -587,9 +592,9 @@ export default function TeamsPage() {
                 }
               />
               <KpiTile
-                label="Customer Rating"
+                label={t("Customer Rating")}
                 value={agg.avg_rating !== null ? `${agg.avg_rating} / 5` : "—"}
-                subtext={`${agg.reopen_pct ?? 0}% reopen`}
+                subtext={`${agg.reopen_pct ?? 0}% ${t("reopen")}`}
                 icon={Star}
                 tone={agg.avg_rating && agg.avg_rating >= 4 ? "success" : "neutral"}
               />
@@ -600,7 +605,7 @@ export default function TeamsPage() {
           <div className="space-y-4">
             {loading ? (
               <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
-                Loading team performance...
+                {t("Loading team performance...")}
               </div>
             ) : !data || filteredMembers?.length === 0 ? (
               <>
@@ -608,7 +613,7 @@ export default function TeamsPage() {
                   <AgentEndUsers />
                 ) : (
                   <div className="py-12 text-center text-sm text-slate-500 bg-white border border-dashed rounded-xl">
-                    No members match the selected filters.
+                    {t("No members match the selected filters.")}
                   </div>
                 )}
               </>
@@ -617,11 +622,11 @@ export default function TeamsPage() {
                 <table className="w-full text-left text-sm text-slate-600">
                   <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     <tr>
-                      <th className="px-4 py-3">Member</th>
-                      <th className="px-4 py-3 hidden sm:table-cell">Role</th>
-                      <th className="px-4 py-3 hidden md:table-cell">Location</th>
-                      <th className="px-4 py-3 text-center">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                      <th className="px-4 py-3">{t("Member")}</th>
+                      <th className="px-4 py-3 hidden sm:table-cell">{t("Role")}</th>
+                      <th className="px-4 py-3 hidden md:table-cell">{t("Location")}</th>
+                      <th className="px-4 py-3 text-center">{t("Status")}</th>
+                      <th className="px-4 py-3 text-right">{t("Actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -636,28 +641,32 @@ export default function TeamsPage() {
                               <div className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-700 transition-colors">
                                 {m.name}
                               </div>
-                              <div className="text-[11px] sm:hidden font-semibold text-blue-600 mt-0.5 truncate">{m.role}</div>
+                              <div className="text-[11px] sm:hidden font-semibold text-blue-600 mt-0.5 truncate">
+                                {m.role ? t(m.role) : ""}
+                              </div>
                             </div>
                           </Link>
                         </td>
-                        <td className="px-4 py-3 hidden sm:table-cell text-xs font-medium text-slate-700">{m.role}</td>
+                        <td className="px-4 py-3 hidden sm:table-cell text-xs font-medium text-slate-700">
+                          {m.role ? t(m.role) : ""}
+                        </td>
                         <td className="px-4 py-3 hidden md:table-cell text-xs text-slate-500">
                           <div className="flex items-center gap-1">
                             <MapPin className="w-3.5 h-3.5" />
-                            <span className="truncate">{m.primary_location?.name || "Global / Multiple"}</span>
+                            <span className="truncate">{m.primary_location?.name || t("Global / Multiple")}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             type="button"
                             onClick={() => toggleAvailability(m)}
-                            title={`Click to toggle availability. Currently ${m.is_available ? "Online" : "Away"}`}
+                            title={`Click to toggle availability. Currently ${m.is_available ? t("Online") : t("Away")}`}
                             className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors text-xs font-medium"
                           >
                             <span
                               className={`flex w-2.5 h-2.5 rounded-full shadow-sm ${m.is_available ? "bg-emerald-500" : "bg-amber-500"}`}
                             />
-                            {m.is_available ? "Online" : "Away"}
+                            {m.is_available ? t("Online") : t("Away")}
                           </button>
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -666,7 +675,7 @@ export default function TeamsPage() {
                             className="text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors shadow-xs"
                             onClick={() => setSelectedMember(m)}
                           >
-                            Manage
+                            {t("Manage")}
                           </button>
                         </td>
                       </tr>

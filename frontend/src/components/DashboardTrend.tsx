@@ -3,17 +3,19 @@ import { api, DashboardStats } from "@/lib/api";
 import { useConfig } from "@/lib/config";
 import { formatDay } from "@/lib/format";
 import { useApiData } from "@/lib/hooks";
+import { useI18n } from "@/lib/i18n";
 import { TREND_COLORS, TrendLineChart } from "./reports/TrendLineChart";
 import { CardDateFilter, DateRange } from "./CardDateFilter";
 
-const SERIES = [
-  { key: "received", label: "Received", color: TREND_COLORS[0] },
-  { key: "resolved", label: "Resolved", color: TREND_COLORS[2] },
-];
-
 export function DashboardTrend({ trend, loading }: { trend: DashboardStats["trend"] | undefined; loading: boolean }) {
   const { ui } = useConfig();
+  const { t } = useI18n();
   const [dateRange, setDateRange] = useState<DateRange>(null);
+
+  const series = [
+    { key: "received", label: t("Received"), color: TREND_COLORS[0] },
+    { key: "resolved", label: t("Resolved"), color: TREND_COLORS[2] },
+  ];
 
   const customStats = useApiData(
     () => (dateRange ? api.complaints.stats(dateRange) : Promise.resolve(undefined)),
@@ -26,7 +28,7 @@ export function DashboardTrend({ trend, loading }: { trend: DashboardStats["tren
   const title =
     dateRange && dateRange.date_from && dateRange.date_to
       ? `${formatDay(dateRange.date_from)} - ${formatDay(dateRange.date_to)}`
-      : `Last ${ui.dashboard_trend_days} days`;
+      : t("Last {days} days", { days: ui.dashboard_trend_days });
 
   return (
     <div className="flex flex-col p-5 sm:p-6 bg-white border border-slate-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.04)] h-full transition-shadow hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
@@ -39,7 +41,7 @@ export function DashboardTrend({ trend, loading }: { trend: DashboardStats["tren
       ) : (
         <TrendLineChart
           points={activeTrend.map((p) => ({ ...p, label: formatDay(p.date) }))}
-          series={SERIES}
+          series={series}
           height={180}
           ariaLabel="Complaints received and resolved per day; use the arrow keys to read values."
         />
