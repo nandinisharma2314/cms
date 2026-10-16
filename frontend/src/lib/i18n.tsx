@@ -44,7 +44,7 @@ interface I18nContextValue {
   languages: Language[];
   popularLanguages: Language[];
   setLanguage: (code: string) => void;
-  t: (key: string, paramsOrFallback?: string | TranslationParams) => string;
+  t: (key: string, paramsOrFallback?: string | TranslationParams, maybeParams?: TranslationParams) => string;
   isModalOpen: boolean;
   openLanguageModal: () => void;
   closeLanguageModal: () => void;
@@ -95,39 +95,44 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   // Pure local translation function - 100% reactive, zero DOM mutations
   const t = useCallback(
-    (key: string, paramsOrFallback?: string | TranslationParams): string => {
+    (key: string, paramsOrFallback?: string | TranslationParams, maybeParams?: TranslationParams): string => {
       if (!key) return "";
 
-      const interpolate = (template: string, params?: TranslationParams) => {
-        if (!params) return template;
+      const interpolate = (template: string, p?: TranslationParams) => {
+        if (!p) return template;
         let out = template;
-        for (const [pKey, pVal] of Object.entries(params)) {
+        for (const [pKey, pVal] of Object.entries(p)) {
           out = out.replaceAll(`{${pKey}}`, String(pVal));
         }
         return out;
       };
 
-      const params = typeof paramsOrFallback === "object" && paramsOrFallback !== null ? paramsOrFallback : undefined;
+      const params = typeof paramsOrFallback === "object" && paramsOrFallback !== null ? paramsOrFallback : maybeParams;
       const fallback = typeof paramsOrFallback === "string" ? paramsOrFallback : undefined;
 
-      if (langCode === "en") {
-        return interpolate(fallback || key, params);
+      const dict = DICTIONARIES[langCode];
+      const trimmed = key.trim();
+
+      // 1. Direct match in current language dictionary
+      if (dict && dict[key] !== undefined) return interpolate(dict[key], params);
+
+      // 2. Trimmed match in current language dictionary
+      if (dict && dict[trimmed] !== undefined) return interpolate(dict[trimmed], params);
+
+      // 3. Lowercase match in current language dictionary
+      const lower = LOWER_DICTS[langCode]?.get(trimmed.toLowerCase());
+      if (lower !== undefined) return interpolate(lower, params);
+
+      // 4. Fallback to English dictionary if current language is not English
+      if (langCode !== "en") {
+        const enDict = DICTIONARIES.en;
+        if (enDict && enDict[key] !== undefined) return interpolate(enDict[key], params);
+        if (enDict && enDict[trimmed] !== undefined) return interpolate(enDict[trimmed], params);
+        const enLower = LOWER_DICTS.en?.get(trimmed.toLowerCase());
+        if (enLower !== undefined) return interpolate(enLower, params);
       }
 
-      const dict = DICTIONARIES[langCode];
-      if (!dict) return interpolate(fallback || key, params);
-
-      // 1. Direct match
-      if (dict[key]) return interpolate(dict[key], params);
-
-      // 2. Trimmed match
-      const trimmed = key.trim();
-      if (dict[trimmed]) return interpolate(dict[trimmed], params);
-
-      // 3. Lowercase match
-      const lower = LOWER_DICTS[langCode]?.get(trimmed.toLowerCase());
-      if (lower) return interpolate(lower, params);
-
+      // 5. Explicit fallback or key itself
       return interpolate(fallback || key, params);
     },
     [langCode],

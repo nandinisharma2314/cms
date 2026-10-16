@@ -31,7 +31,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  useDocumentTitle(filters.escalated === "any" ? t("complaints.all_delayed_title") : t("complaints.delayed_title"));
+  useDocumentTitle(filters.escalated === "any" ? t("All Delayed Complaints") : t("Delayed Complaints"));
 
   const search = useDebounced(filters.search.trim());
   const set = (patch: Partial<ComplaintFilters>) => {
@@ -112,11 +112,11 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
     <div className="flex flex-col h-[calc(100vh-130px)] -mt-5 sm:-mt-2">
       <div className="shrink-0">
         <PageHeader
-          title={filters.escalated === "any" ? t("complaints.all_delayed_title") : t("complaints.delayed_title")}
+          title={filters.escalated === "any" ? t("All Delayed Complaints") : t("Delayed Complaints")}
           description={
             filters.escalated === "any"
-              ? t("complaints.all_delayed_subtitle")
-              : t("complaints.delayed_subtitle")
+              ? t("All complaints in your department that took too long.")
+              : t("Complaints that took too long and need action now.")
           }
         />
       </div>
@@ -133,7 +133,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            {t("complaints.my_team")}
+            {t("My Team")}
           </button>
           <button
             type="button"
@@ -144,7 +144,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            {t("complaints.all_department")}
+            {t("All Department")}
           </button>
         </div>
 
@@ -156,8 +156,8 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
               <input
                 type="search"
                 className="w-full h-10 pl-9 pr-3 text-xs font-medium bg-white border border-slate-200 text-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400"
-                placeholder={t("complaints.search_placeholder")}
-                aria-label={t("complaints.delayed_title")}
+                placeholder={t("Search complaints...")}
+                aria-label={t("Delayed Complaints")}
                 value={filters.search}
                 onChange={(e) => set({ search: e.target.value })}
               />
@@ -174,7 +174,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
               }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>{t("complaints.filters")}</span>
+              <span>{t("Filters")}</span>
               {activeCount > 0 && (
                 <span
                   className={`inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
@@ -296,7 +296,7 @@ function EscalatedList({ initial }: { initial: ComplaintFilters }) {
             {/* Assignment filter chip */}
             {filters.assigned && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-semibold">
-                <span>{filters.assigned === "me" ? t("complaints.assigned_to_you") : t("Unassigned")}</span>
+                <span>{filters.assigned === "me" ? t("Assigned to you") : t("Unassigned")}</span>
                 <button
                   type="button"
                   onClick={() => set({ assigned: "" })}
